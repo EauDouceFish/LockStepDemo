@@ -34,5 +34,8 @@ sysinfo.txt
 [Bb]in/
 TestResults/
 
+# 但手写的测试工程 csproj 必须入库（覆盖上面 *.csproj 的忽略）
+!Tests/**/*.csproj
+
 # 原始 MUGEN 素材（体积大，放在仓库外 ../MugenSource，不入库）
 /MugenSource/

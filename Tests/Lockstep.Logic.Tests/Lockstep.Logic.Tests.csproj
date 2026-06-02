@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    脱 Unity 的逻辑层测试工程。
+    Logic 层是 asmdef `Lockstep.Logic`(noEngineReferences)，纯 C# 无 Unity 依赖，
+    故可直接把其源码 + FixedMath(Fix64) 源码编进本工程，用 `dotnet test` 秒级跑。
+    这是多 agent TDD 的底座：agent 验收只跑 dotnet test，不必开 Unity。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Lockstep.Logic.Tests</AssemblyName>
+    <RootNamespace>Lockstep.Tests</RootNamespace>
+    <!-- 把 Unity 工程的源码作为 link 编入；下面显式 Include -->
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Unity 逻辑层源码（纯 C#，无 UnityEngine 引用） -->
+    <Compile Include="..\..\Assets\Logic\**\*.cs">
+      <Link>LogicSrc\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+    <!-- 定点数底层 Fix64 -->
+    <Compile Include="..\..\Assets\Plugins\FixedMath\**\*.cs">
+      <Link>FixedMathSrc\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+
+</Project>
