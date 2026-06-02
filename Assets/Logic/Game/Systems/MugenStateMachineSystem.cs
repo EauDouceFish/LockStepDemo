@@ -106,6 +106,14 @@ namespace Lockstep.Game.Systems
             state.StateNo = target;
             state.Time = 0;
 
+            // 切状态即停用上一招的 HitDef（防止攻击框跨状态残留命中）
+            HitDefStateC hitDef = entity.Get<HitDefStateC>();
+            if (hitDef != null)
+            {
+                hitDef.Active = false;
+                hitDef.HitTargetsBits = 0;
+            }
+
             if (!character.States.TryGetValue(target, out StateDef stateDef))
             {
                 return;

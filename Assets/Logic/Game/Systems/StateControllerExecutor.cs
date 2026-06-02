@@ -161,6 +161,18 @@ namespace Lockstep.Game.Systems
                     return false;
                 }
 
+                case ControllerType.HitDef:
+                {
+                    HitDefStateC hitDef = entity.Get<HitDefStateC>();
+                    if (hitDef != null && controller.Hit != null)
+                    {
+                        hitDef.Active = true;
+                        hitDef.Current = controller.Hit;
+                        hitDef.HitTargetsBits = 0;   // 新一次 HitDef：清已命中目标，可重新命中
+                    }
+                    return false;
+                }
+
                 default:
                     // Null / NotImplemented / 尚未支持的类型：空操作
                     return false;
