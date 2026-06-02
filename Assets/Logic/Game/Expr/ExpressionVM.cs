@@ -14,10 +14,10 @@ namespace Lockstep.Game.Expr
     }
 
     /// <summary>
-    /// 最小但"形状正确"的表达式 VM：tokenize → 递归下降 parse → AST → 定点求值。
-    /// v1 支持：整数常量、标识符(trigger)、比较(= != &lt; &lt;= &gt; &gt;=)、四则(+ - * / %)、一元负号、括号。
-    /// 扩展方式：加 trigger = 在 IEvalContext 多解析一个名字；加运算/函数 = 加 AST 节点。
-    /// 故意不硬编码任何具体 trigger —— 保证能编译任意 CNS 表达式（避免"形状捷径"烂尾，见架构设计 §12）。
+    /// 表达式 VM：tokenize → 递归下降 parse → AST → 定点求值。
+    /// 支持：整数常量、标识符(trigger)、带参调用(var(n)/abs(x)/ifelse(c,a,b)/min/max)、
+    /// 逻辑(|| &amp;&amp; !)、比较(= != &lt; &lt;= &gt; &gt;=)、四则(+ - * / %)、一元负号、括号。
+    /// 不硬编码具体 trigger（由 IEvalContext 解析）——能编译任意 CNS 表达式（避免形状捷径）。
     /// 全程 FFloat，无 float、无随机 → 确定性。
     /// </summary>
     public sealed class ExpressionVM : IExpressionVM
@@ -38,7 +38,7 @@ namespace Lockstep.Game.Expr
 
         // ───────────────────── 词法 ─────────────────────
 
-        enum TokenKind { Number, Identifier, Operator, LeftParen, RightParen, End }
+        enum TokenKind { Number, Identifier, Operator, LeftParen, RightParen, Comma, End }
 
         struct Token
         {
@@ -92,14 +92,20 @@ namespace Lockstep.Game.Expr
                     index++;
                     continue;
                 }
+                if (current == ',')
+                {
+                    tokens.Add(new Token { Kind = TokenKind.Comma });
+                    index++;
+                    continue;
+                }
                 string twoChar = (index + 1 < source.Length) ? source.Substring(index, 2) : null;
-                if (twoChar == "!=" || twoChar == "<=" || twoChar == ">=")
+                if (twoChar == "!=" || twoChar == "<=" || twoChar == ">=" || twoChar == "&&" || twoChar == "||")
                 {
                     tokens.Add(new Token { Kind = TokenKind.Operator, Text = twoChar });
                     index += 2;
                     continue;
                 }
-                if (current == '=' || current == '<' || current == '>'
+                if (current == '=' || current == '<' || current == '>' || current == '!'
                     || current == '+' || current == '-' || current == '*' || current == '/' || current == '%')
                 {
                     tokens.Add(new Token { Kind = TokenKind.Operator, Text = current.ToString() });
@@ -149,7 +155,31 @@ namespace Lockstep.Game.Expr
 
             public IExpr ParseExpression()
             {
-                return ParseCompare();
+                return ParseOr();
+            }
+
+            IExpr ParseOr()
+            {
+                IExpr left = ParseAnd();
+                while (IsOperator("||"))
+                {
+                    Advance();
+                    IExpr right = ParseAnd();
+                    left = new BinaryNode("||", left, right);
+                }
+                return left;
+            }
+
+            IExpr ParseAnd()
+            {
+                IExpr left = ParseCompare();
+                while (IsOperator("&&"))
+                {
+                    Advance();
+                    IExpr right = ParseCompare();
+                    left = new BinaryNode("&&", left, right);
+                }
+                return left;
             }
 
             IExpr ParseCompare()
@@ -196,6 +226,11 @@ namespace Lockstep.Game.Expr
                     Advance();
                     return new NegateNode(ParseUnary());
                 }
+                if (IsOperator("!"))
+                {
+                    Advance();
+                    return new NotNode(ParseUnary());
+                }
                 return ParsePrimary();
             }
 
@@ -210,6 +245,10 @@ namespace Lockstep.Game.Expr
                 if (token.Kind == TokenKind.Identifier)
                 {
                     Advance();
+                    if (Current.Kind == TokenKind.LeftParen)
+                    {
+                        return ParseCall(token.Text);
+                    }
                     return new TriggerNode(token.Text);
                 }
                 if (token.Kind == TokenKind.LeftParen)
@@ -224,6 +263,27 @@ namespace Lockstep.Game.Expr
                     return inner;
                 }
                 throw new ExprException("意外的记号");
+            }
+
+            IExpr ParseCall(string name)
+            {
+                Advance(); // 吃掉 '('
+                List<IExpr> args = new List<IExpr>();
+                if (Current.Kind != TokenKind.RightParen)
+                {
+                    args.Add(ParseExpression());
+                    while (Current.Kind == TokenKind.Comma)
+                    {
+                        Advance();
+                        args.Add(ParseExpression());
+                    }
+                }
+                if (Current.Kind != TokenKind.RightParen)
+                {
+                    throw new ExprException("调用缺少右括号: " + name);
+                }
+                Advance();
+                return new CallNode(name, args.ToArray());
             }
         }
 
@@ -289,6 +349,73 @@ namespace Lockstep.Game.Expr
             }
         }
 
+        sealed class NotNode : ExprNode
+        {
+            readonly IExpr _inner;
+
+            public NotNode(IExpr inner)
+            {
+                _inner = inner;
+            }
+
+            public override FFloat Eval(IEvalContext context)
+            {
+                return _inner.Eval(context) == FFloat.Zero ? FFloat.One : FFloat.Zero;
+            }
+        }
+
+        sealed class CallNode : ExprNode
+        {
+            readonly string _name;
+            readonly IExpr[] _args;
+
+            public CallNode(string name, IExpr[] args)
+            {
+                _name = name;
+                _args = args;
+            }
+
+            public override FFloat Eval(IEvalContext context)
+            {
+                string lower = _name.ToLowerInvariant();
+
+                // 内建函数（纯、不依赖上下文）
+                if (lower == "abs" && _args.Length == 1)
+                {
+                    FFloat value = _args[0].Eval(context);
+                    return value < FFloat.Zero ? -value : value;
+                }
+                if ((lower == "ifelse" || lower == "cond") && _args.Length == 3)
+                {
+                    return _args[0].Eval(context) != FFloat.Zero ? _args[1].Eval(context) : _args[2].Eval(context);
+                }
+                if (lower == "min" && _args.Length == 2)
+                {
+                    FFloat left = _args[0].Eval(context);
+                    FFloat right = _args[1].Eval(context);
+                    return left < right ? left : right;
+                }
+                if (lower == "max" && _args.Length == 2)
+                {
+                    FFloat left = _args[0].Eval(context);
+                    FFloat right = _args[1].Eval(context);
+                    return left > right ? left : right;
+                }
+
+                // 带参 trigger（var(n)/fvar(n)/const(...) 等）交给上下文
+                FFloat[] values = new FFloat[_args.Length];
+                for (int i = 0; i < _args.Length; i++)
+                {
+                    values[i] = _args[i].Eval(context);
+                }
+                if (context.TryGetFunction(lower, values, out FFloat result))
+                {
+                    return result;
+                }
+                throw new ExprException("未知函数/带参 trigger: " + _name);
+            }
+        }
+
         sealed class BinaryNode : ExprNode
         {
             readonly string _symbol;
@@ -319,6 +446,8 @@ namespace Lockstep.Game.Expr
                     case "<=": return FromBool(left <= right);
                     case ">": return FromBool(left > right);
                     case ">=": return FromBool(left >= right);
+                    case "&&": return FromBool(left != FFloat.Zero && right != FFloat.Zero);
+                    case "||": return FromBool(left != FFloat.Zero || right != FFloat.Zero);
                     default: throw new ExprException("未知运算符: " + _symbol);
                 }
             }
