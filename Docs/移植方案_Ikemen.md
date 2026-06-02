@@ -90,7 +90,7 @@ Assets/Logic/Mugen/
 | **M0** 基础类型 | `BytecodeValue`(定点版) + ValueType | — | ✅ `0bd8303` |
 | **M1** 表达式 VM | `OpCode`(155枚举) + `BytecodeOps`(算术/逻辑/比较/位/区间/三角/取整, 类型规则照搬) + `BytecodeExp`(栈机执行器) + FMath 补 Acos/Atan/Asin/Ln/Pow/Exp。**短路跳转(jz/jnz)未做**(纯表达式两侧求值结果一致, M2 需要时补); **trigger/redirect opcode 走 IExprContext 钩子, M3 接入**。dotnet test 87/87 | M0 | ✅ (本次) |
 | **M2** 编译器 | `compiler.go`(+functions)：CNS trigger 字符串 → BytecodeExp；可按 trigger 增量移植 | M1 | ⬜ |
-| **M3** Char 运行态 | `Char`/`CharSystemVar` 结构体（定点）、生命周期、Clone/WriteHash 接回滚底座 | M0 | ⬜ |
+| **M3** Char 运行态 | `Char`/`CharSystemVar` 结构体（定点）、生命周期、Clone/WriteHash 接回滚底座 | M0 | 🔄 骨架完成(`MChar` 核心字段+IExprContext 接常用 trigger+Clone/WriteHash, dotnet test 95/95)；CharSystemVar 全字段/hitdef/ghv/targets/redirect 待补 |
 | **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states 加载 | M1,M3 | ⬜ |
 | **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…，~90 个战斗相关） | M2,M4 | ⬜ |
 | **M6** 命令系统 | `input.go`：CommandList/Command/cmdElem，charge/`~`/`$`/`>`/`+` 全语义 | M3 | ⬜ |
