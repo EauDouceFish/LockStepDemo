@@ -29,5 +29,10 @@ namespace Lockstep.Tests
         {
             return Path.Combine(TerrarianDir(), "Terrarian.cmd");
         }
+
+        public static string Common1Cns()
+        {
+            return Path.Combine(TerrarianDir(), "common1.cns");
+        }
     }
 }
