@@ -13,9 +13,12 @@ Unity 2022.3.55f1 + .NET 8（测试）。**MUGEN 化定点帧同步格斗引擎*
 把项目从"6 态硬编码状态机"大改为 **MUGEN 化引擎**：
 
 ```
-Ikemen GO 引擎结构（Statedef + Controller + 表达式 VM，只抄设计/读源码，不 fork、不复制 Go、不引浮点）
-  + MUGEN 资源导入管线（SFF/AIR/CMD/CNS → 自有数据格式）
-  + 自有定点确定性（FFloat + hash 对账 + 回滚框架）
+【2026-06-03 起】Ikemen GO 战斗系统 1:1 忠实移植（逻辑/结构照搬 Go 源码，float→定点 FFloat）
+  + MUGEN 资源导入管线（SFF/AIR/CMD/CNS）
+  + 定点确定性（FFloat + hash 对账 + 回滚框架）
+目标：像 Ikemen 一样直接吃别人的 MUGEN 角色文件战斗 + 保回滚。Ikemen MIT 许可，移植合法。
+详见 Docs/移植方案_Ikemen.md（最高纲领）。
+注：原"只抄设计、不复制 Go"的 clean-room 路线已废弃（无法兼容真实角色）。
 ```
 
 - **战斗模拟 0 Lua**：角色行为 = 数据，被 C# 定点表达式 VM 解释。**禁止**为战斗逻辑引入 Lua/XLua。
@@ -108,7 +111,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 |---|---|
 | **强制规约/铁律/工作法** | 本文 `CLAUDE.md`（§1 铁律、§2 工作法、§3 DoD、§4 提交规范） |
 | **架构基准**（分层、ECS、定点、模式 seam） | `Docs/架构设计.md` |
-| **技术路线 + 任务拆分**（Phase/T 编号、依赖、验收标准） | `Docs/细化计划.md`（§"阶段总览" + 各 Phase 表） |
+| **⭐ 当前最高纲领：Ikemen 1:1 移植方案**（2026-06-03 起，取代旧 clean-room 路线） | `Docs/移植方案_Ikemen.md`（架构/float→定点契约/目录/移植顺序+进度表/卡点登记） |
+| **技术路线 + 任务拆分**（旧 clean-room Phase/T，已被移植路线取代，仅留史） | `Docs/细化计划.md` |
 | **进度流水账**（人类可读，按时间） | `Docs/执行日志.md`（最新一条在末尾“RESUME/续N”） |
 | **commit 流水**（= 第二份 ledger） | `git log --oneline`（每个 T 一个 commit，带 `[T*]`） |
 | **跨会话记忆**（背景/决策/坑） | `C:\Users\25087\.claude\projects\D--Desktop-demo\memory\`（`project_lockstep_act_demo.md` 是主进度记忆）。注意另有 `...\D--Desktop-demo-LockstepActDemo\memory\feedback_csharp_style.md` = C# 规范 |
@@ -131,6 +135,10 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 - 关键事实：`FrameInput`=MoveX/MoveY+Buttons(方向在 MoveX/MoveY 不在 Buttons)；`TransformC.Pos`=FVector3、`FacingX`=FFloat(±1)；当前帧=`Characters[id].Anims[AnimNo].Frames[FrameIndex]`。
 - **系统执行顺序**（组装 live pipeline 时）：InputBuffer/Command → StateMachine → Physics → Anim → Collision → Hit。
 
-### 8.4 ▶ 下一步：**Phase 4（连段/受击/击倒/格挡 + 更多 controller）**，见 `Docs/细化计划.md`
-- **留待/诚实边界**：HitDef 完整 attr/hitflag/守招、击退与 hittime 差分对齐 Ikemen、`command="name"` 字符串 trigger 接入表达式 VM（需 VM 支持字符串字面量）、**MUGEN 引擎 live pipeline 尚未组装**（系统现由 dotnet 测试驱动，与 Phase2 一致；组装时按上面顺序注册）。
-- **新引擎与旧 PlayerStates 栈并行**（`BattleGameLogic` 是旧栈，勿混），旧栈接场景时再切除。
+### 8.4 ▶▶ 重大方向变更（2026-06-03）：转 **Ikemen GO 1:1 移植（定点化）**
+- **决策**：放弃 clean-room 简化子集，改为把 Ikemen 战斗系统**逻辑/结构 1:1 忠实移植**进来（float→定点 FFloat，挂回滚底座），目标=**直接吃别人的 MUGEN 角色文件并战斗 + 保回滚**。Ikemen MIT 许可，移植合法（保留版权头）。
+- **一切以 `Docs/移植方案_Ikemen.md` 为准**（含 §4 进度表、§5 卡点登记）。接手者读那份。
+- **新引擎根**：`Assets/Logic/Mugen/`（镜像 Ikemen 模块：Expr/Char/State/StateCtrl/Command/Hit/Anim/Parse/System）。
+- **进度**：M0（BytecodeValue 定点版）🔄起步、已起（dotnet test 70/70）。下一步 M1 表达式字节码 VM（BytecodeExp OpCode 执行器）。
+- **退役中（移植件取代后才删，git 留史）**：旧 clean-room 战斗码 `Assets/Logic/Game/Expr|Systems|Command` + Phase0-3 成果（ExpressionVM/各 System/CommandMatcher/HitSystem…）。**保留**：Framework(定点/Hash/Snapshot)、Import/Sff、Unity 表现层。
+- 旧 `BattleGameLogic`(PlayerStates 栈) 仍是更早的遗留，勿混。
