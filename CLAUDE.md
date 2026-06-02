@@ -1,103 +1,107 @@
-# LockstepActDemo
+# LockstepActDemo — Agent 宪法（每次开工必读）
 
-Unity 2022.3.55f1。横版 2D 帧同步格斗 demo。**网易火影忍者手游项目组实习生的岗前培训课题**——主题 "动作游戏中网络同步方案研究：帧同步与状态同步"。
+Unity 2022.3.55f1 + .NET 8（测试）。**MUGEN 化定点帧同步格斗引擎**。
+网易火影忍者手游项目组实习岗前课题，主题《动作游戏中网络同步方案研究：帧同步与状态同步》。
 
-> 5/10 24:00 简版已交付（KCP 双进程联机 + 4 态状态机），现在是 **polish 期**，目标推进到接近商业品质。
-
----
-
-## 当前模式（**重要，与旧版不同**）
-
-当前是 **工业级编码模式**，**不是**教学循环。
-- Claude 直接写代码（不再走"我解释 → 你写 → 我 review"循环）
-- 代码必须满足 [腾讯 C# 规范](../../C:/Users/25087/.claude/projects/D--Desktop-demo-LockstepActDemo/memory/feedback_csharp_style.md)：Allman `{}`、禁 var、禁单字母命名等
-- 旧版"速通无防御性编程、无注释"风格 **作废**，按腾讯规范来
-
-旧的教学循环 skill 还在 `.claude/skills/lockstep-tutor/SKILL.md` 里，**默认不激活**；用户明确说 "切回教学模式 / 这块我自己写" 时再启用。
+> 本文是所有协作者（含 AI agent）的**强制规约**。设计细节见 `Docs/架构设计.md`，
+> 步骤/任务见 `Docs/细化计划.md`，进度见 `Docs/执行日志.md`。冲突时以本文 + 这三份 Docs 为准。
 
 ---
 
-## 项目方向（2026-05-26 校正）
+## 0. 当前方向（2026-06-02，覆盖一切旧描述）
 
-**作废**（旧版定的、和当前不一致）：
-- ~~严格对标火影手游 → 无主动跳跃，Y 仅受击飞驱动~~
-- ~~单 Attack 按钮 + 多段连击~~
+把项目从"6 态硬编码状态机"大改为 **MUGEN 化引擎**：
 
-**当前**：
-- 简化版 **横版 2D 格斗**（参考 Streets of Rage / KOF）
-- 美术换成 [Streets of Fight 像素素材](C:\Users\25087\Downloads\Streets of Fight files\Streets of Fight files\Assets)（Brawler Girl + Enemy Punk + tileset/props）
-- **有主动跳跃**（Jump / JumpKick / DiveKick），素材已经给了 jump.png
-- 攻击拆 LP / HP / K 三键（Jab / Punch / Kick + 空中变形）
-- 状态机重做为 **8 元状态 + 数据驱动 AttackTable**（见 [plan-fighting-state-machine](../../C:/Users/25087/.claude/projects/D--Desktop-demo-LockstepActDemo/memory/plan_fighting_state_machine.md)）
+```
+Ikemen GO 引擎结构（Statedef + Controller + 表达式 VM，只抄设计/读源码，不 fork、不复制 Go、不引浮点）
+  + MUGEN 资源导入管线（SFF/AIR/CMD/CNS → 自有数据格式）
+  + 自有定点确定性（FFloat + hash 对账 + 回滚框架）
+```
 
-**坐标轴语义（保留旧版火影式伪 3D）**：
-- `X` = 横向（左右走 + Facing）
-- `Y` = 纵深（前后/远近，街机的双行步道）
-- `Z` = 高度（**现在用作跳跃**，不再只是被击飞）
-- 渲染：`screenY = Y + Z`，`sortingOrder ∝ -Y`，shadow 永远贴 `(X, Y, 0)`
+- **战斗模拟 0 Lua**：角色行为 = 数据，被 C# 定点表达式 VM 解释。**禁止**为战斗逻辑引入 Lua/XLua。
+- **v1 只做 MUGEN-2D 模式**：X 横向 + Y 高度（MUGEN 原生坐标，上为负），纯 2D 平面对拳。
+  火影纵深 3D 是 **v2 独立支路**，21 天内不碰。模式专属逻辑隔离在 4 个 seam（Physics/Collision/输入映射/View），命名带 `Mode2D`，共享层不掺 `if(mode)`。
+- 第一个测试角色 = **KFM（功夫男）**，先跑规整角色，复杂角色后置。
+- 旧描述（火影伪 3D 主线、Streets of Fight 美术、8 态 AttackTable、教学模式）**全部作废**。
 
 ---
 
-## 技术栈（保留，**v1 已落地**）
+## 1. 三条铁律（编译期 / 评审强制，不可破）
+
+1. **逻辑层纯定点、纯 C#**：`Assets/Logic/`（asmdef `Lockstep.Logic`，noEngineReferences）严禁
+   `float`/`double`、`UnityEngine.*`、`System.Random`、Lua、单例。数值走 `FFloat`，随机走 `World.Random`(`FRandom`)。
+   表达式 VM 内部运算也必须全 `FFloat`。
+2. **一切跨子系统调用走接口**（`IInputProvider`/`ITransport`/`IPredictor`/`IExpressionVM`/...）。v1 可挂 Null/Static 实现。
+3. **Component = 纯数据 + snapshot-safe**：每个 `IComponent` 实现 `Clone()`（引用/数组字段**深拷**）+ `WriteHash()`（只混整数 raw）。
+   **System / VM 无静态可变状态**——运行时态全写回 Component，否则回滚串状态。
+
+> 导入工具（`Assets/Editor/`）不受此约束（产出的是数据，可用 float/IO）。
+
+---
+
+## 2. 工作法（TDD + 差分测试 + 黄金哈希）
+
+- **测试先行**：每个工作单元先写会失败的测试 → 实现 → 全绿。无测试的代码不合并。
+- **测试工程**：`Tests/Lockstep.Logic.Tests`（.NET，link 编入 Logic + Fix64 源码）。验收只跑
+  `dotnet test`（脱 Unity，秒级）。**新增逻辑代码必须能被它编到**（即保持零 Unity 依赖）。
+- **差分测试**：以 `../MugenSource/_reference/Ikemen-GO`（只读 Oracle）为标准答案。离散量（状态号/动画帧/命中/KO）必须**全等**，连续量（位置/速度）**容差内**一致。
+- **黄金哈希**：固定输入跑 N 帧，断言 `World.ComputeHash()` == 预录值。改了行为就回填新值并在 commit 说明。
+
+---
+
+## 3. 完成定义（DoD）—— 五条全过才算完，不全过不进下一个
+
+1. 该任务的测试全绿
+2. 整套 `dotnet test` 全绿（不回归）
+3. 黄金哈希测试通过
+4. 符合腾讯 C# 规范（Allman `{}`、禁 `var`、禁单字母命名、补注释）
+5. 写 commit + `Docs/执行日志.md` 一条
+
+---
+
+## 4. 提交规范（commit = ledger）
+
+每个工作单元一个 commit：
+```
+<type>(<模块>): <一句话做了啥>  [T<编号>]
+
+- 关键改动点
+- 验收：跑了哪些测试 + 结果
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+```
+`type` ∈ feat/fix/refactor/test/chore/docs。同时在 `Docs/执行日志.md` 追加人类可读摘要（绝对日期）。
+
+---
+
+## 5. 多 agent 协议
+
+- 一个 agent 认领一个 `Docs/细化计划.md` 里的 `T*`，在 **git worktree 隔离**中干。
+- 无依赖的任务可并行多开；依赖见各阶段说明。
+- 收尾按 DoD 5 条；冲突由黄金哈希测试兜底回归。
+
+---
+
+## 6. 技术栈
 
 | 模块 | 选择 |
 |---|---|
-| 定点数 | `asik/FixedMath.Net` 的 Fix64.cs（Q31.32, Apache 2.0） |
-| 数学层 | F 前缀手写包装（`Lockstep.Math.*`，在 `Assets/Logic/Framework/Math/`） |
-| 网络 | `limpo1989/kcp-csharp`，Loopback 模式（本机双开）/ KCP（跨进程 UDP） |
-| 渲染 | Unity Sprite + Animator（仅表现层，逻辑层禁 UnityEngine） |
-| 架构 | 自写极简 ECS（World / Entity / Component / System），rollback-ready 但 v1 没实现 |
-
-### 三大铁律（继续生效）
-
-1. 逻辑层（`Assets/Logic/`，受 asmdef `Lockstep.Logic` 隔离）严禁：
-   - `float` / `double`
-   - `UnityEngine.*`（Vector / Mathf / Random / Time / Physics）
-   - `System.Random`
-   - 单例
-2. 一切跨子系统调用走接口（`IInputProvider` / `ITransport` / `IPredictor` / `ISnapshotSystem` / `IRandomProvider` / `IAudioPlayer`）。v1 用 Null 实现，v2 换真实现，业务 System 不动。
-3. 所有 Component 实现 `IComponent.Clone()`；引用类型字段**必须深拷**（否则 Snapshot 会被串）。
+| 定点数 | `FixMath.NET` 的 Fix64（Q31.32），F 前缀包装在 `Assets/Logic/Framework/Math/` |
+| 网络 | KCP（跨进程）/ Loopback（本机双开）；v1 延迟锁步，回滚 = Stretch |
+| 渲染 | Unity Sprite/Animator（仅表现层，逻辑层禁 UnityEngine） |
+| 架构 | 自写极简 ECS（World/Entity/Component/System），Snapshot/Hash/Desync 已就绪、rollback-ready |
 
 ---
 
-## 已交付（5/10 23:00 状态）
+## 7. 关键路径
 
-- ✅ Framework：Core / Math / Input / Network / Predict 五层骨架
-- ✅ Server：`Room` + `LockstepServer`（邮局模型，30Hz tick，input lag = 2 帧，输入到齐或超时广播）
-- ✅ Client：`LockstepClient` 主循环 + `FrameInputBuffer` + `NullPredictor`
-- ✅ Transport：`LoopbackHub` 本机双开 + `KcpClient/ServerTransport` 跨进程 UDP
-- ✅ Bootstrap 三模式：Loopback / HostAndPlay / ClientConnect
-- ✅ 战斗 v1：4 态状态机（Idle/Walk/Attack/Hit）+ 命中判定 + HP 100 / Damage 10 / K.O. log
-- ✅ View：`BattleScene` + `PlayerView`（火影式 sortingOrder）+ `CameraFollow` + GameConfig SO + Resources prefab
-
-操作（v1）：双方 WASD 走 + J 攻击。
+- 原始 MUGEN 素材：`../MugenSource/<角色>/`（仓库外，已 gitignore）
+- Ikemen 只读 Oracle：`../MugenSource/_reference/Ikemen-GO/src/`（`bytecode.go` controller、`compiler.go` 表达式、`char.go` 运行时、`anim.go` AIR、`image.go` SFF）
+- 设计/计划/日志：`Docs/`
+- 持久记忆（每次启动自动读）：`C:\Users\25087\.claude\projects\D--Desktop-demo-LockstepActDemo\memory\`（`feedback_csharp_style.md` 是 C# 规范）
 
 ---
 
-## Polish 期清单（5/10 → 5/24 半月，**已超期到 5/26**）
+## 8. 当前进度
 
-| 优先级 | 模块 | 备注 |
-|---|---|---|
-| P0 | 战斗系统重做（数据驱动 AttackTable）| 当前主线，见 `plan-fighting-state-machine` |
-| P0 | 报告 + 录屏 | 5/10 简版未交，待补 |
-| P0 | 美术接入（Streets of Fight 素材）| 当前主线 |
-| P0 | 回滚框架（Phase 8）| ISnapshotable + 内存快照 |
-| P0 | 预测 + RollbackPredictor | 基于回滚框架 |
-| P0 | Debug 工具（hash 对账 + 分叉定位）| |
-| P1 | 多平台（Android + 虚拟摇杆）| |
-| P1 | 弱网优化（抖动缓冲 / 自适应 input lag）| |
-| 砍 | iOS / 完整 Replay / UI 美化 | 时间不够 |
-
----
-
-## 文件 / 记忆指引
-
-- 历史课程归档：`Lesson/Lesson01-06_*.txt` + `Day1_Summary.txt`（可直接挪进研究报告 3/4/6/7 节）
-- 教学模式 skill（默认不激活）：`.claude/skills/lockstep-tutor/SKILL.md`
-- 持久化记忆（每次启动会自动读）：`C:\Users\25087\.claude\projects\D--Desktop-demo-LockstepActDemo\memory\`
-  - `feedback_csharp_style.md` — 腾讯 C# 规范（当前主规约）
-  - `plan_fighting_state_machine.md` — 状态机重做方案
-  - `project_overview.md` — 项目概览与坐标轴
-  - `user_profile.md`、`project_tech_stack.md`、`project_architecture.md`、`project_art_workflow.md` 等
-
-旧 deadline（5/10）已过，**当前没有硬 deadline**，目标是接近商业品质。
+Phase 0（工程化地基）已完成：.NET 测试工程、数据 schema 骨架、表达式 VM 最小实现、新增组件、第一个黄金哈希测试（`dotnet test` 12/12 绿）。
+**下一步：Phase 1 导入管线（AIR + SFF），让 MUGEN 角色在 Unity 动起来。** 详见 `Docs/细化计划.md`。
