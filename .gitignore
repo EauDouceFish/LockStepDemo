@@ -42,3 +42,7 @@ TestResults/
 
 # 导入器生成的精灵（可由 SFF 重建，不入库）
 /Assets/Mugen/
+
+# MCP/编辑器截图产物
+/Assets/Screenshots/
+/Assets/Screenshots.meta

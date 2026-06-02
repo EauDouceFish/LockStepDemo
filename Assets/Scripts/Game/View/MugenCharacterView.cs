@@ -58,7 +58,7 @@ namespace Lockstep.View
                 {
                     continue;
                 }
-                Sprite sprite = BuildSprite(sffPath, sff.Nodes, nodeByKey, key, sharedPalette);
+                Sprite sprite = BuildSprite(sffPath, sff.Nodes, nodeByKey, key, sharedPalette, PixelsPerUnit);
                 if (sprite != null)
                 {
                     sprites[key] = sprite;
@@ -109,7 +109,7 @@ namespace Lockstep.View
         }
 
         static Sprite BuildSprite(string sffPath, List<SffNode> nodes, Dictionary<long, SffNode> nodeByKey,
-            long key, byte[] sharedPalette)
+            long key, byte[] sharedPalette, float pixelsPerUnit)
         {
             if (!nodeByKey.TryGetValue(key, out SffNode node))
             {
@@ -161,7 +161,7 @@ namespace Lockstep.View
             float pivotX = image.Width > 0 ? (float)node.AxisX / image.Width : 0.5f;
             float pivotY = image.Height > 0 ? 1f - (float)node.AxisY / image.Height : 0.5f;
             return Sprite.Create(texture, new Rect(0, 0, image.Width, image.Height),
-                new Vector2(pivotX, pivotY), PixelsPerUnit);
+                new Vector2(pivotX, pivotY), pixelsPerUnit);
         }
 
         static bool HasColor(byte[] palette)
