@@ -38,6 +38,21 @@ namespace Lockstep.EditorTools
             CreateShowcase("kfm");
         }
 
+        [MenuItem("MUGEN/Demo/创建角色画廊场景 (全部角色)")]
+        public static void CreateGallery()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+            GameObject gallery = new GameObject("CharacterGallery");
+            gallery.transform.position = Vector3.zero;
+            gallery.AddComponent<MugenGalleryShowcase>();   // 自身在 Start 里扫描角色 + 配相机
+
+            string scenePath = SceneDir() + "/MugenGallery.unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log("[MUGEN] 角色画廊场景已建：" + scenePath
+                + " —— 按 Play 一页展示 4 个角色站立动画。←/→ 或点屏上按钮翻页。");
+        }
+
         static void CreateShowcase(string characterFolder)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);

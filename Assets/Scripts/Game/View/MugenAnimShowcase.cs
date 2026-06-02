@@ -28,8 +28,8 @@ namespace Lockstep.View
         void Start()
         {
             string baseDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource", CharacterFolder));
-            string airPath = MugenAssetPaths.FirstFile(baseDir, "*.air");
-            string sffPath = MugenAssetPaths.FirstFile(baseDir, "*.sff");
+            string airPath = MugenDef.AnimPath(baseDir);
+            string sffPath = MugenDef.SpritePath(baseDir);
             if (airPath == null || sffPath == null)
             {
                 Debug.LogError("[MUGEN] 找不到 .air/.sff，目录：" + baseDir);
