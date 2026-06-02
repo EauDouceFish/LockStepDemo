@@ -48,6 +48,33 @@ namespace Lockstep.Game.Data
                 && first.MinY <= second.MaxY && first.MaxY >= second.MinY;
         }
 
+        /// <summary>
+        /// 攻击框组(attack) 与受击框组(hurt) 是否有任意一对重叠（各自按朝向镜像并平移到世界）。
+        /// 任一组为空 → 不重叠。CollisionSystem 用此判定 Clsn1×Clsn2。
+        /// </summary>
+        public static bool AnyOverlap(
+            ClsnBox[] attack, FFloat attackX, FFloat attackY, FFloat attackFacing,
+            ClsnBox[] hurt, FFloat hurtX, FFloat hurtY, FFloat hurtFacing)
+        {
+            if (attack == null || hurt == null)
+            {
+                return false;
+            }
+            for (int a = 0; a < attack.Length; a++)
+            {
+                RectAabb attackBox = ToWorld(attack[a], attackX, attackY, attackFacing);
+                for (int h = 0; h < hurt.Length; h++)
+                {
+                    RectAabb hurtBox = ToWorld(hurt[h], hurtX, hurtY, hurtFacing);
+                    if (Overlap(attackBox, hurtBox))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         static FFloat Min(FFloat left, FFloat right)
         {
             return left < right ? left : right;
