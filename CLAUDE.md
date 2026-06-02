@@ -123,11 +123,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 - **表现层工具**（`Assets/Scripts/Game/View/` + `Assets/Editor/Demo/`）：`MugenSpriteLoader`(v1/v2 自动分派) / `MugenDef`(读 .def [Files] 取正确 sprite/anim) / 单角色 demo / 全动作 showcase / **多角色画廊**。素材：12 角色（11 SFFv1 + kfm SFFv2），KFM 像素级渲染验证通过。
 - 已知局限：SFFv1 未加载外部 `.act` 调色板（Janos 因此显黑剪影，已查实非 bug，详见执行日志/记忆）。
 
-### 8.3 ▶ 当前任务：**Phase 3（搓招+碰撞+命中）**，见 `Docs/细化计划.md` Phase 3 表
-- **T3.1 CommandSystem**（进行中/起步）：输入环形缓冲 + 搓招匹配（↓↘→+键，时间窗）。
-  - 关键事实：`FrameInput`(Framework/Input) = MoveX/MoveY(-1/0/1)+Buttons(InputButton bitmask)；方向在 MoveX/MoveY **不在** Buttons。
-  - 现有 `InputBufferC`(6帧,仅 Buttons) 不够搓招用 → T3.1 需新建“方向+按钮”的更长输入历史组件 + `CommandSystem`，写 `CommandStateC.Active[i]`（已有，StateMachine 经 `command="..."` trigger 读）。
-  - `CommandData`(Game/Data) = Name/Motion(InputSymbol[])/TimeWindow/BufferTime；`CmdParser` 已能解析 .cmd。
-  - 验收：单测构造输入序列，正确匹配 + 超时各一例。
-- T3.2 HitDef controller / T3.3 CollisionSystem(Clsn1×Clsn2,facing 镜像) / T3.4 HitSystem(伤害/硬直/击退/hitstop)。T3.4 依赖 T3.2+T3.3，T3.1 可并行先做。
-- **新引擎与旧 PlayerStates 栈并行**，旧栈接场景时再切除。
+### 8.3 ✅ Phase 3（搓招+碰撞+命中）已完成（dotnet test 64/64）
+- **T3.1 CommandSystem**：`CommandInputC`(方向+按钮 60 帧环形缓冲) + `CommandMatcher`(方向按朝向转相对 + 序列贪心匹配，末符号当前帧边沿触发) + `CommandSystem`→写 `CommandStateC.Active`。
+- **T3.2 HitDef 控制器**：`StateControllerExecutor` case HitDef 激活 `HitDefStateC`；`ApplyTransition` 切状态停用。
+- **T3.3 CollisionSystem**：`ClsnWorld.AnyOverlap`(Clsn1×Clsn2 facing 镜像) + `PendingHitC` + `CollisionSystem`(HitTargetsBits 防一招多次命中)。
+- **T3.4 HitSystem**：消费 PendingHitC → 扣血/硬直/击退(朝向镜像)/切 BeingHit+state 5000/双方 hitstop。
+- 关键事实：`FrameInput`=MoveX/MoveY+Buttons(方向在 MoveX/MoveY 不在 Buttons)；`TransformC.Pos`=FVector3、`FacingX`=FFloat(±1)；当前帧=`Characters[id].Anims[AnimNo].Frames[FrameIndex]`。
+- **系统执行顺序**（组装 live pipeline 时）：InputBuffer/Command → StateMachine → Physics → Anim → Collision → Hit。
+
+### 8.4 ▶ 下一步：**Phase 4（连段/受击/击倒/格挡 + 更多 controller）**，见 `Docs/细化计划.md`
+- **留待/诚实边界**：HitDef 完整 attr/hitflag/守招、击退与 hittime 差分对齐 Ikemen、`command="name"` 字符串 trigger 接入表达式 VM（需 VM 支持字符串字面量）、**MUGEN 引擎 live pipeline 尚未组装**（系统现由 dotnet 测试驱动，与 Phase2 一致；组装时按上面顺序注册）。
+- **新引擎与旧 PlayerStates 栈并行**（`BattleGameLogic` 是旧栈，勿混），旧栈接场景时再切除。
