@@ -117,5 +117,51 @@ namespace Lockstep.Tests
             // 真实文件含未支持的 trigger/语法 → 预期有降级警告（诚实边界）
             TestContext.WriteLine("common1.cns 解析：状态 " + result.States.Count + " 个，降级警告 " + result.Warnings);
         }
+
+        [Test]
+        public void RealCommon1_StandStateRunsWithoutCrashOrSuicide()
+        {
+            string path = TestAssets.Common1Cns();
+            if (!File.Exists(path))
+            {
+                Assert.Ignore("MugenSource/common1.cns 不在，跳过");
+            }
+
+            CnsParseResult result = CnsParser.ParseFile(path);
+            CharacterDef character = new CharacterDef
+            {
+                Id = 0,
+                Name = "kfm",
+                States = result.States,
+                Anims = new Dictionary<int, AnimData>(),
+                Const = new CharConstants(),
+            };
+
+            World world = new World();
+            world.Init(1);
+            world.GameData = new MugenGameData(new Dictionary<int, CharacterDef> { [0] = character });
+            Entity entity = world.CreateEntity();
+            entity.Add(new MugenStateC { StateNo = 0, StateType = StateType.Stand, Physics = Physics.Stand, Ctrl = true });
+            entity.Add(new TransformC());
+            entity.Add(new VelocityC());
+            entity.Add(new CharacterRefC { CharacterId = 0 });
+            entity.Add(new AnimC());
+            entity.Add(new VarsC());
+            entity.Add(new HealthC { HP = 1000, MaxHP = 1000 });
+            world.RegisterSystem(new MugenStateMachineSystem());
+            world.RegisterSystem(new MugenPhysicsSystem());
+            world.RegisterSystem(new MugenAnimSystem());
+
+            // 运行期容错：未支持 trigger 取 0，alive=1 防自杀。无输入时应稳定站立。
+            Assert.DoesNotThrow(() =>
+            {
+                for (int i = 0; i < 30; i++)
+                {
+                    world.Tick();
+                }
+            });
+            Assert.That(entity.Get<MugenStateC>().StateNo, Is.EqualTo(0),
+                "无输入时应稳定停在站立状态 0（不应误判 !alive 自杀到 5050）");
+        }
     }
 }

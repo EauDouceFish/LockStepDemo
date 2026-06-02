@@ -115,43 +115,59 @@ namespace Lockstep.Game.Expr
                 }
             }
 
-            return false;
+            // 常用判定（让 MUGEN 角色基础状态不至于误判）
+            switch (lower)
+            {
+                case "alive":
+                    value = (health == null || health.HP > 0) ? FFloat.One : FFloat.Zero;
+                    return true;
+                case "ishelper":
+                    value = FFloat.Zero;
+                    return true;
+                case "roundstate":
+                    value = FFloat.FromInt(2);   // 2 = 战斗中
+                    return true;
+            }
+
+            // 宽容降级：尚未支持的 trigger 取 0（不抛异常 → MUGEN 角色不崩）。
+            // 代价：依赖该 trigger 的控制器不触发（诚实边界，完整语义见 T2.3b/Phase3）。
+            value = FFloat.Zero;
+            return true;
         }
 
         public bool TryGetFunction(string name, FFloat[] args, out FFloat value)
         {
             value = FFloat.Zero;
             VarsC vars = _self.Get<VarsC>();
-            if (vars == null || args.Length != 1)
+            if (vars != null && args.Length == 1)
             {
-                return false;
+                int index = args[0].ToInt();
+                switch (name)
+                {
+                    case "var":
+                        if (index >= 0 && index < VarsC.IntCount)
+                        {
+                            value = FFloat.FromInt(vars.Var[index]);
+                        }
+                        return true;
+                    case "fvar":
+                        if (index >= 0 && index < VarsC.FloatCount)
+                        {
+                            value = vars.FVar[index];
+                        }
+                        return true;
+                    case "sysvar":
+                        if (index >= 0 && index < VarsC.SysIntCount)
+                        {
+                            value = FFloat.FromInt(vars.SysVar[index]);
+                        }
+                        return true;
+                }
             }
-            int index = args[0].ToInt();
-            switch (name)
-            {
-                case "var":
-                    if (index >= 0 && index < VarsC.IntCount)
-                    {
-                        value = FFloat.FromInt(vars.Var[index]);
-                        return true;
-                    }
-                    return false;
-                case "fvar":
-                    if (index >= 0 && index < VarsC.FloatCount)
-                    {
-                        value = vars.FVar[index];
-                        return true;
-                    }
-                    return false;
-                case "sysvar":
-                    if (index >= 0 && index < VarsC.SysIntCount)
-                    {
-                        value = FFloat.FromInt(vars.SysVar[index]);
-                        return true;
-                    }
-                    return false;
-            }
-            return false;
+
+            // 宽容降级：未支持的带参 trigger / 函数取 0（不抛异常）。
+            value = FFloat.Zero;
+            return true;
         }
 
         static bool FromState(MugenStateC state, ref FFloat target, FFloat value)
