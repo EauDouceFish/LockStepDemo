@@ -34,5 +34,18 @@ namespace Lockstep.Tests
         {
             return Path.Combine(TerrarianDir(), "common1.cns");
         }
+
+        public static string KfmDir([CallerFilePath] string thisFile = "")
+        {
+            string dir = Path.GetDirectoryName(thisFile);
+            string repo = Path.GetFullPath(Path.Combine(dir, "..", ".."));
+            string demo = Path.GetFullPath(Path.Combine(repo, ".."));
+            return Path.Combine(demo, "MugenSource", "kfm");
+        }
+
+        public static string KfmSff()
+        {
+            return Path.Combine(KfmDir(), "kfm.sff");
+        }
     }
 }
