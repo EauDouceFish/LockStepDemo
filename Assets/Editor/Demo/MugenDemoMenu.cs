@@ -26,6 +26,35 @@ namespace Lockstep.EditorTools
             CreateDemo("kfm", 0);
         }
 
+        [MenuItem("MUGEN/Demo/创建全动作展示场景 (Terrarian)")]
+        public static void CreateTerrarianShowcase()
+        {
+            CreateShowcase("Terrarian");
+        }
+
+        [MenuItem("MUGEN/Demo/创建全动作展示场景 (kfm)")]
+        public static void CreateKfmShowcase()
+        {
+            CreateShowcase("kfm");
+        }
+
+        static void CreateShowcase(string characterFolder)
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+            GameObject character = new GameObject(characterFolder + "_Showcase");
+            character.transform.position = Vector3.zero;
+            MugenAnimShowcase showcase = character.AddComponent<MugenAnimShowcase>();
+            showcase.CharacterFolder = characterFolder;
+
+            SetupCamera();
+
+            string scenePath = SceneDir() + "/MugenShowcase_" + characterFolder + ".unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log("[MUGEN] 全动作展示场景已建：" + scenePath
+                + " —— 按 Play 依次循环播放全部动画。←/→ 手动切，空格暂停。");
+        }
+
         static void CreateDemo(string characterFolder, int animNo)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
@@ -36,24 +65,40 @@ namespace Lockstep.EditorTools
             view.CharacterFolder = characterFolder;
             view.AnimNo = animNo;
 
-            Camera camera = Camera.main;
-            if (camera != null)
-            {
-                camera.orthographic = true;
-                camera.orthographicSize = 3f;
-                camera.transform.position = new Vector3(0f, 1.5f, -10f);
-                camera.backgroundColor = new Color(0.15f, 0.15f, 0.2f);
-            }
+            SetupCamera();
 
+            string scenePath = SceneDir() + "/MugenDemo_" + characterFolder + ".unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log("[MUGEN] Demo 场景已建：" + scenePath + " —— 按 Play 看 " + characterFolder
+                + " 动画。改 AnimNo=20 看走路。换角色：把素材放 ../MugenSource/ 并改 CharacterFolder。");
+        }
+
+        static void SetupCamera()
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                camera = Object.FindObjectOfType<Camera>();
+            }
+            if (camera == null)
+            {
+                return;
+            }
+            camera.orthographic = true;
+            camera.orthographicSize = 1.4f;                       // 拉近：角色脚在 y=0，相机对准其上半身高度
+            camera.transform.position = new Vector3(0f, 1.0f, -10f);
+            camera.clearFlags = CameraClearFlags.SolidColor;      // 否则背景永远是天空盒，纯色不显示
+            camera.backgroundColor = new Color(0.15f, 0.15f, 0.2f);
+        }
+
+        static string SceneDir()
+        {
             string sceneDir = "Assets/Scenes";
             if (!Directory.Exists(sceneDir))
             {
                 Directory.CreateDirectory(sceneDir);
             }
-            string scenePath = sceneDir + "/MugenDemo_" + characterFolder + ".unity";
-            EditorSceneManager.SaveScene(scene, scenePath);
-            Debug.Log("[MUGEN] Demo 场景已建：" + scenePath + " —— 按 Play 看 " + characterFolder
-                + " 动画。改 AnimNo=20 看走路。换角色：把素材放 ../MugenSource/ 并改 CharacterFolder。");
+            return sceneDir;
         }
     }
 }
