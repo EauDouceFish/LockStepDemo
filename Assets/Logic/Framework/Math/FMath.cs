@@ -9,6 +9,13 @@ namespace Lockstep.Math
         public static FFloat Cos(FFloat x)    => new FFloat(Fix64.Cos(x.V));
         public static FFloat Tan(FFloat x)    => new FFloat(Fix64.Tan(x.V));
         public static FFloat Atan2(FFloat y, FFloat x) => new FFloat(Fix64.Atan2(y.V, x.V));
+        public static FFloat Atan(FFloat x)   => new FFloat(Fix64.Atan(x.V));
+        public static FFloat Acos(FFloat x)   => new FFloat(Fix64.Acos(x.V));
+        public static FFloat Asin(FFloat x)   => FFloat.PIOver2 - new FFloat(Fix64.Acos(x.V));   // asin = π/2 - acos
+        public static FFloat Ln(FFloat x)     => new FFloat(Fix64.Ln(x.V));
+        public static FFloat Pow(FFloat b, FFloat e) => new FFloat(Fix64.Pow(b.V, e.V));
+        public static FFloat Exp(FFloat x)    => new FFloat(Fix64.Pow(E.V, x.V));               // e^x
+        private static readonly FFloat E = FFloat.FromRaw(11674931555L);                        // 自然常数 e≈2.718281828 (Q31.32)
         public static FFloat Abs(FFloat x)    => new FFloat(Fix64.Abs(x.V));
         public static int Sign(FFloat x)      => Fix64.Sign(x.V);
         public static FFloat Floor(FFloat x)  => new FFloat(Fix64.Floor(x.V));

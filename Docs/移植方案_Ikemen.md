@@ -87,8 +87,8 @@ Assets/Logic/Mugen/
 
 | 里程碑 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
-| **M0** 基础类型 | `BytecodeValue`(定点版) + ValueType + 战斗枚举/常量梳理（复用现有相同者） | — | 🔄 起步中 |
-| **M1** 表达式 VM | `BytecodeExp` 的 OpCode 执行器（算术/逻辑/比较/位/三角/redirect）；逐 OpCode 移植 | M0 | ⬜ |
+| **M0** 基础类型 | `BytecodeValue`(定点版) + ValueType | — | ✅ `0bd8303` |
+| **M1** 表达式 VM | `OpCode`(155枚举) + `BytecodeOps`(算术/逻辑/比较/位/区间/三角/取整, 类型规则照搬) + `BytecodeExp`(栈机执行器) + FMath 补 Acos/Atan/Asin/Ln/Pow/Exp。**短路跳转(jz/jnz)未做**(纯表达式两侧求值结果一致, M2 需要时补); **trigger/redirect opcode 走 IExprContext 钩子, M3 接入**。dotnet test 87/87 | M0 | ✅ (本次) |
 | **M2** 编译器 | `compiler.go`(+functions)：CNS trigger 字符串 → BytecodeExp；可按 trigger 增量移植 | M1 | ⬜ |
 | **M3** Char 运行态 | `Char`/`CharSystemVar` 结构体（定点）、生命周期、Clone/WriteHash 接回滚底座 | M0 | ⬜ |
 | **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states 加载 | M1,M3 | ⬜ |
@@ -112,6 +112,9 @@ Assets/Logic/Mugen/
 - `[2026-06-03] Expr — BytecodeValue 单 float64 拆 int/float` — 见 §2.2，已定方案（long ival + FFloat fval）。
 - `[2026-06-03] 全局 — 移植量 ~5 万行` — char.go 14k/bytecode.go 15k/compiler 15k。需多会话多 agent。对策：严格按 §4 依赖顺序，每个 OpCode/controller/trigger 是独立可测单元，增量移植增量测试。
 - `[2026-06-03] 架构 — Ikemen 非 ECS、Char 巨struct` — 不强行 ECS 化，照搬 Char struct，仅加 Clone/WriteHash 接回滚。退役旧 ECS 战斗组件。
+- `[2026-06-03] Expr — ToI 截断方向` — FFloat.ToInt 是 floor，Ikemen int32(float) 是向零截断。已在 BytecodeValue.ToI 自行向零截断。其它移植处凡 float→int 都要注意此差异。
+- `[2026-06-03] Expr — OC_float 编码` — 我方 OC_float 携带 8 字节 FFloat raw（Ikemen 是 float32 bits）。属刻意偏离，M2 编译器必须按此编码产出。
+- `[2026-06-03] Expr — 短路跳转未实现` — OC_jz/jnz/jmp 及 8 位变体 M1 未做。纯表达式求值两侧都算结果一致，暂不影响；M2 编译器若需短路/三目优化再补（ifelse 已用 OC_ifelse 实现，无需跳转）。`OC_run/nordrun`(状态控制器调用)归 M4/M5。
 
 ---
 
