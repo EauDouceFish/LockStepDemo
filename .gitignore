@@ -39,3 +39,6 @@ TestResults/
 
 # 原始 MUGEN 素材（体积大，放在仓库外 ../MugenSource，不入库）
 /MugenSource/
+
+# 导入器生成的精灵（可由 SFF 重建，不入库）
+/Assets/Mugen/
