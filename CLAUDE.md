@@ -101,7 +101,33 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 
 ---
 
-## 8. 当前进度
+## 8. 当前进度 + 接手导航（每个 agent 开工先读这节）
 
-Phase 0（工程化地基）已完成：.NET 测试工程、数据 schema 骨架、表达式 VM 最小实现、新增组件、第一个黄金哈希测试（`dotnet test` 12/12 绿）。
-**下一步：Phase 1 导入管线（AIR + SFF），让 MUGEN 角色在 Unity 动起来。** 详见 `Docs/细化计划.md`。
+### 8.1 文档地图（"东西都在哪"）
+| 你要找 | 在哪 |
+|---|---|
+| **强制规约/铁律/工作法** | 本文 `CLAUDE.md`（§1 铁律、§2 工作法、§3 DoD、§4 提交规范） |
+| **架构基准**（分层、ECS、定点、模式 seam） | `Docs/架构设计.md` |
+| **技术路线 + 任务拆分**（Phase/T 编号、依赖、验收标准） | `Docs/细化计划.md`（§"阶段总览" + 各 Phase 表） |
+| **进度流水账**（人类可读，按时间） | `Docs/执行日志.md`（最新一条在末尾“RESUME/续N”） |
+| **commit 流水**（= 第二份 ledger） | `git log --oneline`（每个 T 一个 commit，带 `[T*]`） |
+| **跨会话记忆**（背景/决策/坑） | `C:\Users\25087\.claude\projects\D--Desktop-demo\memory\`（`project_lockstep_act_demo.md` 是主进度记忆）。注意另有 `...\D--Desktop-demo-LockstepActDemo\memory\feedback_csharp_style.md` = C# 规范 |
+| **MUGEN 素材 / Ikemen Oracle** | 见 §7 |
+| **测试入口** | `cd Tests/Lockstep.Logic.Tests && dotnet test`（脱 Unity，秒级） |
+| **Unity 实测** | Unity MCP（`mcp__UnityMCP__*` 工具，会话启动时加载）；菜单 `MUGEN/Demo/*` 建 demo/showcase/画廊场景 |
+
+### 8.2 已完成（都在 git，`dotnet test` 45/45 绿）
+- **Phase 0** 地基：.NET 测试工程、数据 schema、表达式 VM、ECS 组件、黄金哈希。
+- **Phase 1** 导入：AIR 解析、SFFv1(PcxDecoder)、**SFFv2(SffV2Reader：Lz5/Rle8/Rle5/raw + 调色板库)**、AnimAdvance、ClsnWorld。
+- **Phase 2** 引擎：表达式 VM + WorldEvalContext + MugenStateC + StateControllerExecutor(12 controller) + StateMachine/Physics/Anim System + CmdParser + CnsParser。
+- **表现层工具**（`Assets/Scripts/Game/View/` + `Assets/Editor/Demo/`）：`MugenSpriteLoader`(v1/v2 自动分派) / `MugenDef`(读 .def [Files] 取正确 sprite/anim) / 单角色 demo / 全动作 showcase / **多角色画廊**。素材：12 角色（11 SFFv1 + kfm SFFv2），KFM 像素级渲染验证通过。
+- 已知局限：SFFv1 未加载外部 `.act` 调色板（Janos 因此显黑剪影，已查实非 bug，详见执行日志/记忆）。
+
+### 8.3 ▶ 当前任务：**Phase 3（搓招+碰撞+命中）**，见 `Docs/细化计划.md` Phase 3 表
+- **T3.1 CommandSystem**（进行中/起步）：输入环形缓冲 + 搓招匹配（↓↘→+键，时间窗）。
+  - 关键事实：`FrameInput`(Framework/Input) = MoveX/MoveY(-1/0/1)+Buttons(InputButton bitmask)；方向在 MoveX/MoveY **不在** Buttons。
+  - 现有 `InputBufferC`(6帧,仅 Buttons) 不够搓招用 → T3.1 需新建“方向+按钮”的更长输入历史组件 + `CommandSystem`，写 `CommandStateC.Active[i]`（已有，StateMachine 经 `command="..."` trigger 读）。
+  - `CommandData`(Game/Data) = Name/Motion(InputSymbol[])/TimeWindow/BufferTime；`CmdParser` 已能解析 .cmd。
+  - 验收：单测构造输入序列，正确匹配 + 超时各一例。
+- T3.2 HitDef controller / T3.3 CollisionSystem(Clsn1×Clsn2,facing 镜像) / T3.4 HitSystem(伤害/硬直/击退/hitstop)。T3.4 依赖 T3.2+T3.3，T3.1 可并行先做。
+- **新引擎与旧 PlayerStates 栈并行**，旧栈接场景时再切除。
