@@ -1,0 +1,127 @@
+================================================================================
+LESSON 06 — 协议设计（5 个消息）
+完成日期：2026-05-10
+================================================================================
+
+【这节课做了啥】
+定义网络协议层的消息类型枚举 MsgType + 5 个消息类 + IMessage 多态接口。
+v1 不做二进制序列化（Loopback 直传对象），但 MsgType 提前留给 KCP。
+
+【最终产物】
+- Assets/Framework/Network/MsgType.cs    — 枚举 + IMessage 接口
+- Assets/Framework/Network/Protocol.cs   — 5 个消息类
+
+【代码全文】
+
+// MsgType.cs
+namespace Lockstep.Network
+{
+    public enum MsgType : byte
+    {
+        JoinRoom = 1,
+        RoomReady = 2,
+        FrameInput = 3,
+        FrameAuth = 4,
+        GameOver = 5,
+    }
+
+    public interface IMessage
+    {
+        MsgType Type { get; }
+    }
+}
+
+// Protocol.cs
+using Lockstep.Input;
+
+namespace Lockstep.Network
+{
+    public class JoinRoomMsg : IMessage
+    {
+        public MsgType Type => MsgType.JoinRoom;
+        public string RoomId;
+    }
+
+    public class RoomReadyMsg : IMessage
+    {
+        public MsgType Type => MsgType.RoomReady;
+        public int RoomSeed;
+        public int LocalPlayerId;
+        public int PlayerCount;
+    }
+
+    public class FrameInputMsg : IMessage
+    {
+        public MsgType Type => MsgType.FrameInput;
+        public int Frame;
+        public int PlayerId;
+        public FrameInput Input;
+    }
+
+    public class FrameAuthMsg : IMessage
+    {
+        public MsgType Type => MsgType.FrameAuth;
+        public int Frame;
+        public FrameInput[] Inputs;
+    }
+
+    public class GameOverMsg : IMessage
+    {
+        public MsgType Type => MsgType.GameOver;
+        public int WinnerPlayerId;
+    }
+}
+
+【五个消息的语义】
+
+| 流向 | 消息 | 何时发 | 内容 |
+|------|------|--------|------|
+| C → S | JoinRoomMsg | 启动时 | RoomId |
+| S → C | RoomReadyMsg | 房间满 | RoomSeed + LocalPlayerId + PlayerCount |
+| C → S | FrameInputMsg | 每逻辑帧 | Frame + PlayerId + FrameInput |
+| S → C | FrameAuthMsg | 每帧凑齐 | Frame + 所有玩家本帧输入数组 |
+| S → C | GameOverMsg | 终局 | WinnerPlayerId |
+
+【关键设计决策】
+
+1. 为什么 FrameAuth 打包所有玩家本帧输入到一个数组？
+   - 一次广播 = 一次 RTT 成本，N 次广播 = N 倍延迟
+   - 语义就是"这一帧最终结果"，原子性
+   - Inputs[i] 即玩家 i 的本帧输入，索引匹配 RoomReady 给的玩家列表
+
+2. 为什么 MsgType 用 byte？
+   - 网络包头需要 1 字节标识类型，KCP 包格式：[type(1B)][payload]
+   - 5 个消息远小于 256，byte 够用
+   - 速通 v1 用 LoopbackTransport 直传 C# 对象，不需要序列化
+   - MsgType 是为 KCP 序列化（Lesson 36）提前留位
+
+3. 为什么有 IMessage 接口？
+   - ITransport.Send(IMessage) / OnReceive(IMessage) 多态分发
+   - 接收方 if (msg is FrameAuthMsg fa) ... 类型 switch 处理
+   - 不强制基类是因为 C# 的多继承约束少，接口足够
+
+4. 为什么没做二进制序列化？
+   - 速通 v1 跑 Loopback：单进程双客户端共享内存，对象直接传
+   - 二进制序列化只在 KCP（跨进程/跨机）才需要
+   - Lesson 36（被砍）才补，速通不写
+
+5. 为什么消息字段都是 public 直字段？
+   - 速通：少写 getter/setter
+   - 没有校验需求（接收方都做检查）
+   - 未来加序列化时也方便（Protobuf/JSON 都能反射 public 字段）
+
+【后续课程关联】
+- Lesson 7：Room 状态机会消费 JoinRoom/FrameInput，发出 RoomReady/FrameAuth/GameOver
+- Lesson 13-14：ITransport + LoopbackTransport，承载 IMessage 收发
+- Lesson 36（被砍）：KcpTransport 添加 binary serializer，把 IMessage 序列化成 byte[]
+
+【铁律检查】
+✓ namespace Lockstep.Network
+✓ 不依赖 UnityEngine
+✓ 不用 float（FrameInput 内部已是 sbyte/byte）
+✓ Protocol.cs using Lockstep.Input 是合法（Network 可以依赖 Input）
+✓ 极简，无防御性编程
+
+================================================================================
+END OF LESSON 06
+================================================================================

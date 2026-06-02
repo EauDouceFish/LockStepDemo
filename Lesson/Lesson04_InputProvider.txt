@@ -1,0 +1,128 @@
+================================================================================
+LESSON 04 — IInputProvider + LocalInputProvider
+完成日期：2026-05-10
+================================================================================
+
+【这节课做了啥】
+1. 写 IInputProvider 接口（Framework/Input/，干净层）
+2. 写 LocalInputProvider 实现（Scripts/Client/，能用 UnityEngine）
+3. 键盘映射：WASD 移动 + J 普攻
+4. 解释"本地输入为什么不直接喂 World"——帧同步上行/下行分离铁律
+
+【最终产物】
+- Assets/Framework/Input/IInputProvider.cs       — 接口（不依赖 UnityEngine）
+- Assets/Scripts/Client/LocalInputProvider.cs    — 键盘采样器（依赖 UnityEngine）
+
+【代码全文】
+
+// IInputProvider.cs
+namespace Lockstep.Input
+{
+    public interface IInputProvider
+    {
+        FrameInput Sample();
+    }
+}
+
+// LocalInputProvider.cs
+using UnityEngine;
+using Lockstep.Input;
+
+namespace Lockstep.Client
+{
+    public class LocalInputProvider : IInputProvider
+    {
+        public KeyCode Up = KeyCode.W;
+        public KeyCode Down = KeyCode.S;
+        public KeyCode Left = KeyCode.A;
+        public KeyCode Right = KeyCode.D;
+        public KeyCode Attack = KeyCode.J;
+
+        public FrameInput Sample()
+        {
+            sbyte x = 0, z = 0;
+            if (UnityEngine.Input.GetKey(Left)) x = -1;
+            else if (UnityEngine.Input.GetKey(Right)) x = 1;
+            if (UnityEngine.Input.GetKey(Down)) z = -1;
+            else if (UnityEngine.Input.GetKey(Up)) z = 1;
+
+            byte buttons = 0;
+            if (UnityEngine.Input.GetKey(Attack)) buttons |= (byte)InputButton.Attack;
+
+            return new FrameInput { MoveX = x, MoveZ = z, Buttons = buttons };
+        }
+    }
+}
+
+【分层设计】
+
+| 文件 | 层 | namespace | 依赖 UnityEngine? |
+|------|-----|-----------|-------------------|
+| IInputProvider.cs | Framework/Input/ | Lockstep.Input | ❌ 不能 |
+| LocalInputProvider.cs | Scripts/Client/ | Lockstep.Client | ✅ 必须（读键盘） |
+
+接口必须放最干净的层（Framework/Input），让服务器、Replay、单元测试都能引用。
+具体的"键盘采样"实现是 Unity 入口侧的事，放 Client 层。
+
+【按键映射（速通版）】
+
+| 键 | 输入 | 输出 |
+|----|-----|------|
+| A / Left | MoveX = -1 | 向左 |
+| D / Right | MoveX = +1 | 向右 |
+| W / Up | MoveZ = +1 | 向背景方向 |
+| S / Down | MoveZ = -1 | 向相机方向 |
+| J | Attack 位 | 普攻 |
+
+KeyCode 字段为 public，未来双玩家本地测试可不同实例配不同键：
+- Player 1: WASD + J
+- Player 2: 方向键 + 小键盘 0（或 .）
+
+【关键概念：上行 vs 下行（帧同步铁律）】
+
+Q：为什么本地输入【不】直接喂 World？
+
+A：World 必须吃所有玩家本帧的"权威输入"，本地输入只是其中之一。
+
+数据流：
+[本地键盘] → LocalInputProvider.Sample() → FrameInput
+                                            ↓
+                                       发服务器（上行）
+                                            ↓
+                                  服务器收齐所有玩家输入
+                                            ↓
+                                       广播本帧权威输入（下行）
+                                            ↓
+                              [所有客户端] FrameInputBuffer 缓存
+                                            ↓
+                                  World.Tick() 读 buffer 推帧
+
+如果本地输入跳过上下行直接喂 World：
+- 本地玩家无延迟（爽）
+- 远程玩家本帧输入还没到 → World 用空输入推 → 远程玩家停一帧
+- 服务器权威输入到了，发现和本地"猜的"不一致 → 状态分叉
+- N 帧后两边完全两个游戏
+
+铁律：**World 永远只吃权威输入，从不直接吃本地输入**。
+- 本地输入 = 发给服务器的上行数据
+- 权威输入 = 从服务器收回的下行数据
+两条路必须分开。
+
+【后续 IInputProvider 实现】
+- LocalInputProvider（本课）：键盘采样
+- NetworkInputProvider（Lesson 10）：从权威 buffer 拉给定帧给定玩家的输入
+- ReplayInputProvider（Lesson 32）：从文件按帧读入
+- TestInputProvider：单元测试用，hardcode 输入序列
+
+注意：LocalInputProvider 是"上行采样"，后两者是"下行喂 World"。
+都实现 IInputProvider 但语义不同——后续若发现混乱可拆成两个接口。
+
+【铁律检查】
+✓ Framework/Input/IInputProvider.cs：不依赖 UnityEngine
+✓ Scripts/Client/LocalInputProvider.cs：在 Client 层，UnityEngine 合法
+✓ 不用 float（sbyte 装下 -1/0/1）
+✓ 极简，无防御性编程，无解释性注释
+
+================================================================================
+END OF LESSON 04
+================================================================================

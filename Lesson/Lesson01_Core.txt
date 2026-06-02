@@ -1,0 +1,117 @@
+================================================================================
+LESSON 01 — World + Entity + IComponent + ISystem
+完成日期：2026-05-10
+================================================================================
+
+【这节课做了啥】
+搭建 ECS 数据骨架四个核心文件，定下回滚兼容、确定性、命名规范的地基。
+中途切换到"速通帮写"模式，并更新 memory feedback 规则。
+
+【最终产物】
+- Assets/Framework/Core/IComponent.cs   — 空标记接口
+- Assets/Framework/Core/ISystem.cs      — void Tick(World world)
+- Assets/Framework/Core/Entity.cs       — Id + Add/Get/Has<T> + Dictionary<Type, IComponent>
+- Assets/Framework/Core/World.cs        — Frame/RoomSeed/Random/Entities/Systems + CreateEntity/RegisterSystem/Init/Tick
+
+【关键决策】
+1. Component 用 class（不用 struct）
+   理由：Dictionary<Type, IComponent> 装 struct 会装箱，Get<T>() 取出是副本写不回去。
+   class + ISnapshotable 显式深拷贝是 v1 的方案。
+
+2. Entity ID 从 1 开始递增
+   理由：0 保留作 "invalid/null" 哨兵。Component 字段持 entity 引用时，
+   int 默认 0 不能跟"实际指向 entity 0"撞车。
+
+3. Frame++ 放在 foreach 之后
+   理由：Frame 语义 = "已执行完的帧数"。Tick 进入时 Frame=N（N 帧完成），
+   跑完第 N+1 帧 → Frame++ → N+1。
+   这个语义和位置必须同步选定，否则未来 snapshot 会错位一帧。
+
+【教学讨论】
+1. 为什么需要 World：
+   - N 个客户端各跑同一个 World，喂同样输入序列 → 状态完全一致
+   - 服务器只广播输入不广播状态（带宽小、防作弊基础）
+   - 回滚 = World 倒回 N 帧再重算
+   - Replay = 初始 World + 输入文件重跑
+
+2. World 必含五件套：
+   - 当前帧数：动画/技能播到哪帧、回滚单位
+   - 实体列表：角色、判定盒、子弹、可拾取道具（不含 VFX！VFX 是表现层）
+   - System 列表：每帧执行的规则
+   - 随机数源 FRandom：必须可控可备份
+   - 房间种子：开局服务器下发，初始化 FRandom
+
+3. World 严禁装：
+   - GameObject / Transform / Animator
+   - Time.deltaTime
+   - 单例
+
+4. 为什么用 ECS（vs OOP class Player）：
+   - 回滚：遍历 Entity 的 Component 一个个备份/还原，比备份整个 Player 类简单
+   - 数据行为分离：服务器/客户端共用 Component 定义，区别只在装多少 System
+   - 增删功能不改老代码（多写一个 System 就是）
+
+【性能问题：Type 做 Dictionary key 重不重？】
+不重。typeof(T) 是 JIT 编译期常量（零开销，不是反射），
+Type.GetHashCode 是 runtime 缓存的整数，Type.Equals 是引用相等。
+真正的瓶颈是缓存不友好（component 散落堆上）和回滚不友好（遍历 Dict 拷贝慢）。
+v1 50 个 entity 完全够用。Lesson 10 做 snapshot 慢了再换 IComponent[entityCount, typeCount] 二维表。
+
+商业级 ECS 方案：
+- Entitas: 每个 ComponentType 静态 int ID，二维数组索引
+- DOTS: archetype，相同 component 组合的 entity 共享密集 chunk
+- EnTT/bevy: sparse set
+
+【命名规范讨论】
+- 用户问 PascalCase Frame/RoomSeed 是不是匈牙利规范
+- 答：完全不是
+  - 匈牙利命名：iCount/szName/m_iFrame（类型前缀），Win32/MFC 时代产物，C# 不用
+  - PascalCase 公有成员是 Microsoft .NET 标准
+- 鹅厂主流 C# 规范：
+  - public：PascalCase ✓ Frame/RoomSeed 是对的
+  - 接口：I 前缀 ✓
+  - private 字段：_xxx（Microsoft）或 m_xxx（老 C++ 系组）—— 跟项目组现有代码统一
+  - 严格组要求 public 必须用属性而不是字段：public int Frame { get; private set; }
+  - Id vs ID：Microsoft 规范 Id 对（两字母及以下缩写当词处理）
+
+【风格调整】
+2026-05-10 起切到"速通模式"：
+- 用户明确说"帮我写"时可以替写代码
+- 风格：极简，不加防御性编程，不加解释性注释
+- 默认仍走教学循环
+更新文件：
+- ~/.claude/.../memory/feedback_teaching_mode.md（加覆盖条款）
+- .claude/skills/lockstep-tutor/SKILL.md（加代码风格强制小节）
+
+【思考点 + 答案】
+
+Q1: Component 应该是 class 还是 struct？
+A1: class。
+   struct 在真 ECS（DOTS/Entitas 密集数组）里有优势，但我们用 Dictionary<Type, IComponent>
+   会装箱，Get<T>() 取出来是副本，修改不写回去。class + ISnapshotable.Snapshot/Restore
+   做回滚（v2 才填实现，v1 接口空挂着）。
+
+Q2: Entity ID 从 0 还是从 1 开始？为什么？
+A2: 从 1。
+   0 保留作 invalid 哨兵。未来一定有 component 持 entity ID 引用，int 默认 0
+   ——如果 0 是合法 ID，"未初始化" 和 "指向 entity 0" 撞车，无法区分，是 bug 温床。
+
+Q3: Tick() 里 Frame++ 应该放在 foreach 之前还是之后？
+A3: 之后。
+   两种语义都对但只能选一个：
+   - 语义 A：Frame = "已完成帧数" → Frame++ 在结尾
+   - 语义 B：Frame = "当前正在执行的帧号" → Frame++ 在开头
+   我们选了 A（World.cs 注释里写明）。Snapshot 时 frameId = world.Frame，
+   语义和 Frame++ 时机搞反一帧，回滚就错位一帧，调到怀疑人生。
+
+【铁律提醒】
+1. 逻辑层（Framework/* 除 View，Game/*）禁用：
+   float, double, UnityEngine.Vector*, Mathf, Random, Time.deltaTime, UnityEngine.Physics, System.Random, 单例
+2. 跨子系统调用走接口 + Null 实现（rollback-ready）
+3. Component 接口位预留 ISnapshotable（v1 空，v2 填）
+4. F 前缀命名（FFloat/FVector2/FVector3/FQuat/FMath/FRandom/FAABB2D）
+5. 严禁 JiepengTan 教程代码（那是 3D，我们是 2D 横版）
+
+================================================================================
+END OF LESSON 01
+================================================================================

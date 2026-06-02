@@ -1,0 +1,16 @@
+{
+    "name": "Lockstep.Logic",
+    "rootNamespace": "Lockstep",
+    "references": [
+        "Lockstep.FixedMath"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

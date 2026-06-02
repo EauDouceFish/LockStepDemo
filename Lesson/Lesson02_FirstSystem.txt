@@ -1,0 +1,148 @@
+================================================================================
+LESSON 02 — 第一个 System 跑起来（烟雾测试）
+完成日期：2026-05-10
+================================================================================
+
+【这节课做了啥】
+1. 调整目录结构：Scripts/Game/Systems/、Scripts/Client/
+2. 写 LogTickSystem（最小 ISystem 实现）
+3. 写 WorldDriver（MonoBehaviour 入口）
+4. 修复 FFloat.Epsilon 编译错误
+5. 把 Unity 默认空壳 GameCore.cs 删掉
+
+【最终产物】
+- Assets/Scripts/Game/Systems/LogTickSystem.cs   — 烟雾测试 system
+- Assets/Scripts/Client/WorldDriver.cs           — Unity 入口 MonoBehaviour
+（删除）Assets/Scripts/GameCore.cs                — Unity 自动生成的空壳
+
+修复：Assets/Framework/Math/FFloat.cs 第 30 行
+  原：new FFloat(Fix64.Precision)         // Fix64.Precision 是 decimal 不是 Fix64
+  改：new FFloat(Fix64.FromRaw(1))         // 直接构造 raw=1 的 Fix64
+
+【目录结构最终版】
+Assets/
+├── Framework/   (不动)
+│   ├── Core/    World/Entity/IComponent/ISystem
+│   └── Math/    F* 数学层
+├── Plugins/     Fix64 + KCP
+├── Scenes/
+└── Scripts/
+    ├── Client/
+    │   └── WorldDriver.cs        ← Unity 入口
+    └── Game/
+        └── Systems/
+            └── LogTickSystem.cs   ← 业务 system
+
+后续会扩展：
+- Scripts/Game/Components/  TransformC/VelocityC/HitboxC（Lesson 17, 23）
+- Scripts/Game/States/      Idle/Walk/Attack/Hit（Lesson 19+）
+- Scripts/Game/View/        PlayerView（Lesson 18）
+- Scripts/Server/           Room/LockstepServer（Lesson 7-8）
+
+【分层依赖规则】
+Server / Client (顶层，能 using 任何东西)
+   ↓
+Game (Components/Systems/States/View)
+   ↓
+Framework (Core/Math/Input/Network/Predict)
+   ↓
+Plugins
+逻辑层（Framework/Core, Game/Systems...）严禁 using UnityEngine。
+
+【关键设计：Action<string> 注入而不是 Debug.Log 直调】
+LogTickSystem 不能直接 UnityEngine.Debug.Log，因为：
+1. 服务器没 UnityEngine（编译失败）
+2. 单元测试无法 mock 输出
+3. Debug.Log 副作用不在确定性范畴内
+
+解决方案 —— 依赖反转，注入 Action<string>：
+  public class LogTickSystem : ISystem {
+      readonly Action<string> _log;
+      public LogTickSystem(Action<string> log) { _log = log; }
+      public void Tick(World world) { _log($"Frame {world.Frame}"); }
+  }
+
+WorldDriver 那边：
+  world.RegisterSystem(new LogTickSystem(s => Debug.Log(s)));
+
+这是后面所有"接口注入避开 Unity"的最小化练手版。
+IInputProvider/ITransport/ISnapshotSystem 全是同套路。
+
+【WorldDriver 设计】
+namespace Lockstep.Client，MonoBehaviour，Start() 里：
+  _world = new World();
+  _world.Init(12345);
+  _world.RegisterSystem(new LogTickSystem(s => Debug.Log(s)));
+  for (int i = 0; i < 10; i++) _world.Tick();
+
+【场景设置】
+1. 打开 Assets/Scenes/SampleScene.unity（或另存为 Lesson02_Smoke）
+2. 空 GameObject 命名 "Driver"，挂 WorldDriver 脚本
+3. 按 Play
+4. Console 应该看到 Frame 0..9 共 10 行
+
+【验收】
+✓ 看到 Frame 0..9 顺序正确 → Lesson 1 的 Frame++ 位置和语义都对
+✗ 看到 Frame 1..10 → Lesson 1 的 Frame++ 位置写反了，回去修
+✗ 编译报错找不到 ISystem → namespace 引用不对
+
+【思考点 + 答案】
+
+Q1: Action<string> vs ILogger 接口好坏？
+A1:
+  Action<string> 胜：代码量极少（0 个文件 vs 至少 2 个），lambda 一行，单职责场景理想
+  ILogger 胜：能扩展多 level（Info/Warn/Error），结构化日志，全局可搜索
+  本课用 Action<string> 是对的（临时 smoke test，注入点只有一个）。
+  实战里两种都会用：
+  - 日志/上报（多方法、长期）→ ILogger
+  - IInputProvider/ITransport（功能相对固定）→ 接口
+  - 只有一个方法的小 hook → Func/Action 也行
+
+Q2: WorldDriver 在 Update 里调 Tick 对吗？
+A2: 绝对错。
+  Update 频率 = 渲染帧率，60/144/30Hz 漂移，玩家间不一致 → 状态分叉。
+  Time.deltaTime 是 float、不确定 → 摸到逻辑层就破坏确定性。
+  FixedUpdate 也不行：默认 50Hz，绑物理引擎，受 Time.timeScale 影响。
+  正确做法（Lesson 11）：累计器模式
+    const int LogicHz = 30;
+    const float StepMs = 1000f / LogicHz;
+    float _accumulator;
+    void Update() {
+      _accumulator += Time.deltaTime * 1000f;
+      while (_accumulator >= StepMs) {
+        _world.Tick();   // 不传时间！World 自己用固定步长
+        _accumulator -= StepMs;
+      }
+    }
+
+Q3: Debug.Log 替换成"上报后台日志服务"，哪些文件改？
+A3:
+  - LogTickSystem.cs：一个字符不改（它只接受 Action<string>，不知道日志去了哪）
+  - World/Entity/IComponent/ISystem：完全不改（不知道有日志这回事）
+  - WorldDriver.cs：改一行
+      原：new LogTickSystem(s => Debug.Log(s))
+      改：new LogTickSystem(s => RemoteLogger.Send(s))
+  这就是依赖反转的力量：里层只声明"我要个能打字符串的东西"，
+  最外层（Driver）决定具体用谁。
+
+【FFloat 编译错误修复细节】
+错误：Argument 1: cannot convert from 'decimal' to 'FixMath.NET.Fix64'
+位置：Assets/Framework/Math/FFloat.cs:30
+原代码：public static readonly FFloat Epsilon = new FFloat(Fix64.Precision);
+
+原因：原库 Fix64.Precision 类型是 decimal，不是 Fix64。
+  // Fix64.cs:16
+  public static readonly decimal Precision = (decimal)(new Fix64(1L));
+原作者用 decimal 是为了 Console.WriteLine 出来人能读（"0.0000000002328..."）。
+但我们要的是"raw=1 的 Fix64"——Q31.32 能表示的最小正数。
+
+修复：new FFloat(Fix64.FromRaw(1))
+
+附带的边界纠错：
+铁律 1 禁止逻辑层用 decimal。原本 Fix64.Precision 是 decimal，
+若被业务代码碰到就违反铁律。修复后 FFloat.Epsilon 走 raw 通道，
+decimal 被隔离在 Plugins/FixedMath 内部。
+
+================================================================================
+END OF LESSON 02
+================================================================================

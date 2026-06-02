@@ -1,0 +1,106 @@
+================================================================================
+LESSON 03 — FrameInput 数据格式（火影手游对标修订版）
+完成日期：2026-05-10
+================================================================================
+
+【这节课做了啥】
+对标火影忍者手游战斗机制设计 FrameInput。3 字节装下 MoveX + MoveZ + Attack 按钮。
+初稿误用了 Light/Heavy/Dodge/Jump（欧美格斗那套），已修正。
+
+【最终产物】
+- Assets/Framework/Input/FrameInput.cs
+
+【代码全文】
+using System;
+
+namespace Lockstep.Input
+{
+    [Flags]
+    public enum InputButton : byte
+    {
+        None = 0,
+        Attack = 1 << 0,
+    }
+
+    public struct FrameInput
+    {
+        public sbyte MoveX;
+        public sbyte MoveZ;
+        public byte Buttons;
+
+        public bool IsDown(InputButton b) => (Buttons & (byte)b) != 0;
+
+        public static FrameInput Empty => default;
+    }
+}
+
+【为什么是这样设计】
+
+1. 为什么 MoveX + MoveZ 不含 Y？
+   火影手游是 2D 横版 + XYZ：
+   - X = 横向（左右），决定面朝方向 + 攻击距离
+   - Y = 高度，仅"被击飞"才会出现 → 不收玩家输入
+   - Z = 纵深（前后排），命中需 Z 距离接近，是火影手游核心策略
+   玩家不能主动跳跃，所以 FrameInput 没有 Y 轴输入。
+
+2. 为什么只一个 Attack 按钮？
+   火影手游平 A 是单按钮多段连击。每段的伤害/硬直/末段类型由 AttackData
+   ScriptableObject 配置，不靠输入区分。
+   末段类型（平推/击飞/扫地）也是配置决定，不是玩家选的。
+   守护/替身/技能 1/2/3 速通先不做。
+
+3. 为什么用 sbyte 不用 byte 或更精细的 FFloat？
+   - sbyte 装得下 -1/0/1（最简）也装得下 -127..127（未来 8-way 摇杆）
+   - byte 无符号，要额外编码 0=neutral 1=left 2=right，绕
+   - FFloat 16 字节 + 浮点摇杆值，确定性 + 网络都浪费——3 档已经够 demo
+   - 商业级会用 sbyte 全范围（-128..127 ≈ 256 档摇杆灵敏度）
+
+4. struct + [Flags] 同 Lesson 03 初稿，不变
+
+【火影手游战斗机制速查（速通对标）】
+
+PlayerState 枚举：
+- Idle 站立，可移动可平A
+- Walk 走动，可平A
+- Attack 平 A 段数推进；末段类型 by AttackData：平推 / 击飞 / 扫地
+- Hit 受击僵直，无法操作
+- Knockup 浮空（Y 轴抛物线，可被空中连击）
+- Knockdown 倒地（M 帧），扫地命中倒地角色 → 加长僵直
+- Wakeup 起立，结束后 Idle + 2s 无敌
+
+【XYZ 实现方案（2.5D 站位制）】
+
+- 角色坐标 FVector3 Pos：X 横向 / Y 高度 / Z 纵深
+- 相机：Unity 正交相机 + 轻微俯角（5-15°），Z 前后排能看出来
+- 移动：MoveX/Z 改 X/Z；Y 只受击飞驱动
+- 朝向：仅 X 轴左右，Z 不影响
+- 命中判定：hitbox AABB(XY) + |attacker.Z - target.Z| < 阈值（如 0.5）
+
+阈值是策略点：玩家拉 Z 位 → 拉开身位 → 攻击打不到 → 反打机会
+
+【后续课程关联】
+- Lesson 4：IInputProvider，LocalInputProvider 把键盘 → FrameInput
+- Lesson 17：MovementSystem 读 MoveX/Z 改 Velocity
+- Lesson 19+：状态机框架（Idle/Walk/Attack/Hit/Knockup/Knockdown/Wakeup）
+- Lesson 21：AttackData ScriptableObject（startup/active/recovery + 末段类型 + 命中效果）
+- Lesson 22-25：Attack/Hit/Knockup/Knockdown/Wakeup 各 State 实现
+- Lesson 23：CollisionSystem 命中判定带 Z 阈值
+
+【未来 InputButton 扩展位】
+当前 byte 只用了 1 位，余 7 位可加：
+- Guard (守护) = 1 << 1
+- Substitute (替身) = 1 << 2
+- Skill1/2/3 = 1 << 3,4,5
+- Ougi (奥义) = 1 << 6
+速通先不加。
+
+【铁律检查】
+✓ 不依赖 UnityEngine
+✓ 不用 float / decimal
+✓ namespace Lockstep.Input
+✓ struct 值语义
+✓ 极简，无防御性编程，无解释性注释
+
+================================================================================
+END OF LESSON 03 (REVISED)
+================================================================================

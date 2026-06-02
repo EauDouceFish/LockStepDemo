@@ -1,0 +1,38 @@
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# IDE / 工程文件
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.unityproj
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Crash 日志
+sysinfo.txt
+*.stackdump
+
+# .NET 测试工程产物
+[Bb]in/
+TestResults/
+
+# 原始 MUGEN 素材（体积大，放在仓库外 ../MugenSource，不入库）
+/MugenSource/

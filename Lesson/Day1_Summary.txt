@@ -1,0 +1,134 @@
+================================================================================
+DAY 1 SUMMARY — 2026-05-09 ~ 2026-05-10 02:00
+================================================================================
+
+【今天完成的课程】
+Lesson 1-6 全部完成，6 节课中 5 节有代码、1 节是概念课。
+
+【完成清单】
+
+Lesson 1 — World + Entity + IComponent + ISystem
+  Assets/Framework/Core/IComponent.cs
+  Assets/Framework/Core/ISystem.cs
+  Assets/Framework/Core/Entity.cs
+  Assets/Framework/Core/World.cs
+
+Lesson 2 — 第一个 System 跑起来
+  Assets/Scripts/Game/Systems/LogTickSystem.cs
+  Assets/Scripts/Client/WorldDriver.cs
+  ⚠️ 用户尚未在 Unity 中验证 Console 输出 Frame 0..9 —— 明早第一件事
+
+Lesson 3 — FrameInput 数据格式（火影手游对标修订）
+  Assets/Framework/Input/FrameInput.cs
+  ⚠️ 经历一次方向修正：从欧美格斗（Light/Heavy/Jump）改为火影手游（MoveX+MoveZ+Attack）
+
+Lesson 4 — IInputProvider + LocalInputProvider
+  Assets/Framework/Input/IInputProvider.cs
+  Assets/Scripts/Client/LocalInputProvider.cs
+
+Lesson 5 — 服务器是邮局不是裁判（概念课，无代码）
+
+Lesson 6 — 协议设计（5 消息）
+  Assets/Framework/Network/MsgType.cs
+  Assets/Framework/Network/Protocol.cs
+
+【附带修复】
+- Assets/Framework/Math/FFloat.cs 第 30 行 Epsilon 编译错误
+  原：new FFloat(Fix64.Precision)        // Fix64.Precision 是 decimal
+  改：new FFloat(Fix64.FromRaw(1))
+
+【附带的目录调整】
+- 删除：Assets/Scripts/GameCore.cs（Unity 默认空壳）
+- 新建目录结构：Assets/Scripts/{Client, Game/Systems}
+- 创建项目根目录归档：D:/_GameRepository/LockstepActDemo/Lesson/
+
+【附带的规则更新】
+- memory/feedback_teaching_mode.md：加"速通帮写"覆盖条款
+- .claude/skills/lockstep-tutor/SKILL.md：加代码风格强制小节
+- memory/project_lockstep_act_demo.md：明确火影手游对标范围
+
+【今天的重要对齐】
+
+1. 项目对标火影忍者手游（不是街霸/铁拳）
+   - 无主动跳跃，Y 只受击飞驱动
+   - 单 Attack 按钮 + 多段连击
+   - 末段类型：平推 / 击飞 / 扫地
+   - 状态机：Idle/Walk/Attack/Hit/Knockup/Knockdown/Wakeup
+   - 起立 2s 无敌
+   - 命中判定带 Z 阈值（2.5D 站位制）
+
+2. 切到速通帮写模式
+   - 我直接写代码，用户不再每节课写完贴回 review
+   - 风格：极简 + 无防御 + 无解释注释
+   - 思考点直接给答案不留作业
+
+3. 目录架构定型
+   Framework/{Core, Math, Input, Network, ...}
+   Scripts/{Client, Server, Game/{Systems, Components, States, View}}
+   Plugins/, Scenes/, ProjectSettings/
+
+【明天 5/10 的安排（用户拒绝砍课）】
+
+08:00 起，剩余 16h 工时（到 24:00 deadline）
+
+时间表：
+- 08:00-12:00  Phase 3-5：Server + Client 主循环 + Loopback
+- 12:00-14:00  Phase 6 — Checkpoint 1（双角色能走）
+- 14:00-19:00  Phase 7：完整状态机（含 Knockup/Knockdown/Wakeup）
+- 19:00-22:00  联调 + 录屏
+- 22:00-24:00  buffer
+
+⚠️ buffer 仅 2h，任何 Loopback 同步 bug 或战斗调优偏差都会吃光。
+   我已建议过砍 ITransport 抽象层 + 状态机砍到 4 态，用户拒绝。
+   按原计划推。
+
+【明天起来的待办】
+
+1. 在 Unity 里验证 Lesson 2：Console 看到 Frame 0..9（< 2 分钟）
+2. 直接说"继续"或"Lesson 7"，从 Room 状态机开始推
+
+【今日教学讨论中产生的关键认识】
+
+- Component class vs struct：用 class（避免 Dictionary 装箱副本写不回）
+- Entity ID 从 1（0 保留作 invalid 哨兵）
+- Frame++ 在 foreach 之后（语义 = "已完成帧数"）
+- Type 做 Dictionary key 不重（typeof 编译期常量），瓶颈在缓存不友好
+- PascalCase 不是匈牙利规范（匈牙利是 iCount/m_iFrame，PascalCase 是 .NET 标准）
+- LogTickSystem 用 Action<string> 而不是 ILogger（单职责场景接口最小化原则）
+- Update 里调 Tick 是错的（频率漂移 + Time.deltaTime 不确定 → 状态分叉）
+- Time.deltaTime 不能进逻辑层；累计器模式从 View 层吞 deltaTime
+- 本地输入不直接喂 World（必须走"上行→服务器→下行权威"两条路）
+- 服务器是邮局不是裁判（不跑游戏逻辑，只转发输入）
+- FrameAuth 打包所有玩家本帧输入（一次广播原子语义）
+
+【凌晨 02:30 修订决策（用户确认）】
+
+任务真实形态确认（用户翻出原始题目）：
+"动作游戏中网络同步方案研究：帧同步与状态同步"
+是研究课题，明确要求：① 帧同步 demo ② 联网手感 ③ 反作弊思考 ④ 弱网处理
+
+走偏点：
+- 之前完全围绕 demo 功能转
+- KCP/弱网/反作弊/报告全部 0%
+
+用户最终决定（拒绝砍课）：
+- 5/10 24:00 前**全做**：完整状态机 + KCP 真集成 + 弱网测试 + 简版报告
+- 5/10 之后还有约 1 个月慢慢 polish
+- 不发 mentor 确认消息
+
+明天时间表（5/10）：
+08:00-09:30  报告骨架 + 起 Lesson 7
+09:30-12:30  Phase 3-5（Server/Client/Loopback）
+12:30-14:00  Phase 6 走起来
+14:00-17:00  Phase 7 完整状态机
+17:00-19:00  KCP 跨进程联机
+19:00-20:00  弱网测试
+20:00-22:00  报告（2h 简版）
+22:00-23:30  录屏 + 交付包
+23:30-24:00  提交
+
+⚠️ buffer ≈ 0，赌速通生产力 + 1 个月 polish 期兜底。
+
+================================================================================
+晚安。明天 8 点见。
+================================================================================
