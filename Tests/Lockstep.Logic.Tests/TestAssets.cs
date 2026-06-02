@@ -24,5 +24,10 @@ namespace Lockstep.Tests
         {
             return Path.Combine(TerrarianDir(), "Terrarian.sff");
         }
+
+        public static string Cmd()
+        {
+            return Path.Combine(TerrarianDir(), "Terrarian.cmd");
+        }
     }
 }
