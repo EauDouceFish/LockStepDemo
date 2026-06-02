@@ -6,6 +6,7 @@ namespace Lockstep.Import.Sff
     /// </summary>
     public static class PcxDecoder
     {
+        /// <summary>解码一张 8 位索引 PCX，返回尺寸、索引像素与 256 色调色板。</summary>
         public static PcxImage Decode(byte[] data)
         {
             if (data == null || data.Length < 128)
@@ -39,22 +40,22 @@ namespace Lockstep.Import.Sff
             int total = bytesPerLine * nplanes * height;
             byte[] raw = new byte[total];
             int pos = 128;
-            int o = 0;
-            while (o < total && pos < data.Length)
+            int outPos = 0;
+            while (outPos < total && pos < data.Length)
             {
-                byte b = data[pos++];
-                if (encoding == 1 && (b & 0xC0) == 0xC0)
+                byte token = data[pos++];
+                if (encoding == 1 && (token & 0xC0) == 0xC0)
                 {
-                    int count = b & 0x3F;
+                    int count = token & 0x3F;
                     byte value = pos < data.Length ? data[pos++] : (byte)0;
-                    for (int k = 0; k < count && o < total; k++)
+                    for (int repeat = 0; repeat < count && outPos < total; repeat++)
                     {
-                        raw[o++] = value;
+                        raw[outPos++] = value;
                     }
                 }
                 else
                 {
-                    raw[o++] = b;
+                    raw[outPos++] = token;
                 }
             }
 

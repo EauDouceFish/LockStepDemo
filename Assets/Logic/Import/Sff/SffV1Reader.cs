@@ -19,6 +19,7 @@ namespace Lockstep.Import.Sff
     {
         const int SubheaderSize = 32;
 
+        /// <summary>打开 .sff 文件并读取其精灵目录（头 + 全部节点元数据）。</summary>
         public static SffFile ReadDirectory(string path)
         {
             using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
@@ -27,6 +28,7 @@ namespace Lockstep.Import.Sff
             }
         }
 
+        /// <summary>从流读取 SFF v1 精灵目录。沿链表遍历，以 NumImages 计数封顶。</summary>
         public static SffFile ReadDirectory(Stream stream)
         {
             using (BinaryReader reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true))
@@ -106,12 +108,12 @@ namespace Lockstep.Import.Sff
                 int read = 0;
                 while (read < buffer.Length)
                 {
-                    int n = fs.Read(buffer, read, buffer.Length - read);
-                    if (n <= 0)
+                    int readNow = fs.Read(buffer, read, buffer.Length - read);
+                    if (readNow <= 0)
                     {
                         break;
                     }
-                    read += n;
+                    read += readNow;
                 }
                 return buffer;
             }

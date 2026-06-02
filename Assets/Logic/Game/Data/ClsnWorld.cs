@@ -26,6 +26,7 @@ namespace Lockstep.Game.Data
     /// </summary>
     public static class ClsnWorld
     {
+        /// <summary>把相对角色原点的 Clsn 框按朝向镜像并平移到世界坐标，返回轴对齐包围盒。</summary>
         public static RectAabb ToWorld(ClsnBox box, FFloat originX, FFloat originY, FFloat facing)
         {
             FFloat x1 = box.X1 * facing + originX;
@@ -40,20 +41,21 @@ namespace Lockstep.Game.Data
                 Max(y1, y2));
         }
 
-        public static bool Overlap(RectAabb a, RectAabb b)
+        /// <summary>两个轴对齐包围盒是否重叠（含边界相切）。</summary>
+        public static bool Overlap(RectAabb first, RectAabb second)
         {
-            return a.MinX <= b.MaxX && a.MaxX >= b.MinX
-                && a.MinY <= b.MaxY && a.MaxY >= b.MinY;
+            return first.MinX <= second.MaxX && first.MaxX >= second.MinX
+                && first.MinY <= second.MaxY && first.MaxY >= second.MinY;
         }
 
-        static FFloat Min(FFloat a, FFloat b)
+        static FFloat Min(FFloat left, FFloat right)
         {
-            return a < b ? a : b;
+            return left < right ? left : right;
         }
 
-        static FFloat Max(FFloat a, FFloat b)
+        static FFloat Max(FFloat left, FFloat right)
         {
-            return a > b ? a : b;
+            return left > right ? left : right;
         }
     }
 }

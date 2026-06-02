@@ -13,11 +13,13 @@ namespace Lockstep.Import.Air
     /// </summary>
     public static class AirParser
     {
+        /// <summary>读取并解析 .air 文件，返回按出现顺序排列的全部动画。</summary>
         public static List<AnimData> ParseFile(string path)
         {
             return Parse(File.ReadAllText(path));
         }
 
+        /// <summary>解析 .air 文本内容为动画列表。</summary>
         public static List<AnimData> Parse(string text)
         {
             List<AnimData> result = new List<AnimData>();
@@ -84,14 +86,28 @@ namespace Lockstep.Import.Air
                     if (which == 1)
                     {
                         curDefault1 = isDefault;
-                        if (isDefault) { default1.Clear(); }
-                        else { pending1.Clear(); pendingSet1 = true; }
+                        if (isDefault)
+                        {
+                            default1.Clear();
+                        }
+                        else
+                        {
+                            pending1.Clear();
+                            pendingSet1 = true;
+                        }
                     }
                     else
                     {
                         curDefault2 = isDefault;
-                        if (isDefault) { default2.Clear(); }
-                        else { pending2.Clear(); pendingSet2 = true; }
+                        if (isDefault)
+                        {
+                            default2.Clear();
+                        }
+                        else
+                        {
+                            pending2.Clear();
+                            pendingSet2 = true;
+                        }
                     }
                     continue;
                 }
@@ -132,6 +148,7 @@ namespace Lockstep.Import.Air
             return result;
         }
 
+        /// <summary>把动画列表转成"动画号 → AnimData"字典，便于按 Anim 号查。</summary>
         public static Dictionary<int, AnimData> ToDictionary(List<AnimData> anims)
         {
             Dictionary<int, AnimData> map = new Dictionary<int, AnimData>();
@@ -175,39 +192,45 @@ namespace Lockstep.Import.Air
 
         static ClsnBox ParseBox(string line)
         {
-            int eq = line.IndexOf('=');
-            string[] c = line.Substring(eq + 1).Split(',');
+            int equalsAt = line.IndexOf('=');
+            string[] coords = line.Substring(equalsAt + 1).Split(',');
             return new ClsnBox(
-                FFloat.FromInt(ParseInt(c[0])),
-                FFloat.FromInt(ParseInt(c[1])),
-                FFloat.FromInt(ParseInt(c[2])),
-                FFloat.FromInt(ParseInt(c[3])));
+                FFloat.FromInt(ParseInt(coords[0])),
+                FFloat.FromInt(ParseInt(coords[1])),
+                FFloat.FromInt(ParseInt(coords[2])),
+                FFloat.FromInt(ParseInt(coords[3])));
         }
 
         static AnimFrame ParseFrame(string line)
         {
-            string[] p = line.Split(',');
+            string[] parts = line.Split(',');
             AnimFrame frame = new AnimFrame
             {
-                SpriteGroup = ParseInt(p[0]),
-                SpriteImage = ParseInt(p[1]),
-                OffX = FFloat.FromInt(ParseInt(p[2])),
-                OffY = FFloat.FromInt(ParseInt(p[3])),
-                Duration = ParseInt(p[4]),
+                SpriteGroup = ParseInt(parts[0]),
+                SpriteImage = ParseInt(parts[1]),
+                OffX = FFloat.FromInt(ParseInt(parts[2])),
+                OffY = FFloat.FromInt(ParseInt(parts[3])),
+                Duration = ParseInt(parts[4]),
                 Flip = FlipFlags.None,
             };
-            if (p.Length >= 6)
+            if (parts.Length >= 6)
             {
-                string f = p[5].Trim().ToUpperInvariant();
-                if (f.Contains("H")) { frame.Flip |= FlipFlags.Horizontal; }
-                if (f.Contains("V")) { frame.Flip |= FlipFlags.Vertical; }
+                string flip = parts[5].Trim().ToUpperInvariant();
+                if (flip.Contains("H"))
+                {
+                    frame.Flip |= FlipFlags.Horizontal;
+                }
+                if (flip.Contains("V"))
+                {
+                    frame.Flip |= FlipFlags.Vertical;
+                }
             }
             return frame;
         }
 
-        static int ParseInt(string s)
+        static int ParseInt(string text)
         {
-            return int.Parse(s.Trim(), CultureInfo.InvariantCulture);
+            return int.Parse(text.Trim(), CultureInfo.InvariantCulture);
         }
     }
 }

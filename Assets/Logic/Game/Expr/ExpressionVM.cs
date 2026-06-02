@@ -8,7 +8,9 @@ namespace Lockstep.Game.Expr
     /// <summary>表达式编译/求值异常。</summary>
     public sealed class ExprException : Exception
     {
-        public ExprException(string message) : base(message) { }
+        public ExprException(string message) : base(message)
+        {
+        }
     }
 
     /// <summary>
@@ -20,6 +22,7 @@ namespace Lockstep.Game.Expr
     /// </summary>
     public sealed class ExpressionVM : IExpressionVM
     {
+        /// <summary>编译一条 MUGEN 表达式为可反复求值的 AST。</summary>
         public IExpr Compile(string expression)
         {
             if (expression == null)
@@ -28,83 +31,84 @@ namespace Lockstep.Game.Expr
             }
             List<Token> tokens = Lex(expression);
             Parser parser = new Parser(tokens);
-            IExpr expr = parser.ParseExpression();
+            IExpr expressionTree = parser.ParseExpression();
             parser.ExpectEnd();
-            return expr;
+            return expressionTree;
         }
 
         // ───────────────────── 词法 ─────────────────────
 
-        enum TokKind { Number, Ident, Op, LParen, RParen, End }
+        enum TokenKind { Number, Identifier, Operator, LeftParen, RightParen, End }
 
         struct Token
         {
-            public TokKind Kind;
+            public TokenKind Kind;
             public string Text;
             public long Number;
         }
 
-        static List<Token> Lex(string s)
+        static List<Token> Lex(string source)
         {
             List<Token> tokens = new List<Token>();
-            int i = 0;
-            while (i < s.Length)
+            int index = 0;
+            while (index < source.Length)
             {
-                char c = s[i];
-                if (char.IsWhiteSpace(c))
+                char current = source[index];
+                if (char.IsWhiteSpace(current))
                 {
-                    i++;
+                    index++;
                     continue;
                 }
-                if (char.IsDigit(c))
+                if (char.IsDigit(current))
                 {
-                    int start = i;
-                    while (i < s.Length && char.IsDigit(s[i]))
+                    int start = index;
+                    while (index < source.Length && char.IsDigit(source[index]))
                     {
-                        i++;
+                        index++;
                     }
-                    long n = long.Parse(s.Substring(start, i - start), CultureInfo.InvariantCulture);
-                    tokens.Add(new Token { Kind = TokKind.Number, Number = n });
+                    long number = long.Parse(source.Substring(start, index - start), CultureInfo.InvariantCulture);
+                    tokens.Add(new Token { Kind = TokenKind.Number, Number = number });
                     continue;
                 }
-                if (char.IsLetter(c) || c == '_')
+                if (char.IsLetter(current) || current == '_')
                 {
-                    int start = i;
-                    while (i < s.Length && (char.IsLetterOrDigit(s[i]) || s[i] == '_'))
+                    int start = index;
+                    while (index < source.Length && (char.IsLetterOrDigit(source[index]) || source[index] == '_'))
                     {
-                        i++;
+                        index++;
                     }
-                    tokens.Add(new Token { Kind = TokKind.Ident, Text = s.Substring(start, i - start) });
+                    tokens.Add(new Token { Kind = TokenKind.Identifier, Text = source.Substring(start, index - start) });
                     continue;
                 }
-                if (c == '(')
+                if (current == '(')
                 {
-                    tokens.Add(new Token { Kind = TokKind.LParen });
-                    i++;
+                    tokens.Add(new Token { Kind = TokenKind.LeftParen });
+                    index++;
                     continue;
                 }
-                if (c == ')')
+                if (current == ')')
                 {
-                    tokens.Add(new Token { Kind = TokKind.RParen });
-                    i++;
+                    tokens.Add(new Token { Kind = TokenKind.RightParen });
+                    index++;
                     continue;
                 }
-                string two = (i + 1 < s.Length) ? s.Substring(i, 2) : null;
-                if (two == "!=" || two == "<=" || two == ">=")
+                string twoChar = (index + 1 < source.Length) ? source.Substring(index, 2) : null;
+                if (twoChar == "!=" || twoChar == "<=" || twoChar == ">=")
                 {
-                    tokens.Add(new Token { Kind = TokKind.Op, Text = two });
-                    i += 2;
+                    tokens.Add(new Token { Kind = TokenKind.Operator, Text = twoChar });
+                    index += 2;
                     continue;
                 }
-                if (c == '=' || c == '<' || c == '>' || c == '+' || c == '-' || c == '*' || c == '/' || c == '%')
+                if (current == '=' || current == '<' || current == '>'
+                    || current == '+' || current == '-' || current == '*' || current == '/' || current == '%')
                 {
-                    tokens.Add(new Token { Kind = TokKind.Op, Text = c.ToString() });
-                    i++;
+                    tokens.Add(new Token { Kind = TokenKind.Operator, Text = current.ToString() });
+                    index++;
                     continue;
                 }
-                throw new ExprException("无法识别的字符: '" + c + "'");
+                throw new ExprException("无法识别的字符: '" + current + "'");
             }
-            tokens.Add(new Token { Kind = TokKind.End });
+            tokens.Add(new Token { Kind = TokenKind.End });
             return tokens;
         }
 
@@ -112,32 +116,32 @@ namespace Lockstep.Game.Expr
 
         sealed class Parser
         {
-            readonly List<Token> _toks;
-            int _pos;
+            readonly List<Token> _tokens;
+            int _position;
 
-            public Parser(List<Token> toks)
+            public Parser(List<Token> tokens)
             {
-                _toks = toks;
+                _tokens = tokens;
             }
 
-            Token Cur
+            Token Current
             {
-                get { return _toks[_pos]; }
+                get { return _tokens[_position]; }
             }
 
-            Token Next()
+            Token Advance()
             {
-                return _toks[_pos++];
+                return _tokens[_position++];
             }
 
-            bool IsOp(string op)
+            bool IsOperator(string symbol)
             {
-                return Cur.Kind == TokKind.Op && Cur.Text == op;
+                return Current.Kind == TokenKind.Operator && Current.Text == symbol;
             }
 
             public void ExpectEnd()
             {
-                if (Cur.Kind != TokKind.End)
+                if (Current.Kind != TokenKind.End)
                 {
                     throw new ExprException("表达式末尾有多余记号");
                 }
@@ -151,71 +155,72 @@ namespace Lockstep.Game.Expr
             IExpr ParseCompare()
             {
                 IExpr left = ParseAdd();
-                while (IsOp("=") || IsOp("!=") || IsOp("<") || IsOp("<=") || IsOp(">") || IsOp(">="))
+                while (IsOperator("=") || IsOperator("!=") || IsOperator("<")
+                    || IsOperator("<=") || IsOperator(">") || IsOperator(">="))
                 {
-                    string op = Next().Text;
+                    string symbol = Advance().Text;
                     IExpr right = ParseAdd();
-                    left = new BinaryNode(op, left, right);
+                    left = new BinaryNode(symbol, left, right);
                 }
                 return left;
             }
 
             IExpr ParseAdd()
             {
-                IExpr left = ParseMul();
-                while (IsOp("+") || IsOp("-"))
+                IExpr left = ParseMultiply();
+                while (IsOperator("+") || IsOperator("-"))
                 {
-                    string op = Next().Text;
-                    IExpr right = ParseMul();
-                    left = new BinaryNode(op, left, right);
+                    string symbol = Advance().Text;
+                    IExpr right = ParseMultiply();
+                    left = new BinaryNode(symbol, left, right);
                 }
                 return left;
             }
 
-            IExpr ParseMul()
+            IExpr ParseMultiply()
             {
                 IExpr left = ParseUnary();
-                while (IsOp("*") || IsOp("/") || IsOp("%"))
+                while (IsOperator("*") || IsOperator("/") || IsOperator("%"))
                 {
-                    string op = Next().Text;
+                    string symbol = Advance().Text;
                     IExpr right = ParseUnary();
-                    left = new BinaryNode(op, left, right);
+                    left = new BinaryNode(symbol, left, right);
                 }
                 return left;
             }
 
             IExpr ParseUnary()
             {
-                if (IsOp("-"))
+                if (IsOperator("-"))
                 {
-                    Next();
-                    return new UnaryNegNode(ParseUnary());
+                    Advance();
+                    return new NegateNode(ParseUnary());
                 }
                 return ParsePrimary();
             }
 
             IExpr ParsePrimary()
             {
-                Token t = Cur;
-                if (t.Kind == TokKind.Number)
+                Token token = Current;
+                if (token.Kind == TokenKind.Number)
                 {
-                    Next();
-                    return new ConstNode(FFloat.FromInt((int)t.Number));
+                    Advance();
+                    return new ConstNode(FFloat.FromInt((int)token.Number));
                 }
-                if (t.Kind == TokKind.Ident)
+                if (token.Kind == TokenKind.Identifier)
                 {
-                    Next();
-                    return new TriggerNode(t.Text);
+                    Advance();
+                    return new TriggerNode(token.Text);
                 }
-                if (t.Kind == TokKind.LParen)
+                if (token.Kind == TokenKind.LeftParen)
                 {
-                    Next();
+                    Advance();
                     IExpr inner = ParseExpression();
-                    if (Cur.Kind != TokKind.RParen)
+                    if (Current.Kind != TokenKind.RightParen)
                     {
                         throw new ExprException("缺少右括号");
                     }
-                    Next();
+                    Advance();
                     return inner;
                 }
                 throw new ExprException("意外的记号");
@@ -224,27 +229,33 @@ namespace Lockstep.Game.Expr
 
         // ───────────────────── AST 节点 ─────────────────────
 
-        sealed class ConstNode : IExpr
+        /// <summary>AST 基类：统一 EvalBool（MUGEN 约定非 0 即真），子类只实现 Eval。</summary>
+        abstract class ExprNode : IExpr
         {
-            readonly FFloat _v;
+            public abstract FFloat Eval(IEvalContext context);
 
-            public ConstNode(FFloat v)
+            public bool EvalBool(IEvalContext context)
             {
-                _v = v;
-            }
-
-            public FFloat Eval(IEvalContext ctx)
-            {
-                return _v;
-            }
-
-            public bool EvalBool(IEvalContext ctx)
-            {
-                return _v != FFloat.Zero;
+                return Eval(context) != FFloat.Zero;
             }
         }
 
-        sealed class TriggerNode : IExpr
+        sealed class ConstNode : ExprNode
+        {
+            readonly FFloat _value;
+
+            public ConstNode(FFloat value)
+            {
+                _value = value;
+            }
+
+            public override FFloat Eval(IEvalContext context)
+            {
+                return _value;
+            }
+        }
+
+        sealed class TriggerNode : ExprNode
         {
             readonly string _name;
 
@@ -253,83 +264,68 @@ namespace Lockstep.Game.Expr
                 _name = name;
             }
 
-            public FFloat Eval(IEvalContext ctx)
+            public override FFloat Eval(IEvalContext context)
             {
-                if (ctx.TryGetTrigger(_name, out FFloat v))
+                if (context.TryGetTrigger(_name, out FFloat value))
                 {
-                    return v;
+                    return value;
                 }
                 throw new ExprException("未知 trigger: " + _name);
             }
-
-            public bool EvalBool(IEvalContext ctx)
-            {
-                return Eval(ctx) != FFloat.Zero;
-            }
         }
 
-        sealed class UnaryNegNode : IExpr
+        sealed class NegateNode : ExprNode
         {
             readonly IExpr _inner;
 
-            public UnaryNegNode(IExpr inner)
+            public NegateNode(IExpr inner)
             {
                 _inner = inner;
             }
 
-            public FFloat Eval(IEvalContext ctx)
+            public override FFloat Eval(IEvalContext context)
             {
-                return -_inner.Eval(ctx);
-            }
-
-            public bool EvalBool(IEvalContext ctx)
-            {
-                return Eval(ctx) != FFloat.Zero;
+                return -_inner.Eval(context);
             }
         }
 
-        sealed class BinaryNode : IExpr
+        sealed class BinaryNode : ExprNode
         {
-            readonly string _op;
+            readonly string _symbol;
             readonly IExpr _left;
             readonly IExpr _right;
 
-            public BinaryNode(string op, IExpr left, IExpr right)
+            public BinaryNode(string symbol, IExpr left, IExpr right)
             {
-                _op = op;
+                _symbol = symbol;
                 _left = left;
                 _right = right;
             }
 
-            public FFloat Eval(IEvalContext ctx)
+            public override FFloat Eval(IEvalContext context)
             {
-                FFloat a = _left.Eval(ctx);
-                FFloat b = _right.Eval(ctx);
-                switch (_op)
+                FFloat left = _left.Eval(context);
+                FFloat right = _right.Eval(context);
+                switch (_symbol)
                 {
-                    case "+": return a + b;
-                    case "-": return a - b;
-                    case "*": return a * b;
-                    case "/": return a / b;
-                    case "%": return a % b;
-                    case "=": return Bool(a == b);
-                    case "!=": return Bool(a != b);
-                    case "<": return Bool(a < b);
-                    case "<=": return Bool(a <= b);
-                    case ">": return Bool(a > b);
-                    case ">=": return Bool(a >= b);
-                    default: throw new ExprException("未知运算符: " + _op);
+                    case "+": return left + right;
+                    case "-": return left - right;
+                    case "*": return left * right;
+                    case "/": return left / right;
+                    case "%": return left % right;
+                    case "=": return FromBool(left == right);
+                    case "!=": return FromBool(left != right);
+                    case "<": return FromBool(left < right);
+                    case "<=": return FromBool(left <= right);
+                    case ">": return FromBool(left > right);
+                    case ">=": return FromBool(left >= right);
+                    default: throw new ExprException("未知运算符: " + _symbol);
                 }
             }
 
-            public bool EvalBool(IEvalContext ctx)
+            static FFloat FromBool(bool value)
             {
-                return Eval(ctx) != FFloat.Zero;
-            }
-
-            static FFloat Bool(bool b)
-            {
-                return b ? FFloat.One : FFloat.Zero;
+                return value ? FFloat.One : FFloat.Zero;
             }
         }
     }
