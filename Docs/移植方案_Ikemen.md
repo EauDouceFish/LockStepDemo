@@ -91,7 +91,7 @@ Assets/Logic/Mugen/
 | **M1** 表达式 VM | `OpCode`(155枚举) + `BytecodeOps`(算术/逻辑/比较/位/区间/三角/取整, 类型规则照搬) + `BytecodeExp`(栈机执行器) + FMath 补 Acos/Atan/Asin/Ln/Pow/Exp。**短路跳转(jz/jnz)未做**(纯表达式两侧求值结果一致, M2 需要时补); **trigger/redirect opcode 走 IExprContext 钩子, M3 接入**。dotnet test 87/87 | M0 | ✅ (本次) |
 | **M2** 编译器 | `compiler.go`(+functions)：CNS trigger 字符串 → BytecodeExp；可按 trigger 增量移植 | M1 | 🔄 核心完成(`MugenExprCompiler`:tokenizer+完整优先级链[照搬 Ikemen expBoolOr..expValue]+字面量/括号/一元/算术/比较/逻辑/位+无参 trigger+轴 trigger(pos/vel)+函数(abs/floor/trig/ifelse/log)+var/fvar, dotnet test 104/104)；**待补**:statetype/movetype 字母枚举操作数(S/C/A)、`=[a,b]` 区间语法、字符串 command=、redirect(p2/parent)、const(...)/常量、更多 trigger |
 | **M3** Char 运行态 | `Char`/`CharSystemVar` 结构体（定点）、生命周期、Clone/WriteHash 接回滚底座 | M0 | 🔄 骨架完成(`MChar` 核心字段+IExprContext 接常用 trigger+Clone/WriteHash, dotnet test 95/95)；CharSystemVar 全字段/hitdef/ghv/targets/redirect 待补 |
-| **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states 加载 | M1,M3 | ⬜ |
+| **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states 加载 | M1,M3 | 🔄 MVP 完成(`MStateDef`+`MStateController`基类+`ChangeStateController`+`MStateMachine`:trigger 求值跑控制器、ChangeState 同帧重入、statedef 头应用、hitstop 冻结, dotnet test 108/108)；**待补**:StateBlock 的 triggerall/trigger1..n 编译、loop/persistent/ignorehitpause、负状态(-1/-2/-3)、SelfState、common states 加载 |
 | **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…，~90 个战斗相关） | M2,M4 | ⬜ |
 | **M6** 命令系统 | `input.go`：CommandList/Command/cmdElem，charge/`~`/`$`/`>`/`+` 全语义 | M3 | ⬜ |
 | **M7** 命中 | HitDef(130字段)+命中检测+GetHitVar+gethit 5000-5150 | M4,M5 | ⬜ |

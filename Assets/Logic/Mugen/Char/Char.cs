@@ -41,6 +41,9 @@ namespace Lockstep.Mugen.Char
         // 打击感
         public int Hitstop;         // = Ikemen hitPauseTime
 
+        // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
+        public int PendingStateNo = -1;
+
         // 物理
         public FVector3 Pos;
         public FVector3 OldPos;
@@ -64,7 +67,7 @@ namespace Lockstep.Mugen.Char
                 StateType = StateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
                 AnimNo = AnimNo, PrevAnimNo = PrevAnimNo,
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
-                Hitstop = Hitstop,
+                Hitstop = Hitstop, PendingStateNo = PendingStateNo,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -79,7 +82,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
-            hash.AddInt32(Hitstop);
+            hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo);
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             HashVars(ref hash, IntVars);
             HashFloatVars(ref hash, FloatVars);
