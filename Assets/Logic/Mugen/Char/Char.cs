@@ -54,6 +54,9 @@ namespace Lockstep.Mugen.Char
         public int AnimTime;        // 当前动画剩余时间（MUGEN 惯例 ≤0）
         public int AnimElemNo;      // 当前动画元素序号（1-based）
 
+        // AssertSpecial 标志位（每帧清空，须每帧重断言才保持）。见 MAssertFlag。
+        public int AssertFlags;
+
         // 受击变量（命中系统 M7 填值；此处随 Char 快照/哈希）
         public MGetHitVar Ghv = new MGetHitVar();
 
@@ -97,7 +100,7 @@ namespace Lockstep.Mugen.Char
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
                 HitCount = HitCount, UniqHitCount = UniqHitCount,
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
-                PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo,
+                PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 Ghv = Ghv.Clone(),
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
@@ -121,7 +124,7 @@ namespace Lockstep.Mugen.Char
             HashVars(ref hash, PersistCounters);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount);
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
-            hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo);
+            hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             Ghv.WriteHash(ref hash);
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);

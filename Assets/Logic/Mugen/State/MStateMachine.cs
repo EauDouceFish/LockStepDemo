@@ -31,6 +31,9 @@ namespace Lockstep.Mugen.State
                 c.Hitstop--;
             }
 
+            // AssertSpecial 标志每帧清空：须本帧重新断言才保持（对齐 MUGEN 每 tick 清）
+            c.AssertFlags = 0;
+
             // 外部强制切换（命中系统等）优先
             if (c.PendingStateNo >= 0)
             {
