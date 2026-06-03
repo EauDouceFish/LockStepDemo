@@ -147,6 +147,7 @@ namespace Lockstep.Mugen.State
             c.PendingStateNo = -1;
             c.PendingIsSelf = false;
             c.PrevStateNo = c.StateNo;
+            c.PrevStateType = c.StateType;   // 保存上一状态 statetype（prevstatetype trigger）
             c.StateNo = target;
             c.Time = 0;
             c.PersistCounters.Clear();

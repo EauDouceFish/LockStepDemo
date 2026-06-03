@@ -23,6 +23,7 @@ namespace Lockstep.Mugen.Char
         public int StateNo;
         public int PrevStateNo;
         public int StateType;       // 原始 MUGEN 码（S/C/A/...）
+        public int PrevStateType;   // 上一状态的 statetype（prevstatetype trigger）
         public int MoveType;        // I/A/H
         public int Physics;
         public bool Ctrl;
@@ -101,7 +102,7 @@ namespace Lockstep.Mugen.Char
             {
                 Name = Name, Id = Id,
                 Time = Time, StateNo = StateNo, PrevStateNo = PrevStateNo,
-                StateType = StateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
+                StateType = StateType, PrevStateType = PrevStateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
                 AnimNo = AnimNo, PrevAnimNo = PrevAnimNo,
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
                 Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
@@ -127,7 +128,7 @@ namespace Lockstep.Mugen.Char
         public void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(Time); hash.AddInt32(StateNo); hash.AddInt32(PrevStateNo);
-            hash.AddInt32(StateType); hash.AddInt32(MoveType); hash.AddInt32(Physics);
+            hash.AddInt32(StateType); hash.AddInt32(PrevStateType); hash.AddInt32(MoveType); hash.AddInt32(Physics);
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
@@ -249,6 +250,12 @@ namespace Lockstep.Mugen.Char
                     // gethitvar(field)：OC_ex_ + 字段id 字节，从 Ghv 读取
                     int fieldId = code[i]; i++;
                     return ReadGetHitVar(fieldId);
+                }
+                case OpCode.OC_ex2_:
+                {
+                    // prevstatetype = X：OC_ex2_ + 掩码，比较上一状态 statetype
+                    int mask = code[i]; i++;
+                    return BytecodeValue.Bool(PrevStateType == mask);
                 }
 
                 default:

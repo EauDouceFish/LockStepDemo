@@ -300,10 +300,17 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
-            // statetype/movetype 字母枚举比较（自行消费 = / != 与字母列表，是 expValue 级原子布尔）
-            if (name == "statetype" || name == "movetype")
+            // statetype/movetype/prevstatetype 字母枚举比较（自行消费 = / != 与字母列表，是 expValue 级原子布尔）
+            if (name == "statetype" || name == "movetype" || name == "prevstatetype")
             {
                 EmitTypeCompare(name);
+                return;
+            }
+
+            // p2statetype/p2movetype：在 p2 上做 statetype/movetype 比较（用 p2 redirect 包裹）
+            if (name == "p2statetype" || name == "p2movetype")
+            {
+                EmitP2TypeCompare(name.Substring(2));
                 return;
             }
 
@@ -401,15 +408,43 @@ namespace Lockstep.Mugen.Expr
             bool negate = IsOp("!=");
             if (negate || IsOp("=")) { Next(); }
             else { EmitInt(0); return; }
-            OpCode op = trigger == "statetype" ? OpCode.OC_statetype : OpCode.OC_movetype;
-            EmitTypeCheck(op, trigger);
+            OpCode op = TypeOpcode(trigger);
+            bool isMove = trigger == "movetype";
+            EmitTypeCheck(op, isMove);
             while (IsOp(","))
             {
                 Next();
-                EmitTypeCheck(op, trigger);
+                EmitTypeCheck(op, isMove);
                 Emit(OpCode.OC_blor);
             }
             if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        static OpCode TypeOpcode(string trigger)
+        {
+            switch (trigger)
+            {
+                case "movetype": return OpCode.OC_movetype;
+                case "prevstatetype": return OpCode.OC_ex2_;   // 子表标记：MChar 解码为 PrevStateType 比较
+                default: return OpCode.OC_statetype;
+            }
+        }
+
+        // p2statetype/p2movetype：把类型比较编入子缓冲，用 OC_p2 redirect + OC_run 包裹。
+        void EmitP2TypeCompare(string baseTrigger)
+        {
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            EmitTypeCompare(baseTrigger);
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;
+            _out.Add((byte)OpCode.OC_p2);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
         }
 
         // command = "name" / != "name"：发 OC_command + [1字节名长][ASCII 名字]。无比较则压 0。
@@ -430,13 +465,13 @@ namespace Lockstep.Mugen.Expr
             if (negate) { Emit(OpCode.OC_blnot); }
         }
 
-        void EmitTypeCheck(OpCode op, string trigger)
+        void EmitTypeCheck(OpCode op, bool isMove)
         {
             int mask = 0;
             if (Cur.Kind == TokKind.Ident && Cur.Text.Length > 0)
             {
                 char letter = Cur.Text[0];
-                mask = trigger == "statetype" ? StateTypeMask(letter) : MoveTypeMask(letter);
+                mask = isMove ? MoveTypeMask(letter) : StateTypeMask(letter);
                 Next();
             }
             Emit(op);
