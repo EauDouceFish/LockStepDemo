@@ -359,6 +359,15 @@ namespace Lockstep.Mugen.Expr
         void ParseFunction(string name)
         {
             Next(); // 吃掉 '('
+            // const(field)：参数是点分字段名(如 data.life / velocity.walk.fwd.x)，发 OC_const_ + 字段id 字节。
+            if (name == "const")
+            {
+                string field = ReadDottedName();
+                Expect(")");
+                Emit(OpCode.OC_const_);
+                _out.Add((byte)ConstFieldId(field));
+                return;
+            }
             // gethitvar(field)：参数是字段名(ident)，发 OC_ex_ + 字段id 字节，运行期从 Ghv 读
             if (name == "gethitvar")
             {
@@ -407,6 +416,31 @@ namespace Lockstep.Mugen.Expr
         void Expect(string op)
         {
             if (IsOp(op)) { Next(); }
+        }
+
+        // 读点分字段名：ident(.ident)*（标识符已小写）。用于 const(data.fall.defence_up) 等。
+        string ReadDottedName()
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            while (Cur.Kind == TokKind.Ident || IsOp("."))
+            {
+                if (IsOp("."))
+                {
+                    sb.Append('.');
+                }
+                else
+                {
+                    sb.Append(Cur.Text);
+                }
+                Next();
+            }
+            return sb.ToString();
+        }
+
+        // const(...) 字段名 → MConstId（与 MConstants.Read 解码一致）。未知 → Unknown(读出 0)。
+        static MConstId ConstFieldId(string field)
+        {
+            return ConstFields.TryGetValue(field, out MConstId id) ? id : MConstId.Unknown;
         }
 
         // statetype/movetype = X[,Y...] / != X[,Y...]：发 OC_statetype/OC_movetype + 1字节类型掩码，
@@ -621,6 +655,49 @@ namespace Lockstep.Mugen.Expr
             ["movecontact"] = OpCode.OC_movecontact, ["movehit"] = OpCode.OC_movehit,
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
             ["numtarget"] = OpCode.OC_numtarget,
+        };
+
+        // const(...) 字段名 → MConstId。名字照搬 Ikemen compiler.go 的 const token（真实角色用到的子集）。
+        static readonly Dictionary<string, MConstId> ConstFields = new Dictionary<string, MConstId>
+        {
+            ["data.life"] = MConstId.DataLife,
+            ["data.power"] = MConstId.DataPower,
+            ["data.attack"] = MConstId.DataAttack,
+            ["data.defence"] = MConstId.DataDefence,
+            ["data.fall.defence_up"] = MConstId.DataFallDefenceUp,
+            ["data.liedown.time"] = MConstId.DataLiedownTime,
+            ["data.airjuggle"] = MConstId.DataAirjuggle,
+            ["size.ground.back"] = MConstId.SizeGroundBack,
+            ["size.ground.front"] = MConstId.SizeGroundFront,
+            ["size.air.back"] = MConstId.SizeAirBack,
+            ["size.air.front"] = MConstId.SizeAirFront,
+            ["size.height"] = MConstId.SizeHeight,
+            ["size.head.pos.x"] = MConstId.SizeHeadPosX,
+            ["size.head.pos.y"] = MConstId.SizeHeadPosY,
+            ["size.mid.pos.x"] = MConstId.SizeMidPosX,
+            ["size.mid.pos.y"] = MConstId.SizeMidPosY,
+            ["velocity.walk.fwd.x"] = MConstId.VelWalkFwd,
+            ["velocity.walk.back.x"] = MConstId.VelWalkBack,
+            ["velocity.run.fwd.x"] = MConstId.VelRunFwdX,
+            ["velocity.run.fwd.y"] = MConstId.VelRunFwdY,
+            ["velocity.run.back.x"] = MConstId.VelRunBackX,
+            ["velocity.run.back.y"] = MConstId.VelRunBackY,
+            ["velocity.jump.neu.x"] = MConstId.VelJumpNeuX,
+            ["velocity.jump.y"] = MConstId.VelJumpY,
+            ["velocity.jump.back.x"] = MConstId.VelJumpBack,
+            ["velocity.jump.fwd.x"] = MConstId.VelJumpFwd,
+            ["velocity.runjump.fwd.x"] = MConstId.VelRunjumpFwdX,
+            ["velocity.runjump.back.x"] = MConstId.VelRunjumpBackX,
+            ["velocity.runjump.back.y"] = MConstId.VelRunjumpBackY,
+            ["velocity.airjump.neu.x"] = MConstId.VelAirjumpNeuX,
+            ["velocity.airjump.y"] = MConstId.VelAirjumpY,
+            ["velocity.airjump.back.x"] = MConstId.VelAirjumpBack,
+            ["velocity.airjump.fwd.x"] = MConstId.VelAirjumpFwd,
+            ["movement.yaccel"] = MConstId.MoveYaccel,
+            ["movement.stand.friction"] = MConstId.MoveStandFriction,
+            ["movement.crouch.friction"] = MConstId.MoveCrouchFriction,
+            ["movement.airjump.num"] = MConstId.MoveAirjumpNum,
+            ["movement.airjump.height"] = MConstId.MoveAirjumpHeight,
         };
 
         static readonly Dictionary<string, OpCode> UnaryFuncs = new Dictionary<string, OpCode>

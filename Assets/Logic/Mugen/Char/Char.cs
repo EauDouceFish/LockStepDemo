@@ -64,6 +64,10 @@ namespace Lockstep.Mugen.Char
         // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
         public Command.MCommandList CommandList;
 
+        // 角色常量（[Data]/[Size]/[Velocity]/[Movement]）：const(...) 的取值来源。
+        // 加载后不可变 → Clone 浅拷引用、WriteHash 不混入（与状态表同属配置，不进回滚快照）。可为 null。
+        public MConstants Constants;
+
         // 命中系统（M7）：当前 HitDef + 本帧 Clsn 框（Clsn 为动画派生，由 Anim 系统 M8 填，Clone 浅拷不哈希）。
         public Hit.MHitDef HitDef = new Hit.MHitDef();
         public Hit.MClsnBox[] Clsn1;   // 攻击框
@@ -117,6 +121,7 @@ namespace Lockstep.Mugen.Char
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 Ghv = Ghv.Clone(),
                 CommandList = CommandList != null ? CommandList.Clone() : null,
+                Constants = Constants,   // 不可变配置，浅拷引用
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,
@@ -252,6 +257,12 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Float(FloatVars.TryGetValue(index, out FFloat v) ? v : FFloat.Zero);
                 }
 
+                case OpCode.OC_const_:
+                {
+                    // const(field)：OC_const_ + 字段id 字节，从不可变常量集读取
+                    MConstId constId = (MConstId)code[i]; i++;
+                    return Constants != null ? Constants.Read(constId) : BytecodeValue.Int(0);
+                }
                 case OpCode.OC_ex_:
                 {
                     // gethitvar(field)：OC_ex_ + 字段id 字节，从 Ghv 读取
