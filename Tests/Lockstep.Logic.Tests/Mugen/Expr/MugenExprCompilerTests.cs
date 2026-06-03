@@ -95,5 +95,66 @@ namespace Lockstep.Tests.Mugen
             Assert.That(r.Type, Is.EqualTo(ValueType.Float));
             Assert.That(r.ToF().Raw, Is.EqualTo((FFloat.FromInt(7) / FFloat.FromInt(2)).Raw));
         }
+
+        // ───────── M2 补全：statetype/movetype 字母枚举比较 ─────────
+
+        [Test]
+        public void StateType_LetterCompare()
+        {
+            MChar c = new MChar { StateType = 1 };   // S
+            Assert.IsTrue(Eval("statetype = S", c).ToB());
+            Assert.IsFalse(Eval("statetype = A", c).ToB());
+            Assert.IsTrue(Eval("statetype != A", c).ToB());
+        }
+
+        [Test]
+        public void StateType_LetterList_IsOr()
+        {
+            MChar crouch = new MChar { StateType = 2 };   // C
+            Assert.IsTrue(Eval("statetype = S, C", crouch).ToB(), "C ∈ {S,C}");
+            MChar air = new MChar { StateType = 4 };       // A
+            Assert.IsFalse(Eval("statetype = S, C", air).ToB(), "A ∉ {S,C}");
+        }
+
+        [Test]
+        public void MoveType_LetterCompare()
+        {
+            MChar attacking = new MChar { MoveType = 4 };   // A
+            Assert.IsTrue(Eval("movetype = A", attacking).ToB());
+            Assert.IsFalse(Eval("movetype = I", attacking).ToB());
+        }
+
+        // ───────── M2 补全：=[a,b] 区间语法 ─────────
+
+        [Test]
+        public void Range_Syntax_InclusiveExclusive()
+        {
+            MChar c = new MChar { Time = 3 };
+            Assert.IsTrue(Eval("time = [2,5]", c).ToB(), "3 ∈ [2,5]");
+            Assert.IsFalse(Eval("time = [4,5]", c).ToB(), "3 ∉ [4,5]");
+            Assert.IsFalse(Eval("time = (3,5]", c).ToB(), "3 ∉ (3,5]（左开）");
+            Assert.IsTrue(Eval("time != [4,5]", c).ToB(), "!= 区间取反");
+        }
+
+        // ───────── M2 补全：redirect 编译（p2/root/parent）─────────
+
+        [Test]
+        public void Redirect_P2_And_Root()
+        {
+            MChar opp = new MChar { Life = 250 };
+            MChar root = new MChar { Power = 60 };
+            MChar c = new MChar { Life = 1000, P2 = opp, Root = root };
+            Assert.That(Eval("p2, life", c).ToI(), Is.EqualTo(250));
+            Assert.That(Eval("root, power", c).ToI(), Is.EqualTo(60));
+        }
+
+        [Test]
+        public void Redirect_BindsSingleValue_ThenOuterOp()
+        {
+            MChar opp = new MChar { Life = 200, Power = 50 };
+            MChar c = new MChar { Life = 1000, P2 = opp };
+            Assert.That(Eval("p2, (life + power)", c).ToI(), Is.EqualTo(250), "括号→整体重定向");
+            Assert.That(Eval("p2, life + 5", c).ToI(), Is.EqualTo(205), "(p2,life)+5：redirect 只绑单值");
+        }
     }
 }

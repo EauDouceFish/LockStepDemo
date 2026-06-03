@@ -164,8 +164,18 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_time: return BytecodeValue.Int(Time);
                 case OpCode.OC_stateno: return BytecodeValue.Int(StateNo);
                 case OpCode.OC_prevstateno: return BytecodeValue.Int(PrevStateNo);
-                case OpCode.OC_statetype: return BytecodeValue.Int(StateType);
-                case OpCode.OC_movetype: return BytecodeValue.Int(MoveType);
+                // statetype/movetype：消费 1 字节类型掩码，返回是否相等（对齐 Ikemen OC_statetype/OC_movetype）。
+                // 编码：编译器为 `statetype = S` 发 OC_statetype + 掩码(S=1/C=2/A=4/L=8)；多字母用 OR 串联。
+                case OpCode.OC_statetype:
+                {
+                    int mask = code[i]; i++;
+                    return BytecodeValue.Bool(StateType == mask);
+                }
+                case OpCode.OC_movetype:
+                {
+                    int mtype = code[i]; i++;
+                    return BytecodeValue.Bool(MoveType == mtype);   // 我方 MoveType 存小码 I=1/H=2/A=4
+                }
                 case OpCode.OC_ctrl: return BytecodeValue.Bool(Ctrl);
                 case OpCode.OC_anim: return BytecodeValue.Int(AnimNo);
                 case OpCode.OC_pos_x: return BytecodeValue.Float(Pos.X);

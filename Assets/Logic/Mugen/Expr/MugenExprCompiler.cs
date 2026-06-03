@@ -23,7 +23,7 @@ namespace Lockstep.Mugen.Expr
 
         List<Tok> _toks;
         int _pos;
-        readonly List<byte> _out = new List<byte>();
+        List<byte> _out = new List<byte>();   // 非 readonly：redirect 子表达式编译时临时切换缓冲
 
         public BytecodeExp Compile(string expr)
         {
@@ -165,10 +165,37 @@ namespace Lockstep.Mugen.Expr
             ParseGrls();
             while (true)
             {
-                if (IsOp("=")) { Next(); ParseGrls(); Emit(OpCode.OC_eq); }
-                else if (IsOp("!=")) { Next(); ParseGrls(); Emit(OpCode.OC_ne); }
-                else break;
+                bool ne = IsOp("!=");
+                if (!ne && !IsOp("=")) { break; }
+                Next();
+                // = / != 后接 [ 或 ( → 区间比较：左值已在栈，压 min/max + OC_range_xx（!= 追加 blnot）
+                if (IsOp("[") || IsOp("("))
+                {
+                    EmitRange(ne);
+                }
+                else
+                {
+                    ParseGrls();
+                    Emit(ne ? OpCode.OC_ne : OpCode.OC_eq);
+                }
             }
+        }
+
+        // 区间 [min,max] / (min,max] / [min,max) / (min,max)：左操作数已压栈，再压 min、max，发对应 range opcode。
+        void EmitRange(bool negate)
+        {
+            bool incMin = IsOp("[");
+            Next();                 // 吃掉 [ 或 (
+            ParseBoolOr();          // min
+            Expect(",");
+            ParseBoolOr();          // max
+            bool incMax = IsOp("]");
+            if (IsOp("]") || IsOp(")")) { Next(); }
+            OpCode rop = incMin
+                ? (incMax ? OpCode.OC_range_ii : OpCode.OC_range_ie)
+                : (incMax ? OpCode.OC_range_ei : OpCode.OC_range_ee);
+            Emit(rop);
+            if (negate) { Emit(OpCode.OC_blnot); }
         }
         void ParseGrls()
         {
@@ -261,6 +288,20 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            // statetype/movetype 字母枚举比较（自行消费 = / != 与字母列表，是 expValue 级原子布尔）
+            if (name == "statetype" || name == "movetype")
+            {
+                EmitTypeCompare(name);
+                return;
+            }
+
+            // redirect 前缀：p2,/root,/parent, + 单值子表达式（用 OC_run 包裹保证全程用重定向上下文）
+            if ((name == "p2" || name == "root" || name == "parent") && IsOp(","))
+            {
+                EmitRedirect(name);
+                return;
+            }
+
             // 轴 trigger：pos x / vel y / screenpos x / hitvel z
             if ((name == "pos" || name == "vel" || name == "screenpos" || name == "hitvel") && Cur.Kind == TokKind.Ident)
             {
@@ -322,6 +363,88 @@ namespace Lockstep.Mugen.Expr
             if (IsOp(op)) { Next(); }
         }
 
+        // statetype/movetype = X[,Y...] / != X[,Y...]：发 OC_statetype/OC_movetype + 1字节类型掩码，
+        // 多字母用 OC_blor 串成 OR；!= 末尾追加 OC_blnot。无比较运算符则容错压 0(false)。
+        void EmitTypeCompare(string trigger)
+        {
+            bool negate = IsOp("!=");
+            if (negate || IsOp("=")) { Next(); }
+            else { EmitInt(0); return; }
+            OpCode op = trigger == "statetype" ? OpCode.OC_statetype : OpCode.OC_movetype;
+            EmitTypeCheck(op, trigger);
+            while (IsOp(","))
+            {
+                Next();
+                EmitTypeCheck(op, trigger);
+                Emit(OpCode.OC_blor);
+            }
+            if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        void EmitTypeCheck(OpCode op, string trigger)
+        {
+            int mask = 0;
+            if (Cur.Kind == TokKind.Ident && Cur.Text.Length > 0)
+            {
+                char letter = Cur.Text[0];
+                mask = trigger == "statetype" ? StateTypeMask(letter) : MoveTypeMask(letter);
+                Next();
+            }
+            Emit(op);
+            _out.Add((byte)mask);
+        }
+
+        // StateType 掩码对齐 Ikemen ST_*：S=1 C=2 A=4 L=8
+        static int StateTypeMask(char letter)
+        {
+            switch (letter)
+            {
+                case 's': return 1;
+                case 'c': return 2;
+                case 'a': return 4;
+                case 'l': return 8;
+                default: return 0;
+            }
+        }
+
+        // MoveType 小码（我方偏离 Ikemen <<15 内部表示，等价）：I=1 H=2 A=4
+        static int MoveTypeMask(char letter)
+        {
+            switch (letter)
+            {
+                case 'i': return 1;
+                case 'h': return 2;
+                case 'a': return 4;
+                default: return 0;
+            }
+        }
+
+        // redirect 前缀 p2,/root,/parent,：把后续单值(expValue 级)编入子缓冲，
+        // 发 OC_<redirect> + 4字节(OC_run 块长) + OC_run + 4字节(子码长) + 子码。
+        void EmitRedirect(string name)
+        {
+            Next();   // 吃掉 ','
+            OpCode op = name == "root" ? OpCode.OC_root : name == "parent" ? OpCode.OC_parent : OpCode.OC_p2;
+
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            ParseUnary();             // expValue 级单值（含前导一元）
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;   // OC_run(1) + 长度头(4) + 子码
+            _out.Add((byte)op);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
+        }
+
+        void AppendI32(int v)
+        {
+            for (int k = 0; k < 4; k++) { _out.Add((byte)(v >> (8 * k))); }
+        }
+
         static OpCode AxisOpcode(string name, string axis)
         {
             switch (name)
@@ -334,18 +457,23 @@ namespace Lockstep.Mugen.Expr
             }
         }
 
+        // 注：statetype/movetype 不在此表——它们是 expValue 级原子比较(自行消费 = / 字母)，见 ParseIdent。
         static readonly Dictionary<string, OpCode> NoArgTriggers = new Dictionary<string, OpCode>
         {
             ["time"] = OpCode.OC_time, ["statetime"] = OpCode.OC_time,
             ["stateno"] = OpCode.OC_stateno, ["prevstateno"] = OpCode.OC_prevstateno,
-            ["statetype"] = OpCode.OC_statetype, ["movetype"] = OpCode.OC_movetype,
             ["ctrl"] = OpCode.OC_ctrl, ["anim"] = OpCode.OC_anim,
             ["life"] = OpCode.OC_life, ["lifemax"] = OpCode.OC_lifemax,
             ["power"] = OpCode.OC_power, ["powermax"] = OpCode.OC_powermax,
             ["alive"] = OpCode.OC_alive, ["facing"] = OpCode.OC_facing,
             ["random"] = OpCode.OC_random, ["gametime"] = OpCode.OC_gametime,
             ["animtime"] = OpCode.OC_animtime, ["animelemno"] = OpCode.OC_animelemno,
-            ["stateno"] = OpCode.OC_stateno, ["id"] = OpCode.OC_id,
+            ["id"] = OpCode.OC_id, ["palno"] = OpCode.OC_palno,
+            ["hitpausetime"] = OpCode.OC_hitpausetime,
+            ["hitcount"] = OpCode.OC_hitcount, ["uniqhitcount"] = OpCode.OC_uniqhitcount,
+            ["movecontact"] = OpCode.OC_movecontact, ["movehit"] = OpCode.OC_movehit,
+            ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
+            ["numtarget"] = OpCode.OC_numtarget,
         };
 
         static readonly Dictionary<string, OpCode> UnaryFuncs = new Dictionary<string, OpCode>
