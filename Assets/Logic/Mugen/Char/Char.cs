@@ -63,6 +63,11 @@ namespace Lockstep.Mugen.Char
         // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
         public Command.MCommandList CommandList;
 
+        // 命中系统（M7）：当前 HitDef + 本帧 Clsn 框（Clsn 为动画派生，由 Anim 系统 M8 填，Clone 浅拷不哈希）。
+        public Hit.MHitDef HitDef = new Hit.MHitDef();
+        public Hit.MClsnBox[] Clsn1;   // 攻击框
+        public Hit.MClsnBox[] Clsn2;   // 受击框
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -106,6 +111,8 @@ namespace Lockstep.Mugen.Char
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 Ghv = Ghv.Clone(),
                 CommandList = CommandList != null ? CommandList.Clone() : null,
+                HitDef = HitDef.Clone(),
+                Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -131,6 +138,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             Ghv.WriteHash(ref hash);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
+            HitDef.WriteHash(ref hash);
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);

@@ -4,8 +4,10 @@
 // See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
 using System.Globalization;
+using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
+using Lockstep.Mugen.Hit;
 using Lockstep.Mugen.State;
 using Lockstep.Mugen.StateCtrl;
 
@@ -194,6 +196,7 @@ namespace Lockstep.Mugen.Parse
                 case "powerset": return new PowerSetController { Value = Expr(comp, p, "value") };
                 case "turn": return new TurnController();
                 case "assertspecial": return new AssertSpecialController { Flags = ParseFlags(p) };
+                case "hitdef": return new HitDefController { Template = BuildHitDef(comp, p) };
                 default: return new NullController();   // 未知控制器降级（容错）
             }
         }
@@ -226,6 +229,90 @@ namespace Lockstep.Mugen.Parse
                 return new VarAddController { Index = index, IsFloat = isFloat, Value = value };
             }
             return new VarSetController { Index = index, IsFloat = isFloat, Value = value };
+        }
+
+        // HitDef：解析核心字段(表达式按常量求值，适配字面量参数)。
+        static MHitDef BuildHitDef(MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            MHitDef hd = new MHitDef();
+            if (p.TryGetValue("hitflag", out string hf))
+            {
+                hd.HitHigh = hd.HitLow = hd.HitAir = hd.HitDown = false;
+                string flags = hf.ToUpperInvariant();
+                if (flags.IndexOf('H') >= 0 || flags.IndexOf('M') >= 0) { hd.HitHigh = true; }
+                if (flags.IndexOf('L') >= 0 || flags.IndexOf('M') >= 0) { hd.HitLow = true; }
+                if (flags.IndexOf('A') >= 0) { hd.HitAir = true; }
+                if (flags.IndexOf('D') >= 0) { hd.HitDown = true; }
+            }
+            if (p.TryGetValue("damage", out string dmg))
+            {
+                string[] d = dmg.Split(',');
+                hd.HitDamage = EvalI(comp, d[0]);
+                hd.GuardDamage = d.Length > 1 ? EvalI(comp, d[1]) : hd.HitDamage;
+            }
+            if (p.TryGetValue("pausetime", out string pt))
+            {
+                string[] t = pt.Split(',');
+                hd.P1PauseTime = EvalI(comp, t[0]);
+                hd.P2PauseTime = t.Length > 1 ? EvalI(comp, t[1]) : hd.P1PauseTime;
+            }
+            ParseVel(comp, p, "ground.velocity", out hd.GroundVelX, out hd.GroundVelY);
+            ParseVel(comp, p, "air.velocity", out hd.AirVelX, out hd.AirVelY);
+            if (p.TryGetValue("ground.hittime", out string ght)) { hd.GroundHitTime = EvalI(comp, ght); }
+            if (p.TryGetValue("air.hittime", out string aht)) { hd.AirHitTime = EvalI(comp, aht); }
+            if (p.TryGetValue("ground.slidetime", out string gst)) { hd.GroundSlideTime = EvalI(comp, gst); }
+            if (p.TryGetValue("animtype", out string at)) { hd.AnimType = ParseReaction(at); }
+            if (p.TryGetValue("ground.type", out string gt)) { hd.GroundType = ParseHitType(gt); }
+            if (p.TryGetValue("fall", out string fl)) { hd.Fall = EvalI(comp, fl) != 0; }
+            if (p.TryGetValue("p1stateno", out string p1s)) { hd.P1StateNo = EvalI(comp, p1s); }
+            if (p.TryGetValue("p2stateno", out string p2s)) { hd.P2StateNo = EvalI(comp, p2s); }
+            return hd;
+        }
+
+        static void ParseVel(MugenExprCompiler comp, Dictionary<string, string> p, string key, out FFloat x, out FFloat y)
+        {
+            x = FFloat.Zero;
+            y = FFloat.Zero;
+            if (p.TryGetValue(key, out string v))
+            {
+                string[] parts = v.Split(',');
+                x = EvalF(comp, parts[0]);
+                if (parts.Length > 1) { y = EvalF(comp, parts[1]); }
+            }
+        }
+
+        static MReaction ParseReaction(string v)
+        {
+            switch (v.Trim().ToLowerInvariant())
+            {
+                case "medium": return MReaction.Medium;
+                case "hard": return MReaction.Hard;
+                case "back": return MReaction.Back;
+                case "up": return MReaction.Up;
+                case "diagup": return MReaction.DiagUp;
+                default: return MReaction.Light;
+            }
+        }
+
+        static MHitType ParseHitType(string v)
+        {
+            switch (v.Trim().ToLowerInvariant())
+            {
+                case "low": return MHitType.Low;
+                case "trip": return MHitType.Trip;
+                case "none": return MHitType.None;
+                default: return MHitType.High;
+            }
+        }
+
+        static int EvalI(MugenExprCompiler comp, string expr)
+        {
+            return comp.Compile(expr.Trim()).Run(null).ToI();
+        }
+
+        static FFloat EvalF(MugenExprCompiler comp, string expr)
+        {
+            return comp.Compile(expr.Trim()).Run(null).ToF();
         }
 
         static int ParseFlags(Dictionary<string, string> p)
