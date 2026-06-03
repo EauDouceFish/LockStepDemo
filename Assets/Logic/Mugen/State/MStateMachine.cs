@@ -124,13 +124,13 @@ namespace Lockstep.Mugen.State
                         continue;   // trigger 不过：不重置冷却
                     }
                     bool ran = ctrl.Run(c);
-                    ResetPersist(c, def.No, i, ctrl.Persistent);
                     if (ran && c.PendingStateNo >= 0)
                     {
-                        ApplyTransition(c, states, commonStates);
-                        changed = true;
+                        ApplyTransition(c, states, commonStates);   // 切状态：不 reset(对齐 Ikemen 在 return true 后才 reset)，
+                        changed = true;                             // 新状态计数器已由 ApplyTransition 清零
                         break;      // 切状态后从新状态头部重入
                     }
+                    ResetPersist(c, def.No, i, ctrl.Persistent);    // 未切状态：执行后重置冷却(对齐 Ikemen StateBlock.Run 末尾)
                 }
                 if (!changed)
                 {
