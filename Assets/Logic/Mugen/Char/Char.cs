@@ -51,9 +51,15 @@ namespace Lockstep.Mugen.Char
         public int MoveReversed;    // 本招是否被打断/反击：>0
         public int PalNo = 1;       // 调色板号（palno trigger）
 
-        // 动画运行态（由 Anim 系统 M8 维护；此处提供字段供 trigger 读）
-        public int AnimTime;        // 当前动画剩余时间（MUGEN 惯例 ≤0）
+        // 动画运行态（由 MAnimSystem M8 维护）。派生 trigger 量：
+        public int AnimTime;        // 当前动画剩余时间 = curtime-totaltime（MUGEN 惯例 ≤0）
         public int AnimElemNo;      // 当前动画元素序号（1-based）
+        // 原始运行态（移植 Ikemen Animation.curelem/curelemtime/curtime；快照/回滚以这三者为准）：
+        public int AnimElem;        // 当前元素索引（0-based）
+        public int AnimElemTime;    // 当前元素已播 tick 数（curelemtime）
+        public int AnimCurTime;     // 动画累计已播 tick 数（curtime）
+        public bool AnimLoopEnd;    // 本 tick 是否到达动画终点（curtime>=totaltime）
+        public int AnimRunningNo = -1;   // MAnimSystem 跟踪的"当前正在播放的动画号"，与 AnimNo 不同则触发重置
 
         // AssertSpecial 标志位（每帧清空，须每帧重断言才保持）。见 MAssertFlag。
         public int AssertFlags;
@@ -119,6 +125,8 @@ namespace Lockstep.Mugen.Char
                 HitCount = HitCount, UniqHitCount = UniqHitCount,
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
+                AnimElem = AnimElem, AnimElemTime = AnimElemTime, AnimCurTime = AnimCurTime,
+                AnimLoopEnd = AnimLoopEnd, AnimRunningNo = AnimRunningNo,
                 Ghv = Ghv.Clone(),
                 CommandList = CommandList != null ? CommandList.Clone() : null,
                 Constants = Constants,   // 不可变配置，浅拷引用
@@ -148,6 +156,8 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount);
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
+            hash.AddInt32(AnimElem); hash.AddInt32(AnimElemTime); hash.AddInt32(AnimCurTime);
+            hash.AddBool(AnimLoopEnd); hash.AddInt32(AnimRunningNo);
             Ghv.WriteHash(ref hash);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
             HitDef.WriteHash(ref hash);
