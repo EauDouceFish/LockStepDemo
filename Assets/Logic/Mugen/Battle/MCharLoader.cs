@@ -1,0 +1,84 @@
+// 角色装配器：把已读入的 CNS/CMD/AIR 文本组装成 MCharData + 初始 MChar。
+// 逻辑层不做文件 IO（读文件由表现层/测试负责），仅消费文本，保持纯净可单测。
+// 复用既有解析器：MugenCnsParser(状态)/MugenConstParser(常量)/MugenCmdParser(命令)/AirParser+MAnimImport(动画)。
+// See Docs/移植方案_Ikemen.md.
+using System.Collections.Generic;
+using Lockstep.Import.Air;
+using GameData = Lockstep.Game.Data;
+using Lockstep.Mugen.Anim;
+using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Command;
+using Lockstep.Mugen.Parse;
+using Lockstep.Mugen.State;
+
+namespace Lockstep.Mugen.Battle
+{
+    /// <summary>从角色文件文本构建 MCharData / MChar。</summary>
+    public static class MCharLoader
+    {
+        /// <summary>
+        /// 组装角色配置。各文本可为 null（缺省跳过）。stateTexts 是 .def 里 st/st1… 各状态文件内容，
+        /// 后者覆盖前者；cnsText 额外作为常量来源；commonText 为公共状态；airText→动画；cmdText→命令。
+        /// </summary>
+        public static MCharData Load(IReadOnlyList<string> stateTexts, string cnsText,
+            string commonText, string airText, string cmdText, string name = "")
+        {
+            MCharData data = new MCharData { Name = name };
+
+            if (stateTexts != null)
+            {
+                for (int i = 0; i < stateTexts.Count; i++)
+                {
+                    MergeStates(data.States, MugenCnsParser.Parse(stateTexts[i]));
+                }
+            }
+            // cns 文件本身常也含状态（KFM st=cns），并入；同时作为常量来源。
+            if (cnsText != null)
+            {
+                MergeStates(data.States, MugenCnsParser.Parse(cnsText));
+                data.Constants = MugenConstParser.Parse(cnsText);
+            }
+            if (commonText != null)
+            {
+                MergeStates(data.CommonStates, MugenCnsParser.Parse(commonText));
+            }
+            if (airText != null)
+            {
+                List<GameData.AnimData> anims = AirParser.Parse(airText);
+                data.Anims = MAnimImport.FromAirTable(anims);
+            }
+            if (cmdText != null)
+            {
+                data.Commands = MugenCmdParser.Parse(cmdText);
+            }
+            return data;
+        }
+
+        /// <summary>建一个挂好配置的运行期 MChar（命令表/常量接好，进入指定初始状态/动画）。</summary>
+        public static MChar SpawnChar(MCharData data, int id, int startStateNo = 0, int startAnimNo = 0)
+        {
+            MChar c = new MChar
+            {
+                Id = id,
+                Name = data.Name,
+                Life = data.Constants.Life,
+                LifeMax = data.Constants.Life,
+                Power = 0,
+                PowerMax = data.Constants.Power,
+                Constants = data.Constants,
+                StateNo = startStateNo,
+                AnimNo = startAnimNo,
+                CommandList = new MCommandList { Commands = data.Commands },
+            };
+            return c;
+        }
+
+        static void MergeStates(Dictionary<int, MStateDef> into, Dictionary<int, MStateDef> from)
+        {
+            foreach (KeyValuePair<int, MStateDef> kv in from)
+            {
+                into[kv.Key] = kv.Value;   // 后载覆盖先载（对齐 MUGEN st1 覆盖 st）
+            }
+        }
+    }
+}
