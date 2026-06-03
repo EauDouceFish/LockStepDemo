@@ -1,8 +1,8 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
 // Source: src/bytecode.go  (BytecodeExp + run loop)
 // Adapted to fixed-point. 编码上 OC_float 携带 8 字节 FFloat raw（偏离 Ikemen 的 float32，因定点），
-// 由我方编译器(M2)与本执行器约定一致。短路跳转(jz/jnz)M1 未实现（纯表达式两侧求值结果一致），M2 需要时补。
-// trigger/redirect 类 opcode 走 IExprContext 钩子（M3 接入），未提供则压 Undefined。
+// 由我方编译器(M2)与本执行器约定一致。短路跳转(OC_jmp/jz/jnz+8bit+jsf8)已实现(M1)，peek 不 pop、
+// offset 编码照搬 Ikemen。trigger/redirect 类 opcode 走 IExprContext 钩子（M3 接入），未提供则压 Undefined。
 // See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
 using Lockstep.Math;
