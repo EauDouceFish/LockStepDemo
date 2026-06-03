@@ -1,7 +1,7 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
 // Source: src/input.go (ReadCommandSymbols)。把 CMD 命令串解析为 MCommandDef。
 // 支持：方向 B/F/U/D + 对角 DB/DF/UB/UF；按钮 a/b/c/x/y/z/s；修饰 '~'(释放,带数字=蓄力)、'/'(按住)、'$'(4way)；
-//       步内 '+' (同时按 AND)；步前 '>' (严格相邻)。'|'(OR) 暂不支持(降级为 +)。See Docs/移植方案_Ikemen.md.
+//       步内 '+' (同时按 AND) 或 '|' (任一 OR，二者不混用)；步前 '>' (严格相邻)。See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
 
 namespace Lockstep.Mugen.Command
@@ -30,7 +30,17 @@ namespace Lockstep.Mugen.Command
                     step.Greater = true;
                     raw = raw.Substring(1).Trim();
                 }
-                string[] parts = raw.Split('+');   // AND（'|' OR 暂降级）
+                // '|' OR（任一键满足）优先于 '+' AND（全部满足）；两者不混用
+                string[] parts;
+                if (raw.IndexOf('|') >= 0)
+                {
+                    step.OrLogic = true;
+                    parts = raw.Split('|');
+                }
+                else
+                {
+                    parts = raw.Split('+');
+                }
                 for (int k = 0; k < parts.Length; k++)
                 {
                     string token = parts[k].Trim();

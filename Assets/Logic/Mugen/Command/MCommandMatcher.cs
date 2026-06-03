@@ -57,6 +57,23 @@ namespace Lockstep.Mugen.Command
 
         static bool StepSatisfied(MCommandStep step, MCommandBuffer buf, int age, bool facingRight)
         {
+            if (step.Keys.Count == 0)
+            {
+                return false;
+            }
+            if (step.OrLogic)
+            {
+                // 任一键满足即可
+                for (int k = 0; k < step.Keys.Count; k++)
+                {
+                    if (KeySatisfied(step.Keys[k], buf, age, facingRight))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            // 全部键满足（'+' AND）
             for (int k = 0; k < step.Keys.Count; k++)
             {
                 if (!KeySatisfied(step.Keys[k], buf, age, facingRight))
@@ -64,7 +81,7 @@ namespace Lockstep.Mugen.Command
                     return false;
                 }
             }
-            return step.Keys.Count > 0;
+            return true;
         }
 
         static bool KeySatisfied(MCommandKey key, MCommandBuffer buf, int age, bool facingRight)

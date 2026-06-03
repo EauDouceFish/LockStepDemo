@@ -89,6 +89,25 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void OrLogic_AnyKeySatisfies()
+        {
+            // "a|b"：按 a 或 b 任一即可
+            MCommandDef cmd = MCommandParser.Parse("ab", "a|b");
+            Assert.IsTrue(MCommandMatcher.Matches(cmd, Buf(MInput.None, A), true), "按 a 触发");
+            Assert.IsTrue(MCommandMatcher.Matches(cmd, Buf(MInput.None, MInput.B), true), "按 b 触发");
+            Assert.IsFalse(MCommandMatcher.Matches(cmd, Buf(MInput.None, MInput.C), true), "按 c 不触发");
+        }
+
+        [Test]
+        public void AndLogic_RequiresAllKeys()
+        {
+            // "x+y"：须同时按 x 和 y
+            MCommandDef cmd = MCommandParser.Parse("xy", "x+y");
+            Assert.IsTrue(MCommandMatcher.Matches(cmd, Buf(MInput.None, MInput.X | MInput.Y), true));
+            Assert.IsFalse(MCommandMatcher.Matches(cmd, Buf(MInput.None, MInput.X), true), "只按 x 不够");
+        }
+
+        [Test]
         public void SingleButton_EdgeTrigger()
         {
             MCommandDef cmd = MCommandParser.Parse("a", "a");

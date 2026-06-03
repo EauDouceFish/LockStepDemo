@@ -34,6 +34,7 @@ namespace Lockstep.Mugen.Command
     {
         public List<MCommandKey> Keys = new List<MCommandKey>();
         public bool Greater;      // '>' 须紧接上一步
+        public bool OrLogic;      // '|' 步内任一键满足即可(否则 '+' 全部满足)
     }
 
     /// <summary>一条命令(对应 Ikemen Command)。</summary>
