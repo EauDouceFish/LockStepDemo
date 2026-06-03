@@ -1,7 +1,7 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
 // Source: src/char.go  (GetHitVar struct) — 定点常用字段子集。
-// Adapted to fixed-point (FFloat). gethitvar(...) 触发器/opcode 接入归 M7(gethit)；
-// 本类先作为 Char 快照状态的一部分提供深拷/哈希，命中系统(M7)负责填值。
+// Adapted to fixed-point (FFloat). gethitvar(...) 触发器经 OC_ex_ + 字段id 读取(已接入, 见 MChar.ReadGetHitVar)；
+// 命中系统(MHitSystem)负责填值，本类提供深拷/哈希(回滚)。
 // See Docs/移植方案_Ikemen.md.
 using Lockstep.Core;
 using Lockstep.Math;

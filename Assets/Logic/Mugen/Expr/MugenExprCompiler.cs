@@ -344,6 +344,18 @@ namespace Lockstep.Mugen.Expr
         void ParseFunction(string name)
         {
             Next(); // 吃掉 '('
+            // gethitvar(field)：参数是字段名(ident)，发 OC_ex_ + 字段id 字节，运行期从 Ghv 读
+            if (name == "gethitvar")
+            {
+                int fieldId = GetHitVarFieldId(Cur.Kind == TokKind.Ident ? Cur.Text : "");
+                if (Cur.Kind == TokKind.Ident) { Next(); }
+                // 容错吃掉可能的子字段(如 fall.recover 的 .recover)
+                while (!IsOp(")") && Cur.Kind != TokKind.End) { Next(); }
+                Expect(")");
+                Emit(OpCode.OC_ex_);
+                _out.Add((byte)fieldId);
+                return;
+            }
             // var(n) / fvar(n)：压 index 再发 opcode
             if (name == "var" || name == "fvar" || name == "sysvar" || name == "sysfvar")
             {
@@ -480,6 +492,29 @@ namespace Lockstep.Mugen.Expr
         void AppendI32(int v)
         {
             for (int k = 0; k < 4; k++) { _out.Add((byte)(v >> (8 * k))); }
+        }
+
+        // gethitvar 字段名 → 字段 id 字节（与 MChar.ReadTrigger 的 OC_ex_ 解码一致）。未知→255。
+        static int GetHitVarFieldId(string field)
+        {
+            switch (field)
+            {
+                case "xvel": return 0;
+                case "yvel": return 1;
+                case "zvel": return 2;
+                case "hittime": return 3;
+                case "slidetime": return 4;
+                case "ctrltime": return 5;
+                case "hitshaketime": return 6;
+                case "damage": return 7;
+                case "hitcount": return 8;
+                case "fallcount": return 9;
+                case "animtype": return 10;
+                case "type": return 11;
+                case "fall": return 12;
+                case "guarded": return 13;
+                default: return 255;
+            }
         }
 
         static OpCode AxisOpcode(string name, string axis)

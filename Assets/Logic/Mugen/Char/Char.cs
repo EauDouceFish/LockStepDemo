@@ -244,8 +244,38 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Float(FloatVars.TryGetValue(index, out FFloat v) ? v : FFloat.Zero);
                 }
 
+                case OpCode.OC_ex_:
+                {
+                    // gethitvar(field)：OC_ex_ + 字段id 字节，从 Ghv 读取
+                    int fieldId = code[i]; i++;
+                    return ReadGetHitVar(fieldId);
+                }
+
                 default:
                     return BytecodeValue.Undefined();   // 尚未接入的 trigger（增量补全）
+            }
+        }
+
+        // gethitvar 字段 id → Ghv 值（id 见 MugenExprCompiler.GetHitVarFieldId）。
+        BytecodeValue ReadGetHitVar(int fieldId)
+        {
+            switch (fieldId)
+            {
+                case 0: return BytecodeValue.Float(Ghv.XVel);
+                case 1: return BytecodeValue.Float(Ghv.YVel);
+                case 2: return BytecodeValue.Float(Ghv.ZVel);
+                case 3: return BytecodeValue.Int(Ghv.HitTime);
+                case 4: return BytecodeValue.Int(Ghv.SlideTime);
+                case 5: return BytecodeValue.Int(Ghv.CtrlTime);
+                case 6: return BytecodeValue.Int(Ghv.HitShakeTime);
+                case 7: return BytecodeValue.Int(Ghv.Damage);
+                case 8: return BytecodeValue.Int(Ghv.HitCount);
+                case 9: return BytecodeValue.Int(Ghv.FallCount);
+                case 10: return BytecodeValue.Int(Ghv.AnimType);
+                case 11: return BytecodeValue.Int(Ghv.AttrType);
+                case 12: return BytecodeValue.Bool(Ghv.Fall);
+                case 13: return BytecodeValue.Bool(Ghv.Guarded);
+                default: return BytecodeValue.Int(0);
             }
         }
 
