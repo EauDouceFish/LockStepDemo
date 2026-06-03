@@ -91,6 +91,28 @@ namespace Lockstep.Mugen.Expr
                     case OpCode.OC_range_ei: RangeOp(stack, false, true); break;
                     case OpCode.OC_range_ee: RangeOp(stack, false, false); break;
 
+                    // 短路跳转（peek 不 pop，照搬 Ikemen bytecode.go run 循环）：
+                    // 8-bit offset 编码：offset==0 → 跳到末尾；否则下一 opcode = i + offset + 1。
+                    case OpCode.OC_jmp8: i = Jump8(i); break;
+                    case OpCode.OC_jz8:
+                    case OpCode.OC_jnz8:
+                        // jz8 在栈顶为真时不跳(i++跳过 offset 字节)，为假时跳；jnz8 相反
+                        if (Peek(stack).ToB() == (op == OpCode.OC_jz8)) { i++; }
+                        else { i = Jump8(i); }
+                        break;
+                    case OpCode.OC_jsf8:
+                        // 栈顶 undefined 则跳，否则跳过 offset 字节继续
+                        if (Peek(stack).IsUndefined()) { i = Jump8(i); }
+                        else { i++; }
+                        break;
+                    // 32-bit 跳转（offset 为 4 字节长度，下一 opcode = i + len + 4）
+                    case OpCode.OC_jmp: i = Jump32(i); break;
+                    case OpCode.OC_jz:
+                    case OpCode.OC_jnz:
+                        if (Peek(stack).ToB() == (op == OpCode.OC_jz)) { i += 4; }
+                        else { i = Jump32(i); }
+                        break;
+
                     // 三目：弹 falseVal,trueVal,cond（编译器按 cond,trueVal,falseVal 顺序压栈）
                     case OpCode.OC_ifelse:
                     {
@@ -166,6 +188,20 @@ namespace Lockstep.Mugen.Expr
             BytecodeValue tmp = stack[top];
             stack[top] = stack[top - 1];
             stack[top - 1] = tmp;
+        }
+
+        // i 指向 8-bit offset 字节：offset==0 跳到末尾，否则返回 i + offset + 1（下一 opcode 索引）。
+        int Jump8(int i)
+        {
+            byte off = _code[i];
+            return off == 0 ? _code.Length : i + off + 1;
+        }
+
+        // i 指向 4 字节小端长度 len：返回 i + len + 4（下一 opcode 索引）。
+        int Jump32(int i)
+        {
+            int len = _code[i] | (_code[i + 1] << 8) | (_code[i + 2] << 16) | (_code[i + 3] << 24);
+            return i + len + 4;
         }
 
         int ReadInt32(ref int i)
