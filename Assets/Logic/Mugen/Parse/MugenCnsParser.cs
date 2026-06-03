@@ -114,9 +114,9 @@ namespace Lockstep.Mugen.Parse
         {
             switch (key)
             {
-                case "type": s.StateType = StateTypeCode(val); break;
-                case "movetype": s.MoveType = MoveTypeCode(val); break;
-                case "physics": s.Physics = PhysicsCode(val); break;
+                case "type": s.StateType = MugenCodes.StateType(val); break;
+                case "movetype": s.MoveType = MugenCodes.MoveType(val); break;
+                case "physics": s.Physics = MugenCodes.Physics(val); break;
                 case "ctrl": s.Ctrl = ParseFirstInt(val, -1); break;
                 case "anim": s.Anim = ParseFirstInt(val, -1); break;
             }
@@ -185,9 +185,9 @@ namespace Lockstep.Mugen.Parse
                 case "statetypeset":
                     return new StateTypeSetController
                     {
-                        StateType = p.ContainsKey("statetype") ? StateTypeCode(p["statetype"]) : -1,
-                        MoveType = p.ContainsKey("movetype") ? MoveTypeCode(p["movetype"]) : -1,
-                        Physics = p.ContainsKey("physics") ? PhysicsCode(p["physics"]) : -1,
+                        StateType = p.ContainsKey("statetype") ? MugenCodes.StateType(p["statetype"]) : -1,
+                        MoveType = p.ContainsKey("movetype") ? MugenCodes.MoveType(p["movetype"]) : -1,
+                        Physics = p.ContainsKey("physics") ? MugenCodes.Physics(p["physics"]) : -1,
                         CtrlExpr = Expr(comp, p, "ctrl"),
                     };
                 case "lifeadd": return new LifeAddController { Value = Expr(comp, p, "value"), Kill = IntP(p, "kill", 1) != 0 };
@@ -236,7 +236,7 @@ namespace Lockstep.Mugen.Parse
         // HitBy/NotHitBy：value=攻击类别(SCA, AA 形式)、time=持续帧。解析为常量塞控制器。
         static MStateController BuildHitBy(Dictionary<string, string> p, bool isNot)
         {
-            int attr = p.TryGetValue("value", out string v) ? ParseAttr(v) : (int)MAttackType.All;
+            int attr = p.TryGetValue("value", out string v) ? MugenCodes.Attr(v) : (int)MAttackType.All;
             int time = IntP(p, "time", 1);   // MUGEN 默认 time=1
             return new HitByController { Attr = attr, Time = time, IsNot = isNot };
         }
@@ -245,26 +245,17 @@ namespace Lockstep.Mugen.Parse
         static MHitDef BuildHitDef(MugenExprCompiler comp, Dictionary<string, string> p)
         {
             MHitDef hd = new MHitDef();
-            if (p.TryGetValue("attr", out string attr)) { hd.Attr = ParseAttr(attr); }
+            if (p.TryGetValue("attr", out string attr)) { hd.Attr = MugenCodes.Attr(attr); }
             if (p.TryGetValue("guardflag", out string gf))
             {
-                hd.GuardHigh = hd.GuardLow = hd.GuardAir = false;
-                string flags = gf.ToUpperInvariant();
-                if (flags.IndexOf('H') >= 0 || flags.IndexOf('M') >= 0) { hd.GuardHigh = true; }
-                if (flags.IndexOf('L') >= 0 || flags.IndexOf('M') >= 0) { hd.GuardLow = true; }
-                if (flags.IndexOf('A') >= 0) { hd.GuardAir = true; }
+                MugenCodes.HitFlags(gf, out hd.GuardHigh, out hd.GuardLow, out hd.GuardAir, out _);
             }
             if (p.TryGetValue("guard.velocity", out string gv)) { hd.GuardVelX = EvalF(comp, gv.Split(',')[0]); }
             if (p.TryGetValue("guard.hittime", out string ghtt)) { hd.GuardHitTime = EvalI(comp, ghtt); }
             if (p.TryGetValue("guard.ctrltime", out string gct)) { hd.GuardCtrlTime = EvalI(comp, gct); }
             if (p.TryGetValue("hitflag", out string hf))
             {
-                hd.HitHigh = hd.HitLow = hd.HitAir = hd.HitDown = false;
-                string flags = hf.ToUpperInvariant();
-                if (flags.IndexOf('H') >= 0 || flags.IndexOf('M') >= 0) { hd.HitHigh = true; }
-                if (flags.IndexOf('L') >= 0 || flags.IndexOf('M') >= 0) { hd.HitLow = true; }
-                if (flags.IndexOf('A') >= 0) { hd.HitAir = true; }
-                if (flags.IndexOf('D') >= 0) { hd.HitDown = true; }
+                MugenCodes.HitFlags(hf, out hd.HitHigh, out hd.HitLow, out hd.HitAir, out hd.HitDown);
             }
             if (p.TryGetValue("damage", out string dmg))
             {
@@ -384,80 +375,6 @@ namespace Lockstep.Mugen.Parse
         static int IntP(Dictionary<string, string> p, string key, int def)
         {
             return p.TryGetValue(key, out string v) ? ParseFirstInt(v, def) : def;
-        }
-
-        // attr/HitBy value：格式 `<statetype>, <攻击类别>...`，如 `S, NA` 或 `SCA, AA`。
-        // 首段是攻方 statetype(S/C/A，本简化版不入 bitmask)，其余是 2 字母攻击类别 → 合成 MAttackType bitmask。
-        static int ParseAttr(string v)
-        {
-            int mask = 0;
-            string[] tokens = v.Split(',');
-            for (int i = 1; i < tokens.Length; i++)
-            {
-                mask |= AttackTypeCode(tokens[i].Trim().ToUpperInvariant());
-            }
-            return mask != 0 ? mask : (int)MAttackType.All;   // 未写攻击类别 → 全部（容错，HitBy 常用 AA）
-        }
-
-        static int AttackTypeCode(string t)
-        {
-            switch (t)
-            {
-                case "NA": return (int)MAttackType.NA;
-                case "NT": return (int)MAttackType.NT;
-                case "NP": return (int)MAttackType.NP;
-                case "SA": return (int)MAttackType.SA;
-                case "ST": return (int)MAttackType.ST;
-                case "SP": return (int)MAttackType.SP;
-                case "HA": return (int)MAttackType.HA;
-                case "HT": return (int)MAttackType.HT;
-                case "HP": return (int)MAttackType.HP;
-                case "AA": return (int)MAttackType.AA;
-                case "AT": return (int)MAttackType.AT;
-                case "AP": return (int)MAttackType.AP;
-                default: return 0;
-            }
-        }
-
-        static int StateTypeCode(string v)
-        {
-            switch (FirstLetter(v))
-            {
-                case 's': return 1;
-                case 'c': return 2;
-                case 'a': return 4;
-                case 'l': return 8;
-                default: return -1;
-            }
-        }
-
-        static int MoveTypeCode(string v)
-        {
-            switch (FirstLetter(v))
-            {
-                case 'i': return 1;
-                case 'h': return 2;
-                case 'a': return 4;
-                default: return -1;
-            }
-        }
-
-        static int PhysicsCode(string v)
-        {
-            switch (FirstLetter(v))
-            {
-                case 's': return 1;
-                case 'c': return 2;
-                case 'a': return 4;
-                case 'n': return 16;
-                default: return -1;
-            }
-        }
-
-        static char FirstLetter(string v)
-        {
-            string t = v.Trim().ToLowerInvariant();
-            return t.Length > 0 ? t[0] : '\0';
         }
 
         static int ParseFirstInt(string v, int def)
