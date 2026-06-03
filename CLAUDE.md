@@ -47,6 +47,11 @@ Unity 2022.3.55f1 + .NET 8（测试）。**MUGEN 化定点帧同步格斗引擎*
 - **测试先行**：每个工作单元先写会失败的测试 → 实现 → 全绿。无测试的代码不合并。
 - **测试工程**：`Tests/Lockstep.Logic.Tests`（.NET，link 编入 Logic + Fix64 源码）。验收只跑
   `dotnet test`（脱 Unity，秒级）。**新增逻辑代码必须能被它编到**（即保持零 Unity 依赖）。
+- **测试按模块分目录（强制）**：测试文件**不许平铺在工程根**。每个模块在 `Tests/Lockstep.Logic.Tests/`
+  下有自己的子目录，**镜像被测源码的模块树** `Assets/Logic/<模块>/`。例：
+  `Assets/Logic/Mugen/Expr/` → `Tests/.../Mugen/Expr/`，`.../Mugen/Char/` → `.../Mugen/Char/`。
+  新模块先建好命名的测试子目录再往里写用例；csproj 递归 glob 编译，移动/新建文件无需改 csproj。
+  差分基准数据存 `Tests/.../Golden/`。（根目录现存的旧 clean-room 平铺测试属退役件，删一个退一个，不再新增平铺测试。）
 - **差分测试**：以 `../MugenSource/_reference/Ikemen-GO`（只读 Oracle）为标准答案。离散量（状态号/动画帧/命中/KO）必须**全等**，连续量（位置/速度）**容差内**一致。
 - **黄金哈希**：固定输入跑 N 帧，断言 `World.ComputeHash()` == 预录值。改了行为就回填新值并在 commit 说明。
 
