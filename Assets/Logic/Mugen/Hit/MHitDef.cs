@@ -13,6 +13,20 @@ namespace Lockstep.Mugen.Hit
     /// <summary>命中类型（对应 Ikemen HitType）。</summary>
     public enum MHitType { None = 0, High = 1, Low = 2, Trip = 3 }
 
+    /// <summary>攻击类别位标志（对应 Ikemen AttackType AT_*）。N/S/H 强度 × A/T/P 类型。</summary>
+    [System.Flags]
+    public enum MAttackType
+    {
+        None = 0,
+        NA = 1 << 0, NT = 1 << 1, NP = 1 << 2,   // Normal: Attack/Throw/Projectile
+        SA = 1 << 3, ST = 1 << 4, SP = 1 << 5,   // Special
+        HA = 1 << 6, HT = 1 << 7, HP = 1 << 8,   // Hyper
+        AA = NA | SA | HA,
+        AT = NT | ST | HT,
+        AP = NP | SP | HP,
+        All = AA | AT | AP,
+    }
+
     /// <summary>2D 轴对齐包围盒（横 X × 高度 Y）。</summary>
     public readonly struct MAabb
     {
@@ -80,11 +94,19 @@ namespace Lockstep.Mugen.Hit
     {
         public bool Active;
 
+        // attr 攻击类别（HitBy/NotHitBy 过滤 + 守招判定用）
+        public int Attr = (int)MAttackType.NA;
+
         // hitflag：哪些受击姿态能被命中（H 站立/L 蹲/A 空中/D 倒地）
         public bool HitHigh = true;
         public bool HitLow = true;
         public bool HitAir = true;
         public bool HitDown;
+
+        // guardflag：哪些姿态可防御本攻击（高/低/空），守招判定用
+        public bool GuardHigh = true;
+        public bool GuardLow = true;
+        public bool GuardAir = true;
 
         // 伤害
         public int HitDamage;
@@ -96,6 +118,11 @@ namespace Lockstep.Mugen.Hit
         public int GroundHitTime;   // 守方地面硬直
         public int AirHitTime;      // 守方空中硬直
         public int GroundSlideTime; // 守方滑行
+
+        // 守招相关
+        public int GuardHitTime;
+        public int GuardCtrlTime;
+        public FFloat GuardVelX;
 
         // 击退速度（连续量，容差对账）
         public FFloat GroundVelX, GroundVelY;
@@ -116,8 +143,10 @@ namespace Lockstep.Mugen.Hit
 
         public void WriteHash(ref Hash64 hash)
         {
-            hash.AddBool(Active);
+            hash.AddBool(Active); hash.AddInt32(Attr);
             hash.AddBool(HitHigh); hash.AddBool(HitLow); hash.AddBool(HitAir); hash.AddBool(HitDown);
+            hash.AddBool(GuardHigh); hash.AddBool(GuardLow); hash.AddBool(GuardAir);
+            hash.AddInt32(GuardHitTime); hash.AddInt32(GuardCtrlTime); hash.AddFixed(GuardVelX);
             hash.AddInt32(HitDamage); hash.AddInt32(GuardDamage);
             hash.AddInt32(P1PauseTime); hash.AddInt32(P2PauseTime);
             hash.AddInt32(GroundHitTime); hash.AddInt32(AirHitTime); hash.AddInt32(GroundSlideTime);

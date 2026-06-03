@@ -1,7 +1,8 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
 // Source: src/char.go (命中检测 + gethit 结算 + GetHitVar 填值)。
 // 离散量(命中与否/伤害/受击状态号/连击计数)对账 Ikemen；连续量(击退速度/坐标)容差。
-// 守招/格挡系统留后续(当前无 guard 系统，命中即生效)。See Docs/移植方案_Ikemen.md.
+// 含 HitBy/NotHitBy 属性免疫过滤 + guardflag 守招结算(chip 伤害/守方击退/moveguarded，不进受击 5000)。
+// See Docs/移植方案_Ikemen.md.
 using Lockstep.Math;
 using Lockstep.Mugen.Char;
 
@@ -28,14 +29,67 @@ namespace Lockstep.Mugen.Hit
             {
                 return false;
             }
+            // HitBy/NotHitBy 属性免疫：HitBy 仅允许匹配的攻击命中；NotHitBy 仅允许不匹配的命中
+            if (defender.HitByTime > 0)
+            {
+                bool attrMatch = (hd.Attr & defender.HitByAttr) != 0;
+                if (defender.HitByIsNot ? attrMatch : !attrMatch)
+                {
+                    return false;   // 被免疫过滤挡下
+                }
+            }
             if (!MClsn.AnyOverlap(
                     attacker.Clsn1, attacker.Pos.X, attacker.Pos.Y, attacker.Facing,
                     defender.Clsn2, defender.Pos.X, defender.Pos.Y, defender.Facing))
             {
                 return false;
             }
-            ApplyHit(attacker, defender, hd);
+            if (defender.Guarding && GuardFlagAllows(hd, defender.StateType))
+            {
+                ApplyGuard(attacker, defender, hd);
+            }
+            else
+            {
+                ApplyHit(attacker, defender, hd);
+            }
             return true;
+        }
+
+        static bool GuardFlagAllows(MHitDef hd, int defenderStateType)
+        {
+            switch (defenderStateType)
+            {
+                case 1: return hd.GuardHigh;   // S 站立防
+                case 2: return hd.GuardLow;    // C 蹲防
+                case 4: return hd.GuardAir;    // A 空中防
+                default: return hd.GuardHigh;
+            }
+        }
+
+        // 守招结算：chip 伤害 + 守方击退 + ghv.guarded + 攻方 moveguarded（不进受击 5000，不失 movetype）。
+        static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd)
+        {
+            int newLife = defender.Life - hd.GuardDamage;
+            defender.Life = newLife < 0 ? 0 : (newLife > defender.LifeMax ? defender.LifeMax : newLife);
+
+            defender.Facing = -attacker.Facing;
+            defender.Vel = new FVector3(hd.GuardVelX, FFloat.Zero, FFloat.Zero);
+
+            attacker.Hitstop = hd.P1PauseTime;
+            defender.Hitstop = hd.P2PauseTime;
+
+            MGetHitVar ghv = defender.Ghv;
+            ghv.Damage = hd.GuardDamage;
+            ghv.HitTime = hd.GuardHitTime;
+            ghv.CtrlTime = hd.GuardCtrlTime;
+            ghv.HitShakeTime = hd.P2PauseTime;
+            ghv.Guarded = true;
+            ghv.Fall = false;
+
+            attacker.MoveContact = 1;
+            attacker.MoveGuarded = 1;
+            attacker.MoveHit = 0;
+            attacker.Targets.Add(defender);
         }
 
         static bool HitFlagMatches(MHitDef hd, int defenderStateType)

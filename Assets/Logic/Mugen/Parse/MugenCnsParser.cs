@@ -196,6 +196,8 @@ namespace Lockstep.Mugen.Parse
                 case "powerset": return new PowerSetController { Value = Expr(comp, p, "value") };
                 case "turn": return new TurnController();
                 case "assertspecial": return new AssertSpecialController { Flags = ParseFlags(p) };
+                case "hitby": return BuildHitBy(p, false);
+                case "nothitby": return BuildHitBy(p, true);
                 case "hitdef": return new HitDefController { Template = BuildHitDef(comp, p) };
                 default: return new NullController();   // 未知控制器降级（容错）
             }
@@ -231,10 +233,30 @@ namespace Lockstep.Mugen.Parse
             return new VarSetController { Index = index, IsFloat = isFloat, Value = value };
         }
 
+        // HitBy/NotHitBy：value=攻击类别(SCA, AA 形式)、time=持续帧。解析为常量塞控制器。
+        static MStateController BuildHitBy(Dictionary<string, string> p, bool isNot)
+        {
+            int attr = p.TryGetValue("value", out string v) ? ParseAttr(v) : (int)MAttackType.All;
+            int time = IntP(p, "time", 1);   // MUGEN 默认 time=1
+            return new HitByController { Attr = attr, Time = time, IsNot = isNot };
+        }
+
         // HitDef：解析核心字段(表达式按常量求值，适配字面量参数)。
         static MHitDef BuildHitDef(MugenExprCompiler comp, Dictionary<string, string> p)
         {
             MHitDef hd = new MHitDef();
+            if (p.TryGetValue("attr", out string attr)) { hd.Attr = ParseAttr(attr); }
+            if (p.TryGetValue("guardflag", out string gf))
+            {
+                hd.GuardHigh = hd.GuardLow = hd.GuardAir = false;
+                string flags = gf.ToUpperInvariant();
+                if (flags.IndexOf('H') >= 0 || flags.IndexOf('M') >= 0) { hd.GuardHigh = true; }
+                if (flags.IndexOf('L') >= 0 || flags.IndexOf('M') >= 0) { hd.GuardLow = true; }
+                if (flags.IndexOf('A') >= 0) { hd.GuardAir = true; }
+            }
+            if (p.TryGetValue("guard.velocity", out string gv)) { hd.GuardVelX = EvalF(comp, gv.Split(',')[0]); }
+            if (p.TryGetValue("guard.hittime", out string ghtt)) { hd.GuardHitTime = EvalI(comp, ghtt); }
+            if (p.TryGetValue("guard.ctrltime", out string gct)) { hd.GuardCtrlTime = EvalI(comp, gct); }
             if (p.TryGetValue("hitflag", out string hf))
             {
                 hd.HitHigh = hd.HitLow = hd.HitAir = hd.HitDown = false;
@@ -362,6 +384,39 @@ namespace Lockstep.Mugen.Parse
         static int IntP(Dictionary<string, string> p, string key, int def)
         {
             return p.TryGetValue(key, out string v) ? ParseFirstInt(v, def) : def;
+        }
+
+        // attr/HitBy value：格式 `<statetype>, <攻击类别>...`，如 `S, NA` 或 `SCA, AA`。
+        // 首段是攻方 statetype(S/C/A，本简化版不入 bitmask)，其余是 2 字母攻击类别 → 合成 MAttackType bitmask。
+        static int ParseAttr(string v)
+        {
+            int mask = 0;
+            string[] tokens = v.Split(',');
+            for (int i = 1; i < tokens.Length; i++)
+            {
+                mask |= AttackTypeCode(tokens[i].Trim().ToUpperInvariant());
+            }
+            return mask != 0 ? mask : (int)MAttackType.All;   // 未写攻击类别 → 全部（容错，HitBy 常用 AA）
+        }
+
+        static int AttackTypeCode(string t)
+        {
+            switch (t)
+            {
+                case "NA": return (int)MAttackType.NA;
+                case "NT": return (int)MAttackType.NT;
+                case "NP": return (int)MAttackType.NP;
+                case "SA": return (int)MAttackType.SA;
+                case "ST": return (int)MAttackType.ST;
+                case "SP": return (int)MAttackType.SP;
+                case "HA": return (int)MAttackType.HA;
+                case "HT": return (int)MAttackType.HT;
+                case "HP": return (int)MAttackType.HP;
+                case "AA": return (int)MAttackType.AA;
+                case "AT": return (int)MAttackType.AT;
+                case "AP": return (int)MAttackType.AP;
+                default: return 0;
+            }
         }
 
         static int StateTypeCode(string v)

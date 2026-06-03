@@ -24,7 +24,10 @@ namespace Lockstep.Mugen.StateCtrl
 
         static void CopyInto(MHitDef src, MHitDef dst)
         {
+            dst.Attr = src.Attr;
             dst.HitHigh = src.HitHigh; dst.HitLow = src.HitLow; dst.HitAir = src.HitAir; dst.HitDown = src.HitDown;
+            dst.GuardHigh = src.GuardHigh; dst.GuardLow = src.GuardLow; dst.GuardAir = src.GuardAir;
+            dst.GuardHitTime = src.GuardHitTime; dst.GuardCtrlTime = src.GuardCtrlTime; dst.GuardVelX = src.GuardVelX;
             dst.HitDamage = src.HitDamage; dst.GuardDamage = src.GuardDamage;
             dst.P1PauseTime = src.P1PauseTime; dst.P2PauseTime = src.P2PauseTime;
             dst.GroundHitTime = src.GroundHitTime; dst.AirHitTime = src.AirHitTime; dst.GroundSlideTime = src.GroundSlideTime;

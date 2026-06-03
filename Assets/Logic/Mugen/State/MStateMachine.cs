@@ -34,6 +34,12 @@ namespace Lockstep.Mugen.State
             // AssertSpecial 标志每帧清空：须本帧重新断言才保持（对齐 MUGEN 每 tick 清）
             c.AssertFlags = 0;
 
+            // HitBy/NotHitBy 免疫窗口每帧递减（hitpause 期间时间冻结，不递减）。归零即过滤失效。
+            if (!hitpause && c.HitByTime > 0)
+            {
+                c.HitByTime--;
+            }
+
             // 外部强制切换（命中系统等）优先
             if (c.PendingStateNo >= 0)
             {

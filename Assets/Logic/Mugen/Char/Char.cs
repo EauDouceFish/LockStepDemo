@@ -68,6 +68,11 @@ namespace Lockstep.Mugen.Char
         public Hit.MHitDef HitDef = new Hit.MHitDef();
         public Hit.MClsnBox[] Clsn1;   // 攻击框
         public Hit.MClsnBox[] Clsn2;   // 受击框
+        public bool Guarding;          // 守方是否正在防御（守招判定入口；真实防御检测由命令/守招状态后续接）
+        // HitBy/NotHitBy 属性免疫过滤槽（time>0 生效；IsNot=NotHitBy）。每帧递减。
+        public int HitByAttr;
+        public int HitByTime;
+        public bool HitByIsNot;
 
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
@@ -114,6 +119,7 @@ namespace Lockstep.Mugen.Char
                 CommandList = CommandList != null ? CommandList.Clone() : null,
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
+                Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -140,6 +146,7 @@ namespace Lockstep.Mugen.Char
             Ghv.WriteHash(ref hash);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
             HitDef.WriteHash(ref hash);
+            hash.AddBool(Guarding); hash.AddInt32(HitByAttr); hash.AddInt32(HitByTime); hash.AddBool(HitByIsNot);
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);

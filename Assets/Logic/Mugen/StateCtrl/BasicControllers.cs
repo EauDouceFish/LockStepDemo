@@ -163,6 +163,26 @@ namespace Lockstep.Mugen.StateCtrl
     }
 
     /// <summary>
+    /// HitBy / NotHitBy：设置受击属性免疫窗口（对应 Ikemen hitby StateController）。
+    /// HitBy：仅 Attr 匹配的攻击能命中；NotHitBy(IsNot=true)：仅不匹配的能命中。Time 帧后失效（由状态机每帧递减）。
+    /// Attr/Time/IsNot 已在 CnsParser 解析为常量（攻击类别 bitmask），运行期直接写入 MChar。
+    /// </summary>
+    public sealed class HitByController : MStateController
+    {
+        public int Attr;
+        public int Time;
+        public bool IsNot;
+
+        public override bool Run(MChar c)
+        {
+            c.HitByAttr = Attr;
+            c.HitByTime = Time;
+            c.HitByIsNot = IsNot;
+            return false;
+        }
+    }
+
+    /// <summary>
     /// StateTypeSet：状态中途改 statetype/movetype/physics/ctrl（-1/null = 不改）。
     /// 码值对齐 M2/M4：StateType S=1/C=2/A=4/L=8/N=16；MoveType I=1/H=2/A=4。
     /// </summary>
