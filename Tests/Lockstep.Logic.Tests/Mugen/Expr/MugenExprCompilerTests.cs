@@ -156,5 +156,35 @@ namespace Lockstep.Tests.Mugen
             Assert.That(Eval("p2, (life + power)", c).ToI(), Is.EqualTo(250), "括号→整体重定向");
             Assert.That(Eval("p2, life + 5", c).ToI(), Is.EqualTo(205), "(p2,life)+5：redirect 只绑单值");
         }
+
+        // ───────── 修复5-2：enemy / enemynear redirect ─────────
+
+        [Test]
+        public void Redirect_Enemy_DefaultIndex_ToP2()
+        {
+            MChar opp = new MChar { Life = 333 };
+            MChar c = new MChar { Life = 1000, P2 = opp };
+            Assert.That(Eval("enemy, life", c).ToI(), Is.EqualTo(333), "省略索引 enemy = P2");
+            Assert.That(Eval("enemy(0), life", c).ToI(), Is.EqualTo(333), "enemy(0) = P2");
+            Assert.That(Eval("enemynear(0), life", c).ToI(), Is.EqualTo(333), "1v1 enemynear(0) = P2");
+        }
+
+        [Test]
+        public void Redirect_Enemy_OutOfRangeIndex_Undefined()
+        {
+            MChar opp = new MChar { Life = 333 };
+            MChar c = new MChar { Life = 1000, P2 = opp };
+            // 1v1 中只有索引 0 对应敌人；enemy(1) 无对应 → 整块重定向失败，回退默认（容错 0/false）
+            Assert.That(Eval("enemy(1), life", c).IsUndefined(), Is.True, "越界索引 → Undefined");
+        }
+
+        [Test]
+        public void Redirect_Enemy_BindsSingleValue()
+        {
+            MChar opp = new MChar { Life = 200, Power = 50 };
+            MChar c = new MChar { Life = 1000, P2 = opp };
+            Assert.That(Eval("enemy, (life + power)", c).ToI(), Is.EqualTo(250), "括号→整体重定向到 enemy");
+            Assert.That(Eval("enemy, life + 5", c).ToI(), Is.EqualTo(205), "(enemy,life)+5：只绑单值");
+        }
     }
 }

@@ -293,6 +293,14 @@ namespace Lockstep.Mugen.Expr
             string name = Cur.Text;
             Next();
 
+            // 带索引 redirect：enemy(n),/enemynear(n), 或省略索引的 enemy,/enemynear,（索引默认 0）。
+            // 须在函数调用判断之前，否则 enemy(0) 会被误当作函数 enemy(0)。
+            if ((name == "enemy" || name == "enemynear") && (IsOp("(") || IsOp(",")))
+            {
+                EmitEnemyRedirect(name);
+                return;
+            }
+
             // 函数调用：name(...)
             if (IsOp("("))
             {
@@ -517,6 +525,38 @@ namespace Lockstep.Mugen.Expr
             _out = outer;
 
             int runBlockLen = 1 + 4 + sub.Count;   // OC_run(1) + 长度头(4) + 子码
+            _out.Add((byte)op);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
+        }
+
+        // enemy(n),/enemynear(n), <value>：索引在外层上下文求值并压栈（供 Char.Redirect 弹取），
+        // 随后发 OC_enemy/OC_enemynear + OC_run 包裹的子值（子值在重定向后的敌人上下文求值）。
+        // 对齐 Ikemen compiler.go：索引可选(默认 0)，逗号后接子表达式。
+        void EmitEnemyRedirect(string name)
+        {
+            if (IsOp("("))
+            {
+                Next();
+                ParseBoolOr();      // 索引表达式 → 压栈（外层上下文）
+                Expect(")");
+            }
+            else
+            {
+                EmitInt(0);         // 省略索引 → 默认 0
+            }
+            Expect(",");
+
+            OpCode op = name == "enemynear" ? OpCode.OC_enemynear : OpCode.OC_enemy;
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            ParseUnary();           // 重定向后的单值
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;
             _out.Add((byte)op);
             AppendI32(runBlockLen);
             _out.Add((byte)OpCode.OC_run);

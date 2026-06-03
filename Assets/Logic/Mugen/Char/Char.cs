@@ -301,6 +301,14 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_root: return Root;
                 case OpCode.OC_parent: return Parent;
                 case OpCode.OC_p2: return P2;
+                case OpCode.OC_enemy:
+                case OpCode.OC_enemynear:
+                {
+                    // enemy(n) / enemynear(n)：弹索引。1v1 中唯一敌人 = P2（索引 0）；
+                    // 其余索引无对应 → null（VM 压 Undefined 并跳过整块）。多敌队战是后续工作。
+                    int index = Pop(stack).ToI();
+                    return index == 0 ? P2 : null;
+                }
                 case OpCode.OC_target:
                 {
                     // 弹目标 id（<0 表示任意 → 取第一个）。对齐我方编译器约定（Ikemen 原弹 2 个参数）。
