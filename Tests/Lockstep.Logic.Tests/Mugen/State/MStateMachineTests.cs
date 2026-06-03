@@ -16,7 +16,7 @@ namespace Lockstep.Tests.Mugen
         {
             return new ChangeStateController
             {
-                Trigger = Comp.Compile(trigger),
+                Triggers = MTriggerSet.Single(Comp.Compile(trigger)),
                 Value = Comp.Compile(target.ToString()),
                 Ctrl = ctrl,
             };
@@ -86,7 +86,7 @@ namespace Lockstep.Tests.Mugen
         public void NullTrigger_AlwaysRuns()
         {
             MStateMachine sm = new MStateMachine();
-            ChangeStateController always = new ChangeStateController { Trigger = null, Value = Comp.Compile("50") };
+            ChangeStateController always = new ChangeStateController { Triggers = null, Value = Comp.Compile("50") };
             MStateDef s0 = new MStateDef { No = 0 };
             s0.Controllers.Add(always);
             Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0, [50] = new MStateDef { No = 50 } };
@@ -94,6 +94,156 @@ namespace Lockstep.Tests.Mugen
 
             sm.RunFrame(c, states);
             Assert.That(c.StateNo, Is.EqualTo(50), "trigger=null 恒执行");
+        }
+
+        // ───────── M4 补全：triggerall + trigger1..n（OR-of-ANDs）─────────
+
+        [Test]
+        public void TriggerAll_AndsWithGroups()
+        {
+            // triggerall: alive；trigger1: time>=2 ；只有都满足才切
+            ChangeStateController sc = new ChangeStateController { Value = Comp.Compile("99") };
+            sc.Triggers = new MTriggerSet();
+            sc.Triggers.TriggerAll.Add(Comp.Compile("alive"));
+            sc.Triggers.Groups.Add(new List<BytecodeExp> { Comp.Compile("time >= 2") });
+
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(sc);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0, [99] = new MStateDef { No = 99 } };
+
+            MChar dead = new MChar { StateNo = 0, Time = 5, Life = 0 };   // time 够但 !alive
+            new MStateMachine().RunFrame(dead, states);
+            Assert.That(dead.StateNo, Is.EqualTo(0), "triggerall(alive) 不过则不切");
+
+            MChar live = new MChar { StateNo = 0, Time = 5, Life = 100 };
+            new MStateMachine().RunFrame(live, states);
+            Assert.That(live.StateNo, Is.EqualTo(99), "triggerall+trigger1 都过则切");
+        }
+
+        [Test]
+        public void TriggerGroups_AreOred()
+        {
+            // trigger1: time=1 ; trigger2: time=3 → 组间 OR
+            ChangeStateController sc = new ChangeStateController { Value = Comp.Compile("7") };
+            sc.Triggers = new MTriggerSet();
+            sc.Triggers.Groups.Add(new List<BytecodeExp> { Comp.Compile("time = 1") });
+            sc.Triggers.Groups.Add(new List<BytecodeExp> { Comp.Compile("time = 3") });
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(sc);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0, [7] = new MStateDef { No = 7 } };
+
+            MChar c = new MChar { StateNo = 0, Time = 3 };   // 命中 trigger2
+            new MStateMachine().RunFrame(c, states);
+            Assert.That(c.StateNo, Is.EqualTo(7));
+        }
+
+        // ───────── M4 补全：persistent ─────────
+
+        [Test]
+        public void Persistent0_RunsOncePerStateEntry()
+        {
+            // persistent=0 的 VarAdd 风格控制器：进状态只执行一次。用一个计数控制器验证。
+            CountController counter = new CountController { Persistent = 0, Triggers = null };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(counter);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0 };
+            MStateMachine sm = new MStateMachine();
+
+            sm.RunFrame(c, states);
+            sm.RunFrame(c, states);
+            sm.RunFrame(c, states);
+            Assert.That(counter.Count, Is.EqualTo(1), "persistent=0 进状态后只执行一次");
+        }
+
+        [Test]
+        public void Persistent1_RunsEveryFrame()
+        {
+            CountController counter = new CountController { Persistent = 1, Triggers = null };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(counter);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0 };
+            MStateMachine sm = new MStateMachine();
+
+            sm.RunFrame(c, states);
+            sm.RunFrame(c, states);
+            sm.RunFrame(c, states);
+            Assert.That(counter.Count, Is.EqualTo(3), "persistent=1 每帧执行");
+        }
+
+        // ───────── M4 补全：ignorehitpause ─────────
+
+        [Test]
+        public void IgnoreHitPause_RunsDuringHitstop()
+        {
+            CountController normal = new CountController { Persistent = 1, Triggers = null };
+            CountController ihp = new CountController { Persistent = 1, Triggers = null, IgnoreHitPause = true };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(normal);
+            s0.Controllers.Add(ihp);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0, Hitstop = 2 };
+
+            new MStateMachine().RunFrame(c, states);
+            Assert.That(normal.Count, Is.EqualTo(0), "hitpause 期间普通控制器不跑");
+            Assert.That(ihp.Count, Is.EqualTo(1), "ignorehitpause 控制器照跑");
+        }
+
+        // ───────── M4 补全：负状态 -1 每帧跑 ─────────
+
+        [Test]
+        public void NegativeState_RunsEveryFrame()
+        {
+            // 状态 -1：time(当前状态时间)=... 用恒真把 c 切到 200；当前状态 0 无控制器
+            MStateDef neg1 = new MStateDef { No = -1 };
+            neg1.Controllers.Add(new ChangeStateController { Triggers = MTriggerSet.Single(Comp.Compile("stateno = 0")), Value = Comp.Compile("200") });
+            MStateDef s0 = new MStateDef { No = 0 };
+            MStateDef s200 = new MStateDef { No = 200 };
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [-1] = neg1, [0] = s0, [200] = s200 };
+            MChar c = new MChar { StateNo = 0 };
+
+            new MStateMachine().RunFrame(c, states);
+            Assert.That(c.StateNo, Is.EqualTo(200), "负状态 -1 每帧跑并触发切换");
+        }
+
+        // ───────── M4 补全：SelfState ─────────
+
+        [Test]
+        public void SelfState_TransitionsAndClearsFlag()
+        {
+            SelfStateController self = new SelfStateController { Triggers = null, Value = Comp.Compile("0") };
+            MStateDef s10 = new MStateDef { No = 10 };
+            s10.Controllers.Add(self);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [10] = s10, [0] = new MStateDef { No = 0 } };
+            MChar c = new MChar { StateNo = 10 };
+
+            new MStateMachine().RunFrame(c, states);
+            Assert.That(c.StateNo, Is.EqualTo(0), "SelfState 切到自身状态 0");
+            Assert.IsFalse(c.PendingIsSelf, "切换应用后标志清除");
+        }
+
+        // ───────── M4 补全：common states 回退 ─────────
+
+        [Test]
+        public void CommonStates_FallbackLookup()
+        {
+            // 角色自身无状态 5, common 提供状态 5(切到 0)；角色当前 5 → 走 common
+            Dictionary<int, MStateDef> own = new Dictionary<int, MStateDef> { [0] = new MStateDef { No = 0 } };
+            MStateDef common5 = new MStateDef { No = 5 };
+            common5.Controllers.Add(new ChangeStateController { Triggers = null, Value = Comp.Compile("0") });
+            Dictionary<int, MStateDef> common = new Dictionary<int, MStateDef> { [5] = common5 };
+            MChar c = new MChar { StateNo = 5 };
+
+            new MStateMachine().RunFrame(c, own, common);
+            Assert.That(c.StateNo, Is.EqualTo(0), "自身无状态 5 → 回退 common 状态 5");
+        }
+
+        /// <summary>测试用：每次执行计数（模拟 VarAdd 类副作用控制器，验证 persistent/ignorehitpause）。</summary>
+        sealed class CountController : MStateController
+        {
+            public int Count;
+            public override bool Run(MChar c) { Count++; return false; }
         }
     }
 }

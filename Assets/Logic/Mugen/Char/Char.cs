@@ -59,6 +59,9 @@ namespace Lockstep.Mugen.Char
 
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
+        public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
+        // persistent 计数：当前状态内各控制器(按 index)已触发帧数，进入新状态时清空（仅作用当前状态）
+        public Dictionary<int, int> PersistCounters = new Dictionary<int, int>();
 
         // 物理
         public FVector3 Pos;
@@ -90,7 +93,8 @@ namespace Lockstep.Mugen.Char
                 StateType = StateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
                 AnimNo = AnimNo, PrevAnimNo = PrevAnimNo,
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
-                Hitstop = Hitstop, PendingStateNo = PendingStateNo,
+                Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
+                PersistCounters = new Dictionary<int, int>(PersistCounters),
                 HitCount = HitCount, UniqHitCount = UniqHitCount,
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo,
@@ -113,7 +117,8 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
-            hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo);
+            hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
+            HashVars(ref hash, PersistCounters);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount);
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo);
