@@ -77,13 +77,19 @@ namespace Lockstep.Mugen.State
                 MStateController ctrl = def.Controllers[i];
                 if (hitpause && !ctrl.IgnoreHitPause)
                 {
-                    continue;
+                    continue;   // hitpause 期间不执行也不递减 persistent（对齐 Ikemen 在 persistent gate 前返回）
+                }
+                if (!PersistGate(c, no, i))
+                {
+                    continue;   // persistent 冷却中：本帧跳过（不求值 trigger）
                 }
                 if (!ctrl.TriggerPasses(c))
                 {
-                    continue;
+                    continue;   // trigger 不过：返回但不重置冷却（对齐 Ikemen）
                 }
-                if (ctrl.Run(c) && c.PendingStateNo >= 0)
+                bool changed = ctrl.Run(c);
+                ResetPersist(c, no, i, ctrl.Persistent);
+                if (changed && c.PendingStateNo >= 0)
                 {
                     break;   // 负状态触发切换后停止本负状态后续控制器
                 }
@@ -107,17 +113,19 @@ namespace Lockstep.Mugen.State
                     MStateController ctrl = def.Controllers[i];
                     if (hitpause && !ctrl.IgnoreHitPause)
                     {
-                        continue;   // hitpause 期间跳过非 ignorehitpause 控制器
+                        continue;   // hitpause 期间跳过非 ignorehitpause 控制器（不递减 persistent）
+                    }
+                    if (!PersistGate(c, def.No, i))
+                    {
+                        continue;   // persistent 冷却中：本帧跳过（在 trigger 求值之前，对齐 Ikemen）
                     }
                     if (!ctrl.TriggerPasses(c))
                     {
-                        continue;
+                        continue;   // trigger 不过：不重置冷却
                     }
-                    if (!PersistGate(c, i, ctrl.Persistent))
-                    {
-                        continue;   // persistent 节流：本触发帧不执行
-                    }
-                    if (ctrl.Run(c) && c.PendingStateNo >= 0)
+                    bool ran = ctrl.Run(c);
+                    ResetPersist(c, def.No, i, ctrl.Persistent);
+                    if (ran && c.PendingStateNo >= 0)
                     {
                         ApplyTransition(c, states, commonStates);
                         changed = true;
@@ -132,17 +140,79 @@ namespace Lockstep.Mugen.State
             }
         }
 
-        // persistent 门控：1=每帧执行；0=进状态后仅一次；N=每 N 次触发帧。计数仅作用当前状态。
-        static bool PersistGate(MChar c, int ctrlIndex, int persistent)
+        // ───────── persistent（移植 Ikemen StateBlock.Run + ctrlsps 倒计时模型）─────────
+        // 语义：每帧到达该控制器时先递减其计数器，计数器 >0 则本帧跳过（不求值 trigger）；
+        // 计数器 <=0 时求值 trigger，trigger 过则执行并把计数器重置为 persistent 值。
+        // 故 persistent=N 是"执行后冷却 N 帧"（按在状态内的帧计，与 trigger 真值无关），非"第 N 次 trigger 真"。
+        // persistent 取值对齐 Ikemen 编译期归一：1 或 >128 → 1（每帧）；<=0 → 锁定哨兵（进状态仅一次）；其余=N。
+        const int PersistLock = int.MaxValue;   // 对应 Ikemen 的 math.MaxInt32：计数器锁定，不再递减→永不再执行（直到重进状态）
+
+        // 计数器按 (状态号, 控制器序号) 复合键存储，避免负状态/当前状态/重入状态间串扰
+        // （对齐 Ikemen 每个 StateBytecode 各有独立 ctrlsps 数组）。控制器数 <256，故 *256 编码无碰撞。
+        const int PersistKeyStride = 256;
+
+        static int PersistKey(int stateNo, int ctrlIndex)
         {
-            if (persistent == 1)
+            return stateNo * PersistKeyStride + ctrlIndex;
+        }
+
+        static int ResolvePersist(int raw)
+        {
+            if (raw == 1 || raw > 128)
             {
-                return true;
+                return 1;
             }
-            c.PersistCounters.TryGetValue(ctrlIndex, out int fired);
-            bool run = persistent <= 0 ? fired == 0 : (fired % persistent) == 0;
-            c.PersistCounters[ctrlIndex] = fired + 1;   // 触发帧计数（无论是否执行）
-            return run;
+            if (raw <= 0)
+            {
+                return PersistLock;
+            }
+            return raw;
+        }
+
+        // 门控：递减计数器（锁定值不减），返回是否"开放执行"（计数器<=0）。在 trigger 求值之前调用。
+        static bool PersistGate(MChar c, int stateNo, int ctrlIndex)
+        {
+            int key = PersistKey(stateNo, ctrlIndex);
+            c.PersistCounters.TryGetValue(key, out int counter);   // 缺省 0（进状态重置后的初值）
+            if (counter != PersistLock)
+            {
+                counter--;
+            }
+            c.PersistCounters[key] = counter;
+            return counter <= 0;
+        }
+
+        // 执行后重置：把计数器设为 persistent 值（1 / N / 锁定）。
+        static void ResetPersist(MChar c, int stateNo, int ctrlIndex, int rawPersistent)
+        {
+            c.PersistCounters[PersistKey(stateNo, ctrlIndex)] = ResolvePersist(rawPersistent);
+        }
+
+        // 进入状态时重置该状态的 persistent 计数器（对齐 Ikemen changeState 重建 ctrlsps 为全零）。
+        // 仅清目标状态范围 [stateNo*256, stateNo*256+256)，负状态计数器保留（它们从不被"进入"）。
+        static void ClearStatePersist(MChar c, int stateNo)
+        {
+            int lo = stateNo * PersistKeyStride;
+            int hi = lo + PersistKeyStride;
+            List<int> toRemove = null;
+            foreach (int key in c.PersistCounters.Keys)
+            {
+                if (key >= lo && key < hi)
+                {
+                    if (toRemove == null)
+                    {
+                        toRemove = new List<int>();
+                    }
+                    toRemove.Add(key);
+                }
+            }
+            if (toRemove != null)
+            {
+                for (int k = 0; k < toRemove.Count; k++)
+                {
+                    c.PersistCounters.Remove(toRemove[k]);
+                }
+            }
         }
 
         // 对应 changeStateEx + stateChange：设新状态号、time=0、清 persistent 计数、应用 statedef 头部。
@@ -156,7 +226,7 @@ namespace Lockstep.Mugen.State
             c.PrevStateType = c.StateType;   // 保存上一状态 statetype（prevstatetype trigger）
             c.StateNo = target;
             c.Time = 0;
-            c.PersistCounters.Clear();
+            ClearStatePersist(c, target);   // 重置进入状态的 persistent 计数器（负状态计数器保留）
 
             MStateDef def = Lookup(target, states, commonStates);
             if (def == null)

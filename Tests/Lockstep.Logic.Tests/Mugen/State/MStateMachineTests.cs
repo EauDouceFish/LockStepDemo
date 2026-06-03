@@ -172,6 +172,71 @@ namespace Lockstep.Tests.Mugen
             Assert.That(counter.Count, Is.EqualTo(3), "persistent=1 每帧执行");
         }
 
+        [Test]
+        public void PersistentN_FrameCooldown()
+        {
+            // persistent=3：执行后冷却 3 帧（按在状态内的帧计），故 7 帧内在第 1/4/7 帧执行 = 3 次。
+            CountController counter = new CountController { Persistent = 3, Triggers = null };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(counter);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0 };
+            MStateMachine sm = new MStateMachine();
+
+            for (int frame = 0; frame < 7; frame++)
+            {
+                sm.RunFrame(c, states);
+            }
+            Assert.That(counter.Count, Is.EqualTo(3), "persistent=3 在第 1/4/7 帧执行");
+        }
+
+        [Test]
+        public void PersistentN_CountsFramesNotTriggerHits()
+        {
+            // 关键差异（对齐 Ikemen）：冷却按"在状态内的帧"计，与 trigger 真值无关。
+            // trigger = (time != 1)：第 1 帧(time=1)假，其余真。persistent=2。
+            // 帧0(time0,真): 计数器0→-1 开放, trigger真, 执行, 重置2
+            // 帧1(time1,假): 计数器2→1 >0 冷却跳过(trigger 都不求值)
+            // 帧2(time2,真): 计数器1→0 开放, trigger真, 执行, 重置2
+            // 帧3(time3,假): 1 冷却; 帧4: 0 开放执行 → 共 3 次（帧0/2/4）
+            CountController counter = new CountController
+            {
+                Persistent = 2,
+                Triggers = MTriggerSet.Single(Comp.Compile("time != 1")),
+            };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(counter);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0 };
+            MStateMachine sm = new MStateMachine();
+
+            for (int frame = 0; frame < 5; frame++)
+            {
+                sm.RunFrame(c, states);
+            }
+            Assert.That(counter.Count, Is.EqualTo(3), "冷却按帧计而非按 trigger 真次数");
+        }
+
+        [Test]
+        public void Persistent0_RerunsAfterStateReentry()
+        {
+            // persistent=0 锁定后只在"重新进入状态"时复位（ClearStatePersist 清该状态计数器）。
+            CountController counter = new CountController { Persistent = 0, Triggers = null };
+            MStateDef s0 = new MStateDef { No = 0 };
+            s0.Controllers.Add(counter);
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = s0 };
+            MChar c = new MChar { StateNo = 0 };
+            MStateMachine sm = new MStateMachine();
+
+            sm.RunFrame(c, states);   // 帧0：counter 执行(1)，锁定
+            sm.RunFrame(c, states);   // 帧1：已锁定，跳过
+            Assert.That(counter.Count, Is.EqualTo(1), "锁定后不再执行");
+
+            c.PendingStateNo = 0;     // 强制重进状态 0（命中/ChangeState 同效果）
+            sm.RunFrame(c, states);   // 帧2：进状态重置计数器 → counter 再次执行(2)
+            Assert.That(counter.Count, Is.EqualTo(2), "重进状态后 persistent=0 控制器再次执行一次");
+        }
+
         // ───────── M4 补全：ignorehitpause ─────────
 
         [Test]
