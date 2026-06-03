@@ -121,6 +121,8 @@ namespace Lockstep.Mugen.Parse
                 case "yaccel": k.Yaccel = EvalF(comp, val); break;
                 case "stand.friction": k.StandFriction = EvalF(comp, val); break;
                 case "crouch.friction": k.CrouchFriction = EvalF(comp, val); break;
+                case "stand.friction.threshold": k.StandFrictionThreshold = EvalF(comp, val); break;
+                case "crouch.friction.threshold": k.CrouchFrictionThreshold = EvalF(comp, val); break;
                 case "airjump.num": k.AirjumpNum = EvalI(comp, val); break;
                 case "airjump.height": k.AirjumpHeight = EvalF(comp, val); break;
             }

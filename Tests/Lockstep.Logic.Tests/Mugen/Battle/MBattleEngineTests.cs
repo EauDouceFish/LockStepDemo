@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Parse;
 using Lockstep.Mugen.Battle;
@@ -119,6 +120,43 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             }, "真实 KFM 连跑 60 帧不崩");
             Assert.That(engine.Chars[0].AnimCurTime, Is.GreaterThan(0), "KFM 动画 0 随帧推进");
             Assert.That(engine.Chars[0].Alive, Is.True, "未无故自杀");
+        }
+
+        [Test]
+        public void RealKfm_WithCommonStates_StandsAndPhysicsEngages()
+        {
+            string kfmDir = TestAssets.KfmDir();
+            string common = TestAssets.Common1Cns();   // KFM 目录无 common1，借 Terrarian 的标准公共状态
+            string cns = Path.Combine(kfmDir, "kfm.cns");
+            string air = Path.Combine(kfmDir, "kfm.air");
+            if (!File.Exists(cns) || !File.Exists(air) || !File.Exists(common))
+            {
+                Assert.Ignore("KFM/common1 素材缺失，跳过。");
+            }
+
+            MCharData data = MCharLoader.Load(
+                new[] { File.ReadAllText(cns) }, File.ReadAllText(cns),
+                File.ReadAllText(common), File.ReadAllText(air), null, "kfm");
+
+            Assert.That(data.CommonStates.ContainsKey(0), Is.True, "公共状态含站立 Statedef 0");
+            Assert.That(data.CommonStates.ContainsKey(20), Is.True, "公共状态含行走 Statedef 20");
+
+            MChar kfm = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
+            Assert.That(kfm.Physics, Is.EqualTo(1), "入场应用公共 Statedef 0 头部 physics=S");
+            Assert.That(kfm.StateType, Is.EqualTo(1), "type=S");
+            Assert.That(kfm.Constants.StandFriction.Raw, Is.GreaterThan(0), "kfm.cns stand.friction 已载入");
+
+            MBattleEngine engine = new MBattleEngine();
+            engine.Add(kfm, data);
+            List<MInput> inputs = new List<MInput> { MInput.None };
+            Assert.DoesNotThrow(() =>
+            {
+                for (int f = 0; f < 60; f++)
+                {
+                    engine.Tick(inputs);
+                }
+            }, "KFM + 公共状态连跑 60 帧不崩");
+            Assert.That(engine.Chars[0].Alive, Is.True);
         }
     }
 }

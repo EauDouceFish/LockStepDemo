@@ -70,7 +70,24 @@ namespace Lockstep.Mugen.Battle
                 AnimNo = startAnimNo,
                 CommandList = new MCommandList { Commands = data.Commands },
             };
+            ApplyInitialStateHeader(c, data, startStateNo);   // 模拟 MUGEN 入场 changeState：应用初始状态头部
             return c;
+        }
+
+        // 应用初始状态的 [Statedef] 头部（type/movetype/physics/ctrl/anim），对齐 ApplyTransition。
+        // 否则直接置 StateNo 不经转换，physics=S 等头部不生效，摩擦/类型 trigger 会失常。
+        static void ApplyInitialStateHeader(MChar c, MCharData data, int stateNo)
+        {
+            if (!data.States.TryGetValue(stateNo, out MStateDef def) &&
+                !data.CommonStates.TryGetValue(stateNo, out def))
+            {
+                return;
+            }
+            if (def.StateType >= 0) { c.StateType = def.StateType; }
+            if (def.MoveType >= 0) { c.MoveType = def.MoveType; }
+            if (def.Physics >= 0) { c.Physics = def.Physics; }
+            if (def.Ctrl >= 0) { c.Ctrl = def.Ctrl != 0; }
+            if (def.Anim >= 0) { c.AnimNo = def.Anim; }
         }
 
         static void MergeStates(Dictionary<int, MStateDef> into, Dictionary<int, MStateDef> from)

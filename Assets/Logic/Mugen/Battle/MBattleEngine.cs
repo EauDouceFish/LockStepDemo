@@ -59,10 +59,10 @@ namespace Lockstep.Mugen.Battle
                 _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates);
             }
 
-            // 3) 物理（最小积分；重力/摩擦/地面夹取为 M9 物理完善 TODO）
+            // 3) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate；落地由公共状态检测）
             for (int i = 0; i < Chars.Count; i++)
             {
-                IntegrateVelocity(Chars[i]);
+                MPhysics.Step(Chars[i]);
             }
 
             // 4) 动画推进（M8）+ 派生 Clsn
@@ -89,15 +89,6 @@ namespace Lockstep.Mugen.Battle
                 Chars[i].WriteHash(ref hash);
             }
             return hash.Value;
-        }
-
-        // 最小速度积分：pos.x += vel.x*facing、pos.y += vel.y（对齐 Ikemen 朝向相对 X）。
-        static void IntegrateVelocity(MChar c)
-        {
-            FFloat px = c.Pos.X + c.Vel.X * c.Facing;
-            FFloat py = c.Pos.Y + c.Vel.Y;
-            c.OldPos = c.Pos;
-            c.Pos = new FVector3(px, py, c.Pos.Z);
         }
     }
 }

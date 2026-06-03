@@ -56,6 +56,9 @@ namespace Lockstep.Mugen.Char
         public FFloat Yaccel;
         public FFloat StandFriction;
         public FFloat CrouchFriction;
+        // MUGEN 1.0 摩擦阈值：站立/蹲下速度低于此则归零（snap），未给时为 0（靠定点摩擦衰减归零）。
+        public FFloat StandFrictionThreshold;
+        public FFloat CrouchFrictionThreshold;
         public int AirjumpNum;
         public FFloat AirjumpHeight = FFloat.FromInt(35);
 
