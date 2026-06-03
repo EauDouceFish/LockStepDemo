@@ -14,6 +14,13 @@ namespace Lockstep.Mugen.Expr
     {
         /// <summary>读取一个 trigger/redirect opcode 的值；不支持则返回 Undefined。stack 供需要弹参的 opcode 使用。</summary>
         BytecodeValue ReadTrigger(OpCode op, byte[] code, ref int i, List<BytecodeValue> stack);
+
+        /// <summary>
+        /// 解析 redirect opcode（OC_root/parent/p2/target/...），返回被重定向到的上下文；
+        /// 不存在/不支持则返回 null（VM 会压 Undefined 并跳过整个重定向块，对齐 Ikemen）。
+        /// 需要参数的 redirect（target/helper/enemy 等）从 <paramref name="stack"/> 弹取。
+        /// </summary>
+        IExprContext Redirect(OpCode op, List<BytecodeValue> stack);
     }
 
     /// <summary>表达式字节码 + 栈式求值器（对应 Ikemen BytecodeExp.run）。</summary>
@@ -32,11 +39,16 @@ namespace Lockstep.Mugen.Expr
         public BytecodeValue Run(IExprContext context)
         {
             List<BytecodeValue> stack = new List<BytecodeValue>(16);
+            // oc = 原始上下文；cur = 当前(可被 redirect 临时切换)。照搬 Ikemen：每条 opcode 末尾 cur 重置回 oc，
+            // 只有成功的 redirect / nordrun 用 keepContext 跳过重置，使紧随的 OC_run 能以重定向后的上下文跑子块。
+            IExprContext oc = context;
+            IExprContext cur = context;
             int i = 0;
             while (i < _code.Length)
             {
                 OpCode op = (OpCode)_code[i];
                 i++;
+                bool keepContext = false;
                 switch (op)
                 {
                     case OpCode.OC_int8: stack.Add(BytecodeValue.Int((sbyte)_code[i])); i++; break;
@@ -123,17 +135,53 @@ namespace Lockstep.Mugen.Expr
                         break;
                     }
 
+                    // 嵌套子表达式：OC_run 用当前(重定向后)上下文跑；OC_nordrun 用原始 oc 跑（不带重定向）。
+                    // 编码：op + 4字节长度 + 子字节码。跑完压结果并跳过整块（i += len + 4）。
+                    case OpCode.OC_run:
+                    {
+                        int len = Peek32(i);
+                        stack.Add(new BytecodeExp(Slice(i + 4, len)).Run(cur));
+                        i = i + len + 4;
+                        break;
+                    }
+                    case OpCode.OC_nordrun:
+                    {
+                        int len = Peek32(i);
+                        stack.Add(new BytecodeExp(Slice(i + 4, len)).Run(oc));
+                        i = i + len + 4;
+                        keepContext = true;   // 对齐 Ikemen 的 continue（跳过末尾 cur 重置）
+                        break;
+                    }
+                    case OpCode.OC_rdreset:
+                        break;   // NOP；cur 的还原由每迭代末尾 cur=oc 完成
+
                     default:
-                        // trigger/redirect/子表 opcode：交给 context（M3）；无则压 Undefined
-                        if (context != null)
+                        if (op >= OpCode.OC_player && op <= OpCode.OC_stateowner)
                         {
-                            stack.Add(context.ReadTrigger(op, _code, ref i, stack));
+                            // redirect：切上下文并进入后续子块（i+=4 跳过长度头并保留 cur）；失败压 Undefined 跳过整块
+                            IExprContext redirected = cur != null ? cur.Redirect(op, stack) : null;
+                            if (redirected != null)
+                            {
+                                cur = redirected;
+                                keepContext = true;
+                                i += 4;
+                            }
+                            else
+                            {
+                                stack.Add(BytecodeValue.Undefined());
+                                i = Jump32(i);
+                            }
                         }
                         else
                         {
-                            stack.Add(BytecodeValue.Undefined());
+                            // 普通 trigger / 子表 opcode：交给当前上下文；无则压 Undefined
+                            stack.Add(cur != null ? cur.ReadTrigger(op, _code, ref i, stack) : BytecodeValue.Undefined());
                         }
                         break;
+                }
+                if (!keepContext)
+                {
+                    cur = oc;   // 每条 opcode 后重置当前上下文（照搬 Ikemen run 循环末尾 c = oc）
                 }
             }
             return stack.Count > 0 ? stack[stack.Count - 1] : BytecodeValue.Undefined();
@@ -200,8 +248,21 @@ namespace Lockstep.Mugen.Expr
         // i 指向 4 字节小端长度 len：返回 i + len + 4（下一 opcode 索引）。
         int Jump32(int i)
         {
-            int len = _code[i] | (_code[i + 1] << 8) | (_code[i + 2] << 16) | (_code[i + 3] << 24);
-            return i + len + 4;
+            return i + Peek32(i) + 4;
+        }
+
+        // 读 i 处 4 字节小端长度（对应 Ikemen PeekLength）。
+        int Peek32(int i)
+        {
+            return _code[i] | (_code[i + 1] << 8) | (_code[i + 2] << 16) | (_code[i + 3] << 24);
+        }
+
+        // 截取子字节码 [start, start+len)。
+        byte[] Slice(int start, int len)
+        {
+            byte[] sub = new byte[len];
+            System.Array.Copy(_code, start, sub, 0, len);
+            return sub;
         }
 
         int ReadInt32(ref int i)
