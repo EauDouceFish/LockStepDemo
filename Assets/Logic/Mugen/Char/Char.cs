@@ -60,6 +60,9 @@ namespace Lockstep.Mugen.Char
         // 受击变量（命中系统 M7 填值；此处随 Char 快照/哈希）
         public MGetHitVar Ghv = new MGetHitVar();
 
+        // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
+        public Command.MCommandList CommandList;
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -102,6 +105,7 @@ namespace Lockstep.Mugen.Char
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 Ghv = Ghv.Clone(),
+                CommandList = CommandList != null ? CommandList.Clone() : null,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -126,6 +130,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             Ghv.WriteHash(ref hash);
+            if (CommandList != null) { CommandList.WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);
@@ -197,6 +202,15 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_power: return BytecodeValue.Int(Power);
                 case OpCode.OC_powermax: return BytecodeValue.Int(PowerMax);
                 case OpCode.OC_alive: return BytecodeValue.Bool(Alive);
+
+                case OpCode.OC_command:
+                {
+                    // 编码：OC_command + [1字节名长] + ASCII 名字
+                    int len = code[i]; i++;
+                    string cmdName = System.Text.Encoding.ASCII.GetString(code, i, len);
+                    i += len;
+                    return BytecodeValue.Bool(CommandList != null && CommandList.IsActive(cmdName));
+                }
 
                 // CharSystemVar 常用 trigger
                 case OpCode.OC_id: return BytecodeValue.Int(Id);

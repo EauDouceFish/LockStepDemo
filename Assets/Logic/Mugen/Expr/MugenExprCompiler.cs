@@ -11,7 +11,7 @@ namespace Lockstep.Mugen.Expr
     /// <summary>把 MUGEN 触发条件表达式字符串编译成 <see cref="BytecodeExp"/>。</summary>
     public sealed class MugenExprCompiler
     {
-        enum TokKind { End, Number, FloatNumber, Ident, Op }
+        enum TokKind { End, Number, FloatNumber, Ident, Op, Str }
 
         struct Tok
         {
@@ -45,6 +45,18 @@ namespace Lockstep.Mugen.Expr
                 if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n')
                 {
                     i++;
+                    continue;
+                }
+                if (ch == '"')
+                {
+                    int start = i + 1;
+                    i++;
+                    while (i < s.Length && s[i] != '"')
+                    {
+                        i++;
+                    }
+                    toks.Add(new Tok { Kind = TokKind.Str, Text = s.Substring(start, i - start) });
+                    if (i < s.Length) { i++; }   // 跳过收尾引号
                     continue;
                 }
                 if (char.IsDigit(ch) || (ch == '.' && i + 1 < s.Length && char.IsDigit(s[i + 1])))
@@ -295,6 +307,13 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            // command = "name" / != "name"：发 OC_command + 名字串，运行期查命令是否 active
+            if (name == "command")
+            {
+                EmitCommandCompare();
+                return;
+            }
+
             // redirect 前缀：p2,/root,/parent, + 单值子表达式（用 OC_run 包裹保证全程用重定向上下文）
             if ((name == "p2" || name == "root" || name == "parent") && IsOp(","))
             {
@@ -377,6 +396,24 @@ namespace Lockstep.Mugen.Expr
                 Next();
                 EmitTypeCheck(op, trigger);
                 Emit(OpCode.OC_blor);
+            }
+            if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        // command = "name" / != "name"：发 OC_command + [1字节名长][ASCII 名字]。无比较则压 0。
+        void EmitCommandCompare()
+        {
+            bool negate = IsOp("!=");
+            if (negate || IsOp("=")) { Next(); }
+            else { EmitInt(0); return; }
+            string cmdName = Cur.Kind == TokKind.Str ? Cur.Text : "";
+            if (Cur.Kind == TokKind.Str) { Next(); }
+            Emit(OpCode.OC_command);
+            byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(cmdName);
+            _out.Add((byte)(nameBytes.Length > 255 ? 255 : nameBytes.Length));
+            for (int k = 0; k < nameBytes.Length && k < 255; k++)
+            {
+                _out.Add(nameBytes[k]);
             }
             if (negate) { Emit(OpCode.OC_blnot); }
         }

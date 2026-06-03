@@ -92,8 +92,8 @@ Assets/Logic/Mugen/
 | **M2** 编译器 | `compiler.go`(+functions)：CNS trigger 字符串 → BytecodeExp | M1 | ✅ 核心完成(`6a67038`): tokenizer+完整优先级链+字面量/括号/一元/算术/比较/逻辑/位+无参&轴 trigger+函数(abs/floor/trig/ifelse/log)+var/fvar + **statetype/movetype 字母枚举(S/C/A/L,OR列表,!=)** + **`=[a,b]`/`(a,b]` 区间语法** + **redirect 编译(p2/root/parent, OC_run 包裹)**。dotnet test 127/127。**待补(后续里程碑)**: 字符串 `command=`(→M6)、`const(...)`/常量(→M9 角色加载)、p2statetype/prevstatetype/target 编译、更多 trigger |
 | **M3** Char 运行态 | `Char`/`CharSystemVar`(定点)、生命周期、Clone/WriteHash 接回滚 | M0 | ✅ 地基完成(`d91ab38`): 核心 trigger + **redirect 机制(VM oc/cur 双上下文+每迭代重置, OC_root/parent/p2/target + OC_run/nordrun + rdreset; MChar Id/P2/Root/Parent/Targets, Clone 浅拷结构引用待 World 重链)** + **CharSystemVar 常用字段+trigger(id/palno/hitpausetime/hit*/move*/animtime/numtarget)** + **MGetHitVar 受击容器(常用字段+Clone/Hash)**。dotnet test 121/121。**待补(→M7)**: CharSystemVar 全字段、gethitvar(...) opcode 接入、HitDef(130字段) |
 | **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states | M1,M3 | ✅ 完成(`9584849`): **MTriggerSet(triggerall全AND + trigger1..n 组内AND/组间OR)** + 控制器 **persistent(1每帧/0一次/N每N次)** + **ignorehitpause** + **负状态 -3/-2/-1 每帧跑(移植 actionRun 顺序)** + **SelfStateController** + **common states 回退查找** + ChangeState 同帧重入/statedef 头应用/hitpause 门控。dotnet test 135/135。**待补(后续)**: 嵌套 StateBlock if/else 树、loop/for、persistent=N 精确节奏、-4/+1 Ikemen 扩展态 |
-| **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…，~90 个战斗相关） | M2,M4 | 🔄 第一批完成(`a06ebd7`): `Mugen/StateCtrl/BasicControllers` = Null/VelSet/VelAdd/PosSet/PosAdd/ChangeAnim/CtrlSet/VarSet/VarAdd/StateTypeSet，朝向语义照搬 Ikemen(PosAdd X 乘 facing/PosSet 绝对/VelSet 存原值)。dotnet test 146/146。**待续**: 其余控制器(HitBy/AssertSpecial/Width/Turn/AfterImage/Explod/PlaySnd/...)、把控制器接入 CnsParser(`[State N] type=` → 实例化)、HitDef→M7 |
-| **M6** 命令系统 | `input.go`：CommandList/Command/cmdElem，charge/`~`/`$`/`>`/`+` 全语义 | M3 | ⬜ |
+| **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…，~90 个战斗相关） | M2,M4 | ✅ 核心完成(`a06ebd7`/`431edc3`/`c736b13`): 已有 Null/VelSet/VelAdd/PosSet/PosAdd/ChangeAnim/CtrlSet/VarSet/VarAdd/StateTypeSet/LifeAdd/LifeSet/PowerAdd/PowerSet/Turn/AssertSpecial，并已接入 `MugenCnsParser`，CNS 文本可端到端驱动状态机。Codex 复核通过，`dotnet test` 167/167（含当前 M6 工作树）。**边界**: 不是 ~90 控制器全量完成；HitDef 归 M7，PlaySnd/Explod/AfterImage/HitBy/Width 等仍待续。 |
+| **M6** 命令系统 | `input.go`：CommandList/Command/cmdElem，charge/`~`/`$`/`>`/`+` 全语义 | M3 | 🔄 核心进行中(`a8ace2c`): 输入缓冲、CMD 键解析、匹配测试已提交；当前工作树另有 `MCommandList.cs`/`MugenCmdParser.cs` 未跟踪但已参与本地 167/167 测试，提交前不得视为完整 ledger。 |
 | **M7** 命中 | HitDef(130字段)+命中检测+GetHitVar+gethit 5000-5150 | M4,M5 | ⬜ |
 | **M8** 动画/SFF 对接 | `anim.go`(AIR→Animation) + 对接 SFF 读取 → Clsn/精灵 | M3 | ⬜ |
 | **M9** 角色加载+整合 | DEF/CNS/CMD/AIR/SFF 全链路加载 → 跑起 KFM → **差分对账 Ikemen**（离散全等/连续容差） | M2,M5,M6,M7,M8 | ⬜ |
@@ -114,7 +114,7 @@ Assets/Logic/Mugen/
 - `[2026-06-03] 架构 — Ikemen 非 ECS、Char 巨struct` — 不强行 ECS 化，照搬 Char struct，仅加 Clone/WriteHash 接回滚。退役旧 ECS 战斗组件。
 - `[2026-06-03] Expr — ToI 截断方向` — FFloat.ToInt 是 floor，Ikemen int32(float) 是向零截断。已在 BytecodeValue.ToI 自行向零截断。其它移植处凡 float→int 都要注意此差异。
 - `[2026-06-03] Expr — OC_float 编码` — 我方 OC_float 携带 8 字节 FFloat raw（Ikemen 是 float32 bits）。属刻意偏离，M2 编译器必须按此编码产出。
-- `[2026-06-03] Expr — 短路跳转未实现` — OC_jz/jnz/jmp 及 8 位变体 M1 未做。纯表达式求值两侧都算结果一致，暂不影响；M2 编译器若需短路/三目优化再补（ifelse 已用 OC_ifelse 实现，无需跳转）。`OC_run/nordrun`(状态控制器调用)归 M4/M5。
+- `[2026-06-03] Expr — 短路跳转` — 已在 M1 commit `3ba75b4` 补 OC_jmp/jz/jnz + 8bit + jsf8，peek 不 pop 与 offset 编码对齐 Ikemen；后续若编译器生成更复杂控制流，需继续加差分用例兜底。
 
 ---
 
