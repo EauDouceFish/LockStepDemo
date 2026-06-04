@@ -129,12 +129,22 @@ namespace Lockstep.Mugen.Hit
         public FFloat AirVelX, AirVelY;
 
         // 反应/状态
-        public MReaction AnimType = MReaction.Light;
-        public MHitType GroundType = MHitType.High;
+        public MReaction AnimType = MReaction.Light;       // animtype（地面反应类型）
+        public MReaction AirAnimType = MReaction.Up;       // air.animtype（默认随 animtype，解析时回填）
+        public MReaction FallAnimType = MReaction.Up;      // fall.animtype
+        public MHitType GroundType = MHitType.High;        // ground.type
+        public MHitType AirType = MHitType.High;           // air.type
         public bool Fall;
         public int P1StateNo = -1;  // 攻方命中后切状态（-1 不切）
         public int P2StateNo = -1;  // 守方切状态（-1=默认 5000）
         public int NumHits = 1;
+
+        // 击飞 fall 分支（连续量容差；解析归 R-HITDEF，此处给 MUGEN 默认值）
+        public FFloat YAccel = FFloat.FromInt(35) / FFloat.FromInt(100);   // yaccel 默认 .35
+        public FFloat FallXVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.xvelocity 默认 -4.5
+        public FFloat FallYVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.yvelocity 默认 -4.5
+        public bool FallRecover = true;     // fall.recover 默认 1
+        public int FallRecoverTime = 4;     // fall.recovertime 默认 4
 
         public MHitDef Clone()
         {
@@ -151,8 +161,11 @@ namespace Lockstep.Mugen.Hit
             hash.AddInt32(P1PauseTime); hash.AddInt32(P2PauseTime);
             hash.AddInt32(GroundHitTime); hash.AddInt32(AirHitTime); hash.AddInt32(GroundSlideTime);
             hash.AddFixed(GroundVelX); hash.AddFixed(GroundVelY); hash.AddFixed(AirVelX); hash.AddFixed(AirVelY);
-            hash.AddInt32((int)AnimType); hash.AddInt32((int)GroundType);
+            hash.AddInt32((int)AnimType); hash.AddInt32((int)AirAnimType); hash.AddInt32((int)FallAnimType);
+            hash.AddInt32((int)GroundType); hash.AddInt32((int)AirType);
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddInt32(NumHits);
+            hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
+            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime);
         }
     }
 }

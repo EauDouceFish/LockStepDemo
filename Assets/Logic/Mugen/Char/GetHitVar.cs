@@ -29,11 +29,24 @@ namespace Lockstep.Mugen.Char
         public int FallCount;        // 浮空内被击次数
 
         // 反应类型 / 标志
-        public int AnimType;         // 受击动画类型（light/medium/hard/back/...）原始码
-        public int AttrType;         // 命中属性类型（S/C/A）原始码
-        public bool Fall;            // 是否击倒/浮空
+        public int AnimType;         // 实际受击动画类型 gethitvar(animtype)（gethitAnimtype() 派生：地/空/fall 三选一）
+        public int AttrType;         // gethitvar(type)：命中属性类型（按当前 stateType 取 groundtype/airtype）原始码
+        public int GroundType = (int)Hit.MHitType.High;   // gethitvar(groundtype)：HitDef ground.type（1=high,2=low,3=trip）
+        public int AirType = (int)Hit.MHitType.High;      // gethitvar(airtype)：HitDef air.type
+        public int GroundAnimType;   // HitDef animtype（地面反应类型，gethitAnimtype 源）
+        public int AirAnimType;      // HitDef air.animtype
+        public int FallAnimType = (int)Hit.MReaction.Up;  // HitDef fall.animtype（默认 Up）
+        public bool Fall;            // gethitvar(fall)：是否击倒/浮空（= Ikemen fallflag）
         public bool Guarded;         // 是否被防御
         public bool Up;              // 是否处于击倒上升段（fall.recover 判定用）
+
+        // 重力 / 击飞（fall 分支用，common1 5030 读 gethitvar(yaccel)、5050 读 fall.*）
+        public FFloat YAccel;        // gethitvar(yaccel)：浮空下落加速度
+        public FFloat FallXVel;      // gethitvar(fall.xvel)
+        public FFloat FallYVel;      // gethitvar(fall.yvel)：落地反弹后的 Y 速度
+        public bool FallRecover = true;  // 是否允许 fall.recover 起身
+        public int FallRecoverTime = 4;  // canRecover 所需浮空帧数
+        public int DownRecoverTime;  // 倒地起身计时（5110 读，逐帧递减）
 
         public MGetHitVar Clone()
         {
@@ -42,8 +55,11 @@ namespace Lockstep.Mugen.Char
                 XVel = XVel, YVel = YVel, ZVel = ZVel,
                 HitShakeTime = HitShakeTime, HitTime = HitTime, SlideTime = SlideTime,
                 CtrlTime = CtrlTime, Damage = Damage, HitCount = HitCount, FallCount = FallCount,
-                AnimType = AnimType, AttrType = AttrType,
+                AnimType = AnimType, AttrType = AttrType, GroundType = GroundType, AirType = AirType,
+                GroundAnimType = GroundAnimType, AirAnimType = AirAnimType, FallAnimType = FallAnimType,
                 Fall = Fall, Guarded = Guarded, Up = Up,
+                YAccel = YAccel, FallXVel = FallXVel, FallYVel = FallYVel,
+                FallRecover = FallRecover, FallRecoverTime = FallRecoverTime, DownRecoverTime = DownRecoverTime,
             };
         }
 
@@ -52,8 +68,11 @@ namespace Lockstep.Mugen.Char
             hash.AddFixed(XVel); hash.AddFixed(YVel); hash.AddFixed(ZVel);
             hash.AddInt32(HitShakeTime); hash.AddInt32(HitTime); hash.AddInt32(SlideTime);
             hash.AddInt32(CtrlTime); hash.AddInt32(Damage); hash.AddInt32(HitCount); hash.AddInt32(FallCount);
-            hash.AddInt32(AnimType); hash.AddInt32(AttrType);
+            hash.AddInt32(AnimType); hash.AddInt32(AttrType); hash.AddInt32(GroundType); hash.AddInt32(AirType);
+            hash.AddInt32(GroundAnimType); hash.AddInt32(AirAnimType); hash.AddInt32(FallAnimType);
             hash.AddBool(Fall); hash.AddBool(Guarded); hash.AddBool(Up);
+            hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
+            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(DownRecoverTime);
         }
     }
 }

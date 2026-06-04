@@ -39,6 +39,17 @@ namespace Lockstep.Tests
             return Path.Combine(TerrarianDir(), "common1.cns");
         }
 
+        public static string MugenSourceDir()
+        {
+            return Path.Combine(DemoDir(), "MugenSource");
+        }
+
+        /// <summary>任意角色目录（../MugenSource/&lt;name&gt;）。用于多角色批量加载测试。</summary>
+        public static string CharDir(string name)
+        {
+            return Path.Combine(MugenSourceDir(), name);
+        }
+
         public static string KfmDir()
         {
             return Path.Combine(DemoDir(), "MugenSource", "kfm");

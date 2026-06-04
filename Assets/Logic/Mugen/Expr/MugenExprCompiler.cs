@@ -368,16 +368,13 @@ namespace Lockstep.Mugen.Expr
                 _out.Add((byte)ConstFieldId(field));
                 return;
             }
-            // gethitvar(field)：参数是字段名(ident)，发 OC_ex_ + 字段id 字节，运行期从 Ghv 读
+            // gethitvar(field)：参数是点分字段名(如 fall.yvel)，发 OC_ex_ + 字段id 字节，运行期从 Ghv 读
             if (name == "gethitvar")
             {
-                int fieldId = GetHitVarFieldId(Cur.Kind == TokKind.Ident ? Cur.Text : "");
-                if (Cur.Kind == TokKind.Ident) { Next(); }
-                // 容错吃掉可能的子字段(如 fall.recover 的 .recover)
-                while (!IsOp(")") && Cur.Kind != TokKind.End) { Next(); }
+                string field = ReadDottedName();
                 Expect(")");
                 Emit(OpCode.OC_ex_);
-                _out.Add((byte)fieldId);
+                _out.Add((byte)GetHitVarFieldId(field));
                 return;
             }
             // var(n) / fvar(n)：压 index 再发 opcode
@@ -622,6 +619,13 @@ namespace Lockstep.Mugen.Expr
                 case "type": return 11;
                 case "fall": return 12;
                 case "guarded": return 13;
+                case "groundtype": return 14;
+                case "airtype": return 15;
+                case "yaccel": return 16;
+                case "fall.yvel": case "fall.yvelocity": return 17;
+                case "fall.xvel": case "fall.xvelocity": return 18;
+                case "fall.recovertime": return 19;
+                case "fall.recover": return 20;
                 default: return 255;
             }
         }
@@ -655,6 +659,9 @@ namespace Lockstep.Mugen.Expr
             ["movecontact"] = OpCode.OC_movecontact, ["movehit"] = OpCode.OC_movehit,
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
             ["numtarget"] = OpCode.OC_numtarget,
+            // 受击触发器（common1 5000-5160 用）
+            ["hitshakeover"] = OpCode.OC_hitshakeover, ["hitover"] = OpCode.OC_hitover,
+            ["hitfall"] = OpCode.OC_hitfall, ["canrecover"] = OpCode.OC_canrecover,
         };
 
         // const(...) 字段名 → MConstId。名字照搬 Ikemen compiler.go 的 const token（真实角色用到的子集）。
@@ -706,6 +713,9 @@ namespace Lockstep.Mugen.Expr
             ["sin"] = OpCode.OC_sin, ["cos"] = OpCode.OC_cos, ["tan"] = OpCode.OC_tan,
             ["acos"] = OpCode.OC_acos, ["asin"] = OpCode.OC_asin, ["atan"] = OpCode.OC_atan,
             ["floor"] = OpCode.OC_floor, ["ceil"] = OpCode.OC_ceil,
+            // animexist(n)/selfanimexist(n)：求值参数 n 后发 trigger opcode，运行期由 MChar 查动画表。
+            // 对齐 Ikemen compiler.go:1824/3588（参数压栈 + OC_animexist/OC_selfanimexist）。
+            ["animexist"] = OpCode.OC_animexist, ["selfanimexist"] = OpCode.OC_selfanimexist,
         };
 
         // ───────── 字节码发射（编码与 BytecodeExp.Run 一致）─────────

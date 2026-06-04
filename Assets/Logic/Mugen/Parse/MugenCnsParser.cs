@@ -189,6 +189,7 @@ namespace Lockstep.Mugen.Parse
                     return new SelfStateController { Value = Expr(comp, p, "value"), Ctrl = IntP(p, "ctrl", -1), Anim = IntP(p, "anim", -1) };
                 case "velset": return new VelSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "veladd": return new VelAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
+                case "velmul": return new VelMulController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
                 case "posset": return new PosSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "posadd": return new PosAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "changeanim": return new ChangeAnimController { Value = Expr(comp, p, "value") };
@@ -212,6 +213,18 @@ namespace Lockstep.Mugen.Parse
                 case "hitby": return BuildHitBy(p, false);
                 case "nothitby": return BuildHitBy(p, true);
                 case "hitdef": return new HitDefController { Template = BuildHitDef(comp, p) };
+                case "hitvelset": return new HitVelSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
+                case "hitadd": return new HitAddController { Value = Expr(comp, p, "value") };
+                case "hitfallset":
+                    return new HitFallSetController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        XVelocity = Expr(comp, p, "xvel"),
+                        YVelocity = Expr(comp, p, "yvel"),
+                        ZVelocity = Expr(comp, p, "zvel"),
+                    };
+                case "hitfallvel": return new HitFallVelController();
+                case "gravity": return new GravityController();
                 default: return new NullController();   // 未知控制器降级（容错）
             }
         }

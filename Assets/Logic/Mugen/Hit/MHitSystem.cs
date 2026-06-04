@@ -104,40 +104,60 @@ namespace Lockstep.Mugen.Hit
             }
         }
 
+        // 命中结算（移植 Ikemen char.go getHitVarSet + 受击状态路由 char.go:12195-12259）。
         static void ApplyHit(MChar attacker, MChar defender, MHitDef hd)
         {
-            bool isAir = defender.StateType == 4;
+            int stateType = defender.StateType;
+            bool isAir = stateType == 4;
 
+            // 伤害
             int newLife = defender.Life - hd.HitDamage;
             defender.Life = newLife < 0 ? 0 : (newLife > defender.LifeMax ? defender.LifeMax : newLife);
 
-            // 守方转向面对攻方 + 击退速度（连续量；facing 在积分时应用）
+            // 守方转向面对攻方 + 击退速度（连续量；vx/vy 与 ghv.xvel/yvel 同惯例，物理积分时乘 facing）
             defender.Facing = -attacker.Facing;
             FFloat vx = isAir ? hd.AirVelX : hd.GroundVelX;
             FFloat vy = isAir ? hd.AirVelY : hd.GroundVelY;
             defender.Vel = new FVector3(vx, vy, FFloat.Zero);
 
-            // hitstop（双方冻结）
+            // hitstop：仅攻方冻结。守方不进 hitpause（对齐 Ikemen char.go:12202 getter.hitPauseTime=0），
+            // 其"受击抖动冻结"由 ghv.HitShakeTime 驱动（逐帧递减，见 MStateMachine.UpdateGetHitTimers）。
             attacker.Hitstop = hd.P1PauseTime;
-            defender.Hitstop = hd.P2PauseTime;
+            defender.Hitstop = 0;
 
-            // GetHitVar 填值
+            // GetHitVar 填值（char.go:10790-10924）
             MGetHitVar ghv = defender.Ghv;
             ghv.Damage = hd.HitDamage;
             ghv.XVel = vx;
             ghv.YVel = vy;
-            ghv.HitTime = isAir ? hd.AirHitTime : hd.GroundHitTime;
             ghv.SlideTime = hd.GroundSlideTime;
-            ghv.HitShakeTime = hd.P2PauseTime;
+            ghv.HitShakeTime = hd.P2PauseTime < 0 ? 0 : hd.P2PauseTime;
+            ghv.HitTime = isAir ? hd.AirHitTime : hd.GroundHitTime;
+            if (ghv.HitTime < 0)
+            {
+                ghv.HitTime = 0;
+            }
             ghv.CtrlTime = isAir ? hd.AirHitTime : hd.GroundHitTime;
-            ghv.AnimType = (int)hd.AnimType;
-            ghv.AttrType = (int)hd.GroundType;
+            ghv.GroundType = (int)hd.GroundType;
+            ghv.AirType = (int)hd.AirType;
+            ghv.AttrType = isAir ? ghv.AirType : ghv.GroundType;
+            ghv.GroundAnimType = (int)hd.AnimType;
+            ghv.AirAnimType = (int)hd.AirAnimType;
+            ghv.FallAnimType = (int)hd.FallAnimType;
+            ghv.YAccel = hd.YAccel;
+            ghv.FallXVel = hd.FallXVel;
+            ghv.FallYVel = hd.FallYVel;
+            ghv.FallRecover = hd.FallRecover;
+            ghv.FallRecoverTime = hd.FallRecoverTime;
             ghv.Fall = hd.Fall || isAir;
             ghv.Guarded = false;
             ghv.HitCount++;
+            defender.FallTime = 0;
+            // 实际受击动画类型（须在 yvel/animtype 之后派生，char.go:10924 gethitAnimtype）
+            ghv.AnimType = defender.GetHitAnimType();
 
-            // 守方进入受击状态（默认 5000）+ movetype H + 失控
-            defender.PendingStateNo = hd.P2StateNo >= 0 ? hd.P2StateNo : GetHitStateNo;
+            // 守方进入受击状态 + movetype H + 失控
+            defender.PendingStateNo = ResolveGetHitState(defender, hd, ghv);
             defender.PendingIsSelf = true;
             defender.MoveType = 2;        // H 受击
             defender.Ctrl = false;
@@ -151,6 +171,35 @@ namespace Lockstep.Mugen.Hit
             if (hd.P1StateNo >= 0)
             {
                 attacker.PendingStateNo = hd.P1StateNo;
+            }
+        }
+
+        // 受击状态号路由（移植 Ikemen char.go:12195-12259）：
+        // p2stateno 优先（命中进自定义状态）；否则倒地→5080、摔绊→5070、按 statetype S/C/A→5000/5010/5020
+        // （蹲被击致死则改进 5000 站立倒地，char.go:12252）。
+        static int ResolveGetHitState(MChar defender, MHitDef hd, MGetHitVar ghv)
+        {
+            if (hd.P2StateNo >= 0)
+            {
+                return hd.P2StateNo;
+            }
+            bool downed = defender.StateType == 8 && defender.Pos.Y == FFloat.Zero;   // ST_L 倒地
+            if (downed)
+            {
+                return 5080;
+            }
+            if (ghv.AttrType == (int)MHitType.Trip)
+            {
+                return 5070;
+            }
+            switch (defender.StateType)
+            {
+                case 1:   // ST_S 立
+                    return 5000;
+                case 2:   // ST_C 蹲
+                    return defender.Life <= 0 ? 5000 : 5010;   // 蹲被击致死→站立倒下
+                default:  // ST_A 空中
+                    return 5020;
             }
         }
     }

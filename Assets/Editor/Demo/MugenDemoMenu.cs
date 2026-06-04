@@ -43,6 +43,23 @@ namespace Lockstep.EditorTools
                 + " —— 按 Play 看 KFM 经新引擎站立/行走。方向键走路，Z/X/C 出招。");
         }
 
+        [MenuItem("MUGEN/Demo/创建对战场景 (kfm vs kfm)")]
+        public static void CreateKfmVersus()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+            GameObject root = new GameObject("kfm_Versus");
+            root.transform.position = Vector3.zero;
+            root.AddComponent<MugenVersusView>();   // R-2P：双角色引擎 + 回合系统驱动
+
+            SetupCamera();
+
+            string scenePath = SceneDir() + "/MugenVersus_kfm.unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log("[MUGEN] 对战场景已建：" + scenePath
+                + " —— 按 Play：两个 KFM 同场，P1 方向键走位 + Z/X/C 出招命中 P2（木桩），P2 掉血进受击。");
+        }
+
         [MenuItem("MUGEN/Demo/创建全动作展示场景 (Terrarian)")]
         public static void CreateTerrarianShowcase()
         {

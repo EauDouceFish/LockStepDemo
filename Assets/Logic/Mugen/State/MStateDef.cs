@@ -75,7 +75,10 @@ namespace Lockstep.Mugen.State
     {
         public int No;
         public int StateType = -1;   // 字母枚举，-1 = 进入时不改
-        public int MoveType = -1;
+        // movetype 默认 I（对齐 Ikemen bytecode.go:15139 newStateBytecode moveType:MT_I）：
+        // statedef 省略 movetype 时进入即重置为 I，否则受击 movetype=H 会滞留到恢复后的站立态。
+        // （type/physics 仍用 -1 不改的既有约定——多数状态显式指定，避免广面回归；见头注。）
+        public int MoveType = 1;     // MT_I
         public int Physics = -1;
         // 头部表达式（null = 该参数未写，不改）。进入状态时由 RunInit 求值。
         public BytecodeExp Anim;        // 求值为 int；-1 表示不改（对齐 Ikemen "anim = -1"）

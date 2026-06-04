@@ -67,6 +67,9 @@ namespace Lockstep.Mugen.Char
         // 受击变量（命中系统 M7 填值；此处随 Char 快照/哈希）
         public MGetHitVar Ghv = new MGetHitVar();
 
+        // 浮空已持续帧数（= Ikemen fallTime）：fallflag 期间每帧 ++，进受击/落地清零。canRecover 判定用。
+        public int FallTime;
+
         // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
         public Command.MCommandList CommandList;
 
@@ -133,6 +136,48 @@ namespace Lockstep.Mugen.Char
             return AnimTable != null && AnimTable.ContainsKey(animNo);
         }
 
+        // ───────── 受击触发器（移植 Ikemen char.go hitOver/hitShakeOver/canRecover；HitFall=ghv.fallflag）─────────
+
+        /// <summary>HitShakeOver：受击抖动结束（char.go:5342，ghv.hitshaketime &lt;= 0）。</summary>
+        public bool HitShakeOver()
+        {
+            return Ghv.HitShakeTime <= 0;
+        }
+
+        /// <summary>HitOver：受击硬直结束（char.go:5338，ghv.hittime &lt; 0）。</summary>
+        public bool HitOver()
+        {
+            return Ghv.HitTime < 0;
+        }
+
+        /// <summary>CanRecover：浮空可起身（char.go:5165，fall.recover 且浮空时长达 recovertime）。</summary>
+        public bool CanRecover()
+        {
+            return Ghv.FallRecover && FallTime >= Ghv.FallRecoverTime;
+        }
+
+        /// <summary>
+        /// 受击实际动画类型（移植 Ikemen char.go:7680 gethitAnimtype）：
+        /// fall 用 fall.animtype；空中用 air.animtype；地面用 ground.animtype，
+        /// 但若 ground.animtype 为 Back 及以上且 yvel=0 则降级为 Hard（MUGEN 行为）。
+        /// </summary>
+        public int GetHitAnimType()
+        {
+            if (Ghv.Fall)
+            {
+                return Ghv.FallAnimType;
+            }
+            if (StateType == 4)   // ST_A 空中
+            {
+                return Ghv.AirAnimType;
+            }
+            if (Ghv.GroundAnimType >= (int)Hit.MReaction.Back && Ghv.YVel == FFloat.Zero)
+            {
+                return (int)Hit.MReaction.Hard;
+            }
+            return Ghv.GroundAnimType;
+        }
+
         /// <summary>
         /// 是否允许把当前动画切到该号（对齐 Ikemen changeAnimEx：目标动画不存在则不切、保留当前动画，避免冻结）。
         /// 无表（裸构造的单测）时放行，以保持既有行为。
@@ -160,7 +205,7 @@ namespace Lockstep.Mugen.Char
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 AnimElem = AnimElem, AnimElemTime = AnimElemTime, AnimCurTime = AnimCurTime,
                 AnimLoopEnd = AnimLoopEnd, AnimRunningNo = AnimRunningNo,
-                Ghv = Ghv.Clone(),
+                Ghv = Ghv.Clone(), FallTime = FallTime,
                 CommandList = CommandList != null ? CommandList.Clone() : null,
                 Input = Input != null ? Input.Clone() : null,
                 KeyCtrl = KeyCtrl, AirJumpCount = AirJumpCount,
@@ -194,7 +239,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             hash.AddInt32(AnimElem); hash.AddInt32(AnimElemTime); hash.AddInt32(AnimCurTime);
             hash.AddBool(AnimLoopEnd); hash.AddInt32(AnimRunningNo);
-            Ghv.WriteHash(ref hash);
+            Ghv.WriteHash(ref hash); hash.AddInt32(FallTime);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
             if (Input != null) { Input.WriteHash(ref hash); }
             hash.AddBool(KeyCtrl); hash.AddInt32(AirJumpCount);
@@ -294,6 +339,28 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_animtime: return BytecodeValue.Int(AnimTime);
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
 
+                // 受击触发器（common1 5000-5160 状态机用）
+                case OpCode.OC_hitshakeover: return BytecodeValue.Bool(HitShakeOver());
+                case OpCode.OC_hitover: return BytecodeValue.Bool(HitOver());
+                case OpCode.OC_hitfall: return BytecodeValue.Bool(Ghv.Fall);
+                case OpCode.OC_canrecover: return BytecodeValue.Bool(CanRecover());
+
+                case OpCode.OC_animexist:
+                case OpCode.OC_selfanimexist:
+                {
+                    // animexist(n)/selfanimexist(n)：弹参数 n，查本角色动画表是否存在编号 n。
+                    // 对齐 Ikemen char.go:5088 animExist / char.go:5102 selfAnimExist——
+                    // undefined 参数透传 undefined。v1 单角色无 helper/共享动画表，
+                    // animExist(查 animPN 表) 与 selfAnimExist(查 gi 表) 同归本角色 AnimTable；
+                    // 二者分歧待 R-ENT 实体系统（helper 借用 root 动画）落地后再细分。
+                    BytecodeValue anim = Pop(stack);
+                    if (anim.IsUndefined())
+                    {
+                        return BytecodeValue.Undefined();
+                    }
+                    return BytecodeValue.Bool(AnimExists(anim.ToI()));
+                }
+
                 case OpCode.OC_var:
                 {
                     int index = Pop(stack).ToI();
@@ -348,6 +415,13 @@ namespace Lockstep.Mugen.Char
                 case 11: return BytecodeValue.Int(Ghv.AttrType);
                 case 12: return BytecodeValue.Bool(Ghv.Fall);
                 case 13: return BytecodeValue.Bool(Ghv.Guarded);
+                case 14: return BytecodeValue.Int(Ghv.GroundType);
+                case 15: return BytecodeValue.Int(Ghv.AirType);
+                case 16: return BytecodeValue.Float(Ghv.YAccel);
+                case 17: return BytecodeValue.Float(Ghv.FallYVel);
+                case 18: return BytecodeValue.Float(Ghv.FallXVel);
+                case 19: return BytecodeValue.Int(Ghv.FallRecoverTime);
+                case 20: return BytecodeValue.Bool(Ghv.FallRecover);
                 default: return BytecodeValue.Int(0);
             }
         }

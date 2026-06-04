@@ -59,7 +59,43 @@ namespace Lockstep.Mugen.State
 
             if (!hitpause)
             {
+                UpdateGetHitTimers(c);
                 c.Time++;
+            }
+        }
+
+        // 受击计时逐帧更新（移植 Ikemen char.go:11775-11834，仅非 hitpause 帧）：
+        // movetype=H 时 HitShakeTime 递减、fallflag 时 FallTime++；非 H 时清受击残留态；
+        // 抖动结束(HitShakeTime<=0)后 HitTime 递减（<0 即 HitOver）；倒地起身计时(5110)递减。
+        static void UpdateGetHitTimers(MChar c)
+        {
+            MGetHitVar ghv = c.Ghv;
+            if (c.MoveType == 2)   // MT_H 受击中
+            {
+                if (ghv.HitShakeTime > 0)
+                {
+                    ghv.HitShakeTime--;
+                }
+                if (ghv.Fall)
+                {
+                    c.FallTime++;
+                }
+            }
+            else
+            {
+                // 离开受击：清残留（对齐 Ikemen 非 MT_H 分支，避免 HitFall/HitShakeOver 滞留）
+                ghv.HitShakeTime = 0;
+                ghv.Fall = false;
+                ghv.FallCount = 0;
+                c.FallTime = 0;
+            }
+            if (ghv.HitShakeTime <= 0 && ghv.HitTime >= 0)
+            {
+                ghv.HitTime--;
+            }
+            if (ghv.DownRecoverTime > 0 && c.StateNo == 5110)
+            {
+                ghv.DownRecoverTime--;
             }
         }
 

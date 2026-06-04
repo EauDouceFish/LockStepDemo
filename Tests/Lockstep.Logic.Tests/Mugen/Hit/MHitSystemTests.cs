@@ -75,7 +75,9 @@ namespace Lockstep.Tests.Mugen
 
             Assert.IsTrue(MHitSystem.TryHit(atk, def));
             Assert.That(def.Life, Is.EqualTo(920), "扣 80 血");
-            Assert.That(def.Hitstop, Is.EqualTo(8), "守方 hitstop");
+            // 守方不进 hitpause（对齐 Ikemen：getter.hitPauseTime=0），受击冻结由 ghv.HitShakeTime 驱动
+            Assert.That(def.Hitstop, Is.EqualTo(0), "守方不冻结（hitshake 代替 hitpause）");
+            Assert.That(def.Ghv.HitShakeTime, Is.EqualTo(8), "守方 hitshake = P2PauseTime");
             Assert.That(atk.Hitstop, Is.EqualTo(8), "攻方 hitstop");
             Assert.That(def.PendingStateNo, Is.EqualTo(5000), "守方进受击状态 5000");
             Assert.That(def.MoveType, Is.EqualTo(2), "守方 movetype=H");
