@@ -234,6 +234,7 @@ namespace Lockstep.Mugen.Parse
                         ZVelocity = Expr(comp, p, "zvel"),
                     };
                 case "hitfallvel": return new HitFallVelController();
+                case "hitfalldamage": return new HitFallDamageController();
                 case "gravity": return new GravityController();
                 default: return new NullController();   // 未知控制器降级（容错）
             }
@@ -336,6 +337,7 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall.yvelocity", out string fyv)) { hd.FallYVel = EvalF(comp, fyv); }
             if (p.TryGetValue("fall.recover", out string frc)) { hd.FallRecover = EvalI(comp, frc) != 0; }
             if (p.TryGetValue("fall.recovertime", out string frt)) { hd.FallRecoverTime = EvalI(comp, frt); }
+            if (p.TryGetValue("fall.damage", out string fdmg)) { hd.FallDamage = EvalI(comp, fdmg); }
 
             // forcestand：默认 = 有 Y 击退速度（char.go:911）。
             hd.ForceStand = hd.GroundVelY != FFloat.Zero;

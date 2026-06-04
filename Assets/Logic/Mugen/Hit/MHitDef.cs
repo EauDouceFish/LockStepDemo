@@ -148,6 +148,7 @@ namespace Lockstep.Mugen.Hit
         public FFloat FallYVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.yvelocity 默认 -4.5
         public bool FallRecover = true;     // fall.recover 默认 1
         public int FallRecoverTime = 4;     // fall.recovertime 默认 4
+        public int FallDamage;              // fall.damage：受击方落地时受到的伤害（默认 0，char.go:9109）
 
         // KO 阻止（kill=0：本次伤害不会致死，最多打到剩 1 血；对齐 char.go:8453 computeDamage）
         public bool Kill = true;        // kill 默认 1
@@ -182,7 +183,7 @@ namespace Lockstep.Mugen.Hit
             hash.AddInt32((int)GroundType); hash.AddInt32((int)AirType);
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
-            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime);
+            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage);
             hash.AddBool(Kill); hash.AddBool(GuardKill); hash.AddBool(FallKill); hash.AddBool(ForceStand);
             hash.AddInt32(HitGetPower); hash.AddInt32(HitGivePower);
             hash.AddInt32(GuardGetPower); hash.AddInt32(GuardGivePower);

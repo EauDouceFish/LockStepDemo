@@ -49,6 +49,8 @@ namespace Lockstep.Mugen.Char
         public bool FallRecover = true;  // 是否允许 fall.recover 起身
         public int FallRecoverTime = 4;  // canRecover 所需浮空帧数
         public int DownRecoverTime;  // 倒地起身计时（5110 读，逐帧递减）
+        public int FallDamage;       // gethitvar(fall.damage)：落地时受到的伤害（HitFallDamage 控制器应用，char.go:9109）
+        public bool FallKill = true; // fall.damage 是否可致死（HitDef fall.kill）
 
         public MGetHitVar Clone()
         {
@@ -62,6 +64,7 @@ namespace Lockstep.Mugen.Char
                 Fall = Fall, Guarded = Guarded, Up = Up, ForceStand = ForceStand, Kill = Kill,
                 YAccel = YAccel, FallXVel = FallXVel, FallYVel = FallYVel,
                 FallRecover = FallRecover, FallRecoverTime = FallRecoverTime, DownRecoverTime = DownRecoverTime,
+                FallDamage = FallDamage, FallKill = FallKill,
             };
         }
 
@@ -76,6 +79,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(ForceStand); hash.AddBool(Kill);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(DownRecoverTime);
+            hash.AddInt32(FallDamage); hash.AddBool(FallKill);
         }
     }
 }

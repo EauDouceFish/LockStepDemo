@@ -182,6 +182,8 @@ namespace Lockstep.Mugen.Hit
             ghv.FallYVel = hd.FallYVel;
             ghv.FallRecover = hd.FallRecover;
             ghv.FallRecoverTime = hd.FallRecoverTime;
+            ghv.FallDamage = hd.FallDamage;   // 落地伤害（HitFallDamage 控制器读取，char.go:10842）
+            ghv.FallKill = hd.FallKill;
             ghv.Fall = hd.Fall || isAir;
             ghv.Guarded = false;
             ghv.HitCount++;
@@ -283,6 +285,20 @@ namespace Lockstep.Mugen.Hit
                 return 0;
             }
             return life > lifeMax ? lifeMax : life;
+        }
+
+        /// <summary>
+        /// 自伤（落地 fall.damage 等）：按受方 finalDefense 缩放（无攻方倍率），kill=false 时保底剩 1 血，
+        /// 直接扣到 Life（移植 char.go:9111 lifeAdd(-fall_damage, fall_kill, absolute=false)）。
+        /// </summary>
+        public static void ApplySelfDamage(MChar character, int rawDamage, bool kill)
+        {
+            if (rawDamage == 0)
+            {
+                return;
+            }
+            int dealt = ComputeDamage(character.Life, rawDamage, kill, FFloat.One, character.ComputeFinalDefense());
+            character.Life = ClampLife(character.Life - dealt, character.LifeMax);
         }
 
         // 能量增减（powerAdd）：累加后夹到 [0, PowerMax]。
