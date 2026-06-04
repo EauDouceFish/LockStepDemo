@@ -26,6 +26,23 @@ namespace Lockstep.EditorTools
             CreateDemo("kfm", 0);
         }
 
+        [MenuItem("MUGEN/Demo/创建 Live 引擎场景 (kfm)")]
+        public static void CreateKfmLive()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+            GameObject character = new GameObject("kfm_Live");
+            character.transform.position = Vector3.zero;
+            character.AddComponent<MugenLiveView>();   // M9.2：MBattleEngine 逐帧驱动 + 键盘输入
+
+            SetupCamera();
+
+            string scenePath = SceneDir() + "/MugenLive_kfm.unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log("[MUGEN] Live 引擎场景已建：" + scenePath
+                + " —— 按 Play 看 KFM 经新引擎站立/行走。方向键走路，Z/X/C 出招。");
+        }
+
         [MenuItem("MUGEN/Demo/创建全动作展示场景 (Terrarian)")]
         public static void CreateTerrarianShowcase()
         {
