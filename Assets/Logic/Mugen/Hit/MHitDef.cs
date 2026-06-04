@@ -150,6 +150,11 @@ namespace Lockstep.Mugen.Hit
         public int FallRecoverTime = 4;     // fall.recovertime 默认 4
         public int FallDamage;              // fall.damage：受击方落地时受到的伤害（默认 0，char.go:9109）
 
+        // 击打倒地对手（受击方 statetype=L）分支（char.go:10859-10871）
+        public FFloat DownVelX, DownVelY;   // down.velocity（默认随 air.velocity，char.go:892-894）
+        public int DownHitTime = 20;        // down.hittime（默认 20，char.go:724）
+        public bool DownBounce;             // down.bounce（默认 0；false 时倒地命中不反弹）
+
         // KO 阻止（kill=0：本次伤害不会致死，最多打到剩 1 血；对齐 char.go:8453 computeDamage）
         public bool Kill = true;        // kill 默认 1
         public bool GuardKill = true;   // guard.kill 默认 1
@@ -184,6 +189,7 @@ namespace Lockstep.Mugen.Hit
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage);
+            hash.AddFixed(DownVelX); hash.AddFixed(DownVelY); hash.AddInt32(DownHitTime); hash.AddBool(DownBounce);
             hash.AddBool(Kill); hash.AddBool(GuardKill); hash.AddBool(FallKill); hash.AddBool(ForceStand);
             hash.AddInt32(HitGetPower); hash.AddInt32(HitGivePower);
             hash.AddInt32(GuardGetPower); hash.AddInt32(GuardGivePower);

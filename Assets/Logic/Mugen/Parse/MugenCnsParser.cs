@@ -339,6 +339,14 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall.recovertime", out string frt)) { hd.FallRecoverTime = EvalI(comp, frt); }
             if (p.TryGetValue("fall.damage", out string fdmg)) { hd.FallDamage = EvalI(comp, fdmg); }
 
+            // 击打倒地分支：down.velocity 默认随 air.velocity（char.go:892-894）；down.hittime 默认 20；down.bounce 默认 0。
+            hd.DownVelX = hd.AirVelX;
+            hd.DownVelY = hd.AirVelY;
+            ParseVel(comp, p, "down.velocity", out FFloat dvx, out FFloat dvy);
+            if (p.ContainsKey("down.velocity")) { hd.DownVelX = dvx; hd.DownVelY = dvy; }
+            if (p.TryGetValue("down.hittime", out string dht)) { hd.DownHitTime = EvalI(comp, dht); }
+            if (p.TryGetValue("down.bounce", out string db)) { hd.DownBounce = EvalI(comp, db) != 0; }
+
             // forcestand：默认 = 有 Y 击退速度（char.go:911）。
             hd.ForceStand = hd.GroundVelY != FFloat.Zero;
             if (p.TryGetValue("forcestand", out string fs)) { hd.ForceStand = EvalI(comp, fs) != 0; }

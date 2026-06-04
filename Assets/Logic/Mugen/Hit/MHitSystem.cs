@@ -146,9 +146,26 @@ namespace Lockstep.Mugen.Hit
             defender.Power = AddPower(defender.Power, hd.HitGivePower, defender.PowerMax);
 
             // 守方转向面对攻方 + 击退速度（连续量；vx/vy 与 ghv.xvel/yvel 同惯例，物理积分时乘 facing）
-            defender.Facing = -attacker.Facing;
-            FFloat vx = isAir ? hd.AirVelX : hd.GroundVelX;
-            FFloat vy = isAir ? hd.AirVelY : hd.GroundVelY;
+            // 倒地(ST_L)分支：贴地用 down.velocity，浮空倒地用 air.velocity；否则空中→air、地面→ground（char.go:10859-10873）。
+            bool downed = stateType == 8;   // ST_L 倒地
+            bool downedOnGround = downed && defender.Pos.Y == FFloat.Zero;
+            FFloat vx;
+            FFloat vy;
+            if (downedOnGround)
+            {
+                vx = hd.DownVelX;
+                vy = hd.DownVelY;
+            }
+            else if (isAir || downed)
+            {
+                vx = hd.AirVelX;
+                vy = hd.AirVelY;
+            }
+            else
+            {
+                vx = hd.GroundVelX;
+                vy = hd.GroundVelY;
+            }
             defender.Vel = new FVector3(vx, vy, FFloat.Zero);
 
             // hitstop：仅攻方冻结。守方不进 hitpause（对齐 Ikemen char.go:12202 getter.hitPauseTime=0），
@@ -165,12 +182,10 @@ namespace Lockstep.Mugen.Hit
             ghv.YVel = vy;
             ghv.SlideTime = hd.GroundSlideTime;
             ghv.HitShakeTime = hd.P2PauseTime < 0 ? 0 : hd.P2PauseTime;
-            ghv.HitTime = isAir ? hd.AirHitTime : hd.GroundHitTime;
-            if (ghv.HitTime < 0)
-            {
-                ghv.HitTime = 0;
-            }
-            ghv.CtrlTime = isAir ? hd.AirHitTime : hd.GroundHitTime;
+            // 硬直/控制时间：倒地用 down.hittime，否则空中→air.hittime、地面→ground.hittime（char.go:10860）。
+            int hitTime = downed ? hd.DownHitTime : (isAir ? hd.AirHitTime : hd.GroundHitTime);
+            ghv.HitTime = hitTime < 0 ? 0 : hitTime;
+            ghv.CtrlTime = hitTime;
             ghv.GroundType = (int)hd.GroundType;
             ghv.AirType = (int)hd.AirType;
             ghv.AttrType = isAir ? ghv.AirType : ghv.GroundType;
@@ -180,6 +195,11 @@ namespace Lockstep.Mugen.Hit
             ghv.YAccel = hd.YAccel;
             ghv.FallXVel = hd.FallXVel;
             ghv.FallYVel = hd.FallYVel;
+            // 倒地贴地命中且 down.bounce=0 且有 Y 速度 → 落地不反弹（fall.yvel 归零，char.go:10867-10870）。
+            if (downedOnGround && !hd.DownBounce && vy != FFloat.Zero)
+            {
+                ghv.FallYVel = FFloat.Zero;
+            }
             ghv.FallRecover = hd.FallRecover;
             ghv.FallRecoverTime = hd.FallRecoverTime;
             ghv.FallDamage = hd.FallDamage;   // 落地伤害（HitFallDamage 控制器读取，char.go:10842）
