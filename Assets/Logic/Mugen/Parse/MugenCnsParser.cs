@@ -316,6 +316,12 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("p1stateno", out string p1s)) { hd.P1StateNo = EvalI(comp, p1s); }
             if (p.TryGetValue("p2stateno", out string p2s)) { hd.P2StateNo = EvalI(comp, p2s); }
             if (p.TryGetValue("numhits", out string nh)) { hd.NumHits = EvalI(comp, nh); }
+            if (p.TryGetValue("hitonce", out string ho)) { hd.HitOnce = EvalI(comp, ho); }
+            // hitonce 默认：未显式给出（-1）时，投技(attr 含 throw 类)默认 1，否则 0（char.go:848）。
+            if (hd.HitOnce < 0)
+            {
+                hd.HitOnce = (hd.Attr & (int)MAttackType.AT) != 0 ? 1 : 0;
+            }
 
             // 空中/fall 反应字段（air.type 默认随 ground.type，char.go:907；air.animtype 默认随 animtype）。
             hd.AirType = hd.GroundType;

@@ -35,7 +35,7 @@ namespace Lockstep.Mugen.StateCtrl
             dst.AirVelX = src.AirVelX; dst.AirVelY = src.AirVelY;
             dst.AnimType = src.AnimType; dst.AirAnimType = src.AirAnimType; dst.FallAnimType = src.FallAnimType;
             dst.GroundType = src.GroundType; dst.AirType = src.AirType; dst.Fall = src.Fall;
-            dst.P1StateNo = src.P1StateNo; dst.P2StateNo = src.P2StateNo; dst.NumHits = src.NumHits;
+            dst.P1StateNo = src.P1StateNo; dst.P2StateNo = src.P2StateNo; dst.NumHits = src.NumHits; dst.HitOnce = src.HitOnce;
             dst.YAccel = src.YAccel; dst.FallXVel = src.FallXVel; dst.FallYVel = src.FallYVel;
             dst.FallRecover = src.FallRecover; dst.FallRecoverTime = src.FallRecoverTime;
             dst.Kill = src.Kill; dst.GuardKill = src.GuardKill; dst.FallKill = src.FallKill;

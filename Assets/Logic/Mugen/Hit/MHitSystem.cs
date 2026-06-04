@@ -99,6 +99,10 @@ namespace Lockstep.Mugen.Hit
             attacker.MoveHit = 0;
             attacker.GuardCount += hd.NumHits;   // char.go:12191（被防按 numhits 计）
             attacker.Targets.Add(defender);
+            if (hd.HitOnce > 0)
+            {
+                hd.Active = false;   // hitonce 在被防（接触）时同样停用（char.go:12171 hitdefContact）
+            }
         }
 
         static bool HitFlagMatches(MHitDef hd, int defenderStateType)
@@ -199,6 +203,10 @@ namespace Lockstep.Mugen.Hit
             attacker.HitCount += hd.NumHits;   // char.go:12189（按 numhits 计，非 +1）
             attacker.UniqHitCount++;
             attacker.Targets.Add(defender);
+            if (hd.HitOnce > 0)
+            {
+                hd.Active = false;   // hitonce：只命中一个目标，命中即停用本招（char.go:11283/12172）
+            }
             if (hd.P1StateNo >= 0)
             {
                 attacker.PendingStateNo = hd.P1StateNo;
