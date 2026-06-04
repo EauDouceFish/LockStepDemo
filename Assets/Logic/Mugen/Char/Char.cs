@@ -52,8 +52,10 @@ namespace Lockstep.Mugen.Char
         public int Hitstop;         // = Ikemen hitPauseTime（hitpausetime trigger）
 
         // CharSystemVar 常用计数/标志（攻击命中统计，供 trigger 与控制器读）
-        public int HitCount;        // 本招累计命中数
-        public int UniqHitCount;    // 去重命中数
+        public int HitCount;        // 本招累计命中数（命中时 += HitDef.numhits，char.go:12189）
+        public int UniqHitCount;    // 去重命中数（每命中一个目标 +1）
+        public int GuardCount;      // 本招被防累计数（被防时 += HitDef.numhits，char.go:12191）
+        public int ReceivedHits;    // 本角色当前连段内被命中次数（= Ikemen receivedHits，combocount 源；脱离受击清零）
         public int MoveContact;     // 本招是否接触(命中或被防)：>0
         public int MoveHit;         // 本招是否命中：>0
         public int MoveGuarded;     // 本招是否被防：>0
@@ -229,7 +231,7 @@ namespace Lockstep.Mugen.Char
                 FallDefenseMul = FallDefenseMul, DefenseMulDelay = DefenseMulDelay,
                 Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
-                HitCount = HitCount, UniqHitCount = UniqHitCount,
+                HitCount = HitCount, UniqHitCount = UniqHitCount, GuardCount = GuardCount, ReceivedHits = ReceivedHits,
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 AnimElem = AnimElem, AnimElemTime = AnimElemTime, AnimCurTime = AnimCurTime,
@@ -265,7 +267,7 @@ namespace Lockstep.Mugen.Char
             hash.AddFixed(FallDefenseMul); hash.AddBool(DefenseMulDelay);
             hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
             HashVars(ref hash, PersistCounters);
-            hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount);
+            hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount); hash.AddInt32(GuardCount); hash.AddInt32(ReceivedHits);
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             hash.AddInt32(AnimElem); hash.AddInt32(AnimElemTime); hash.AddInt32(AnimCurTime);

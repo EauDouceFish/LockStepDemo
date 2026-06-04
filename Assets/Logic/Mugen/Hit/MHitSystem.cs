@@ -97,6 +97,7 @@ namespace Lockstep.Mugen.Hit
             attacker.MoveContact = 1;
             attacker.MoveGuarded = 1;
             attacker.MoveHit = 0;
+            attacker.GuardCount += hd.NumHits;   // char.go:12191（被防按 numhits 计）
             attacker.Targets.Add(defender);
         }
 
@@ -189,10 +190,13 @@ namespace Lockstep.Mugen.Hit
             defender.PendingIsSelf = true;
             defender.Ctrl = false;        // MoveType=2(H) 已在伤害计算前设置
 
+            // 连段计数（受击方）：numhits 计入 receivedHits（combocount 源，char.go:11170）
+            defender.ReceivedHits += hd.NumHits;
+
             // 攻方命中统计 + 目标登记 + 可选切状态
             attacker.MoveContact = 1;
             attacker.MoveHit = 1;
-            attacker.HitCount++;
+            attacker.HitCount += hd.NumHits;   // char.go:12189（按 numhits 计，非 +1）
             attacker.UniqHitCount++;
             attacker.Targets.Add(defender);
             if (hd.P1StateNo >= 0)

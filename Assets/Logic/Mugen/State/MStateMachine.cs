@@ -88,6 +88,8 @@ namespace Lockstep.Mugen.State
                 ghv.Fall = false;
                 ghv.FallCount = 0;
                 c.FallTime = 0;
+                c.ReceivedHits = 0;   // 连段结束清零（char.go:11809）
+                c.GuardCount = 0;     // char.go:11807
             }
             if (ghv.HitShakeTime <= 0 && ghv.HitTime >= 0)
             {

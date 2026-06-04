@@ -315,6 +315,7 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall", out string fl)) { hd.Fall = EvalI(comp, fl) != 0; }
             if (p.TryGetValue("p1stateno", out string p1s)) { hd.P1StateNo = EvalI(comp, p1s); }
             if (p.TryGetValue("p2stateno", out string p2s)) { hd.P2StateNo = EvalI(comp, p2s); }
+            if (p.TryGetValue("numhits", out string nh)) { hd.NumHits = EvalI(comp, nh); }
 
             // 空中/fall 反应字段（air.type 默认随 ground.type，char.go:907；air.animtype 默认随 animtype）。
             hd.AirType = hd.GroundType;
