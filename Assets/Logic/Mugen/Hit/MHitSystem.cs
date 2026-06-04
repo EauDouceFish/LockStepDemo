@@ -69,7 +69,9 @@ namespace Lockstep.Mugen.Hit
         // 守招结算：chip 伤害 + 守方击退 + ghv.guarded + 攻方 moveguarded（不进受击 5000，不失 movetype）。
         static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd)
         {
-            // 守招 chip 伤害（含攻防倍率；guard.kill=0 时不致死，char.go:10587/10589）
+            // 守招 chip 伤害（含攻防倍率；公式对标 char.go:11074-11078 Damage on guard，computeDamage 本体 char.go:8433；
+            // guard.kill 等价 Ikemen getter.ghv.kill 在守招路径，char.go:10579/10587）。
+            // 伤害应用时机同 ApplyHit 注释（R-DMG-PIPELINE）：当场扣血，单帧单次等价 Ikemen 累加→tick 应用。
             int dealt = ComputeDamage(defender.Life, hd.GuardDamage, hd.GuardKill,
                 attacker.AttackDamageMul(), defender.ComputeFinalDefense());
             defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
@@ -111,6 +113,15 @@ namespace Lockstep.Mugen.Hit
         }
 
         // 命中结算（移植 Ikemen char.go getHitVarSet + 受击状态路由 char.go:12195-12259）。
+        //
+        // ⚠ 伤害应用时机的刻意适配（R-DMG-PIPELINE，依赖 R-ENT）：
+        //   Ikemen 是两段式——命中阶段把伤害「累加」到 getter.ghv.damage（char.go:11063/11078，不扣血），
+        //   再在防守方自身 update 循环里「一次性应用」(char.go:11743 lifeAdd(-ghv.damage, kill, absolute=true))。
+        //   本引擎在命中当场直接扣血（下方 defender.Life -= dealt）。
+        //   单帧单次命中两者「逐位等价」(已验证)；仅当【同帧多次命中】(弹幕/helper，需 R-ENT) 或
+        //   【同帧读 life 的触发器】时才会分歧（第 2 次命中的 bounds/kill 保底基准、扣血差一帧）。
+        //   现作用域为 1v1 单 root、每帧至多一次命中，故安全；待 R-ENT 引入多实体时，
+        //   连同 char.go:11098-11140 的 KO 排序一并改为 ghv.damage 累加→防守方 tick 应用。离散 life 由差分对账(R-ORACLE)兜底。
         static void ApplyHit(MChar attacker, MChar defender, MHitDef hd)
         {
             int stateType = defender.StateType;
