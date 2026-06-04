@@ -39,6 +39,15 @@ namespace Lockstep.Mugen.Char
         public int PowerMax = 3000;
         public int Juggle;
 
+        // 攻防倍率（运行态，移植 char.go attackMul[0]/customDefense/superDefenseMul/fallDefenseMul/finalDefense）。
+        // 伤害公式 computeDamage：damage *= (AttackMul×AttackBase/100) / FinalDefense。
+        // AttackBase/DefenceBase 取自 Constants.Attack/Defence（[Data] attack/defence，默认 100）。
+        public FFloat AttackMul = FFloat.One;        // attackMul[0]：仅伤害分量（redlife/dizzy/guard 分量后续）
+        public FFloat CustomDefense = FFloat.One;    // DefenceMulSet 设置（mulType 决定取 val 或 1/val）
+        public FFloat SuperDefenseMul = FFloat.One;  // SuperPause p2defmul 缓冲应用后的累积（后续）
+        public FFloat FallDefenseMul = FFloat.One;   // 浮空防御加成（后续）
+        public bool DefenseMulDelay;                 // DefenceMulSet onHit：true 时 customDefense 仅受击态(movetype H)生效
+
         // 打击感
         public int Hitstop;         // = Ikemen hitPauseTime（hitpausetime trigger）
 
@@ -124,6 +133,24 @@ namespace Lockstep.Mugen.Char
 
         public bool Alive => Life > 0;
 
+        /// <summary>
+        /// 最终防御系数（移植 char.go:12081-12085）：(DefenceBase × customDef × superDef × fallDef) / 100。
+        /// customDef 在 DefenseMulDelay 且非受击态(movetype≠H)时按 1 计（onHit 延迟生效）。
+        /// </summary>
+        public FFloat ComputeFinalDefense()
+        {
+            FFloat customDef = (!DefenseMulDelay || MoveType == 2) ? CustomDefense : FFloat.One;
+            int defenceBase = Constants != null ? Constants.Defence : 100;
+            return FFloat.FromInt(defenceBase) * customDef * SuperDefenseMul * FallDefenseMul / FFloat.FromInt(100);
+        }
+
+        /// <summary>伤害攻击系数（移植 char.go atkmul[0]×attackBase/100）：AttackMul × AttackBase / 100。</summary>
+        public FFloat AttackDamageMul()
+        {
+            int attackBase = Constants != null ? Constants.Attack : 100;
+            return AttackMul * FFloat.FromInt(attackBase) / FFloat.FromInt(100);
+        }
+
         /// <summary>是否有控制权（移植 Ikemen ctrl()）。standby/dizzy/guardbreak 等状态机后置，暂仅 Ctrl 位。</summary>
         public bool Control()
         {
@@ -198,6 +225,8 @@ namespace Lockstep.Mugen.Char
                 StateType = StateType, PrevStateType = PrevStateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
                 AnimNo = AnimNo, PrevAnimNo = PrevAnimNo,
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
+                AttackMul = AttackMul, CustomDefense = CustomDefense, SuperDefenseMul = SuperDefenseMul,
+                FallDefenseMul = FallDefenseMul, DefenseMulDelay = DefenseMulDelay,
                 Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
                 HitCount = HitCount, UniqHitCount = UniqHitCount,
@@ -232,6 +261,8 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
+            hash.AddFixed(AttackMul); hash.AddFixed(CustomDefense); hash.AddFixed(SuperDefenseMul);
+            hash.AddFixed(FallDefenseMul); hash.AddBool(DefenseMulDelay);
             hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
             HashVars(ref hash, PersistCounters);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount);

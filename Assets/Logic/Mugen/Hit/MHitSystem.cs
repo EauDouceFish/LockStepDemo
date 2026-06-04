@@ -69,8 +69,9 @@ namespace Lockstep.Mugen.Hit
         // 守招结算：chip 伤害 + 守方击退 + ghv.guarded + 攻方 moveguarded（不进受击 5000，不失 movetype）。
         static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd)
         {
-            // 守招 chip 伤害（guard.kill=0 时不致死，char.go:10587/10589）
-            int dealt = ComputeDamage(defender.Life, hd.GuardDamage, hd.GuardKill);
+            // 守招 chip 伤害（含攻防倍率；guard.kill=0 时不致死，char.go:10587/10589）
+            int dealt = ComputeDamage(defender.Life, hd.GuardDamage, hd.GuardKill,
+                attacker.AttackDamageMul(), defender.ComputeFinalDefense());
             defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
 
             // 能量结算（被防：攻方 +guardgetpower、守方 +guardgivepower）
@@ -115,8 +116,13 @@ namespace Lockstep.Mugen.Hit
             int stateType = defender.StateType;
             bool isAir = stateType == 4;
 
-            // 伤害（kill=0 时不会致死，最多打到剩 1 血；对齐 char.go:8433 computeDamage + :12252 蹲被击致死改站立倒下）
-            int dealt = ComputeDamage(defender.Life, hd.HitDamage, hd.Kill);
+            // 守方先进受击态 H（受击当帧成立）：使 DefenceMulSet onHit 的 customDefense 对本次命中即生效
+            // （对齐 char.go finalDefense 在 movetype==MT_H 下取 customDefense）。
+            defender.MoveType = 2;
+
+            // 伤害（含攻防倍率；kill=0 不致死保底 1 血；对齐 char.go:8433 computeDamage + :12252 蹲被击致死改站立倒下）
+            int dealt = ComputeDamage(defender.Life, hd.HitDamage, hd.Kill,
+                attacker.AttackDamageMul(), defender.ComputeFinalDefense());
             defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
 
             // 能量结算（命中：攻方 +getpower、守方 +givepower；char.go:931-961 + powerAdd）
@@ -170,8 +176,7 @@ namespace Lockstep.Mugen.Hit
             // 守方进入受击状态 + movetype H + 失控
             defender.PendingStateNo = ResolveGetHitState(defender, hd, ghv);
             defender.PendingIsSelf = true;
-            defender.MoveType = 2;        // H 受击
-            defender.Ctrl = false;
+            defender.Ctrl = false;        // MoveType=2(H) 已在伤害计算前设置
 
             // 攻方命中统计 + 目标登记 + 可选切状态
             attacker.MoveContact = 1;
@@ -219,24 +224,33 @@ namespace Lockstep.Mugen.Hit
             }
         }
 
-        // 计算实际造成的伤害（移植 char.go:8433 computeDamage 的离散部分；攻防倍率归后续 R-CTRL-hit）。
-        // kill=false 且伤害足以致死时，最多打到剩 1 血（char.go:8453）。
-        static int ComputeDamage(int life, int damage, bool kill)
+        // 计算实际造成的伤害（移植 char.go:8433 computeDamage）：
+        // damage ×= atkMul / finalDefense（攻防倍率，char.go:8440）→ 至少 1（char.go:8443）→
+        // 不超过剩余血量（bounds，char.go:8447）→ kill=0 保底剩 1（char.go:8453）→ 四舍五入取整（math.Round）。
+        // 默认 atkMul=finalDefense=1 时退化为纯整数，与既有行为一致。
+        static int ComputeDamage(int life, int damage, bool kill, FFloat atkMul, FFloat finalDefense)
         {
-            int dealt = damage;
-            if (dealt < 0)
+            if (damage == 0)
             {
-                dealt = 0;
+                return 0;
             }
-            if (dealt > life)
+            FFloat dealt = FFloat.FromInt(damage) * atkMul / finalDefense;
+            // 极高防/极低攻仍至少 1 点（仅对正伤害）
+            if (dealt > FFloat.Zero && dealt < FFloat.One)
             {
-                dealt = life;   // 伤害不超过剩余血量
+                dealt = FFloat.One;
             }
-            if (!kill && dealt >= life && life > 0)
+            FFloat lifeF = FFloat.FromInt(life);
+            if (dealt > lifeF)
             {
-                dealt = life - 1;   // 不可致死：保底剩 1 血
+                dealt = lifeF;   // 伤害不超过剩余血量
             }
-            return dealt;
+            if (!kill && dealt >= lifeF && life > 0)
+            {
+                dealt = FFloat.FromInt(life - 1);   // 不可致死：保底剩 1 血
+            }
+            // 四舍五入（伤害非负，floor(x+0.5) 即 Round half away from zero）
+            return (dealt + FFloat.Half).ToInt();
         }
 
         static int ClampLife(int life, int lifeMax)

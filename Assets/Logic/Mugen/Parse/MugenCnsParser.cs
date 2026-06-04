@@ -208,6 +208,16 @@ namespace Lockstep.Mugen.Parse
                 case "lifeset": return new LifeSetController { Value = Expr(comp, p, "value") };
                 case "poweradd": return new PowerAddController { Value = Expr(comp, p, "value") };
                 case "powerset": return new PowerSetController { Value = Expr(comp, p, "value") };
+                case "attackmulset":
+                    return new AttackMulSetController { Value = Expr(comp, p, "value"), Damage = Expr(comp, p, "damage") };
+                case "defencemulset":
+                case "defensemulset":
+                    return new DefenceMulSetController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        OnHit = Expr(comp, p, "onhit"),
+                        MulType = Expr(comp, p, "multype"),
+                    };
                 case "turn": return new TurnController();
                 case "assertspecial": return new AssertSpecialController { Flags = ParseFlags(p) };
                 case "hitby": return BuildHitBy(p, false);

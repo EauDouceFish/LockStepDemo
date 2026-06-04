@@ -178,7 +178,12 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
                 }
             }
             Assert.IsTrue(sawGetHit, $"{name}: 进入受击状态机 5000-5160");
-            Assert.That(def.Life, Is.EqualTo(startLife - 100), $"{name}: 受击掉 100 血");
+            // 实际伤害 = 100 ÷ finalDefense（finalDefense = 角色 [Data] defence / 100）；
+            // 多数角色 defence=100 → 扣 100，少数（如 Final defence=200）按其防御常量半伤。
+            int defenceBase = def.Constants != null ? def.Constants.Defence : 100;
+            int expectedDamage = (int)System.Math.Round(10000.0 / defenceBase, System.MidpointRounding.AwayFromZero);
+            Assert.That(def.Life, Is.EqualTo(startLife - expectedDamage),
+                $"{name}: 受击掉 {expectedDamage} 血（按 defence={defenceBase} 缩放）");
             Assert.IsTrue(recovered, $"{name}: 受击周期走完，脱离受击态恢复（StateNo<5000）");
         }
     }
