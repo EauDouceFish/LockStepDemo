@@ -3,6 +3,7 @@
 // 不照搬 Ikemen 的嵌套 StateBlock 树，而是移植其触发/persistent/ignorehitpause 行为到扁平控制器模型。
 // See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
+using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 
@@ -65,18 +66,74 @@ namespace Lockstep.Mugen.State
     }
 
     /// <summary>
-    /// 一个状态（对应 MUGEN [Statedef N]）。头部(type/movetype/physics/ctrl/anim) + 控制器列表。
-    /// StateType/MoveType/Physics 用 int 原始码(S=1/C=2/A=4/L=8/N=16；MoveType I=1/H=2/A=4)；Ctrl/Anim -1=不改。
+    /// 一个状态（对应 MUGEN [Statedef N]）。头部 + 控制器列表。
+    /// type/movetype/physics 是字母枚举（字面量 int 码：S=1/C=2/A=4/L=8/N=16；MoveType I=1/H=2/A=4；-1=不改）。
+    /// 其余头部参数（anim/ctrl/velset/facep2/juggle/poweradd）在 MUGEN 里**可为表达式**（如 anim=40+var(11)），
+    /// 故存编译后的 <see cref="BytecodeExp"/>，进入状态时用角色上下文求值——对齐 Ikemen StateBytecode.init + stateDef.Run。
     /// </summary>
     public sealed class MStateDef
     {
         public int No;
-        public int StateType = -1;   // -1 = 进入时不改
+        public int StateType = -1;   // 字母枚举，-1 = 进入时不改
         public int MoveType = -1;
         public int Physics = -1;
-        public int Ctrl = -1;        // -1 不改 / 0 / 1
-        public int Anim = -1;        // -1 不改
+        // 头部表达式（null = 该参数未写，不改）。进入状态时由 RunInit 求值。
+        public BytecodeExp Anim;        // 求值为 int；-1 表示不改（对齐 Ikemen "anim = -1"）
+        public BytecodeExp Ctrl;        // 求值为 bool
+        public BytecodeExp VelSetX;     // velset 第 1 分量
+        public BytecodeExp VelSetY;     // velset 第 2 分量（可缺）
+        public BytecodeExp VelSetZ;     // velset 第 3 分量（可缺）
+        public BytecodeExp Facep2;      // 求值为 bool：true 则转向面对 P2
+        public BytecodeExp Juggle;      // 求值为 int
+        public BytecodeExp PowerAdd;    // 求值为 int
         public List<MStateController> Controllers = new List<MStateController>();
+
+        /// <summary>
+        /// 进入本状态时应用头部（对齐 Ikemen StateBytecode.init + stateDef.Run）：
+        /// 先 type/movetype/physics（字面量），再按表达式求值 anim/ctrl/velset/facep2/juggle/poweradd。
+        /// **anim 等表达式（如 40+var(11)）必须在此用角色上下文求值**，否则跳跃/落地/走路状态的动画号取不到。
+        /// </summary>
+        public void RunInit(MChar c)
+        {
+            if (StateType >= 0) { c.StateType = StateType; }
+            if (MoveType >= 0) { c.MoveType = MoveType; }
+            if (Physics >= 0) { c.Physics = Physics; }
+
+            if (Facep2 != null && Facep2.Run(c).ToB() && c.P2 != null)
+            {
+                // 转向面对 P2（对齐 stateDef_facep2）。
+                c.Facing = c.P2.Pos.X.Raw >= c.Pos.X.Raw ? FFloat.One : -FFloat.One;
+            }
+            if (Juggle != null)
+            {
+                c.Juggle = Juggle.Run(c).ToI();
+            }
+            if (VelSetX != null)
+            {
+                FFloat vx = VelSetX.Run(c).ToF();
+                FFloat vy = VelSetY != null ? VelSetY.Run(c).ToF() : c.Vel.Y;
+                FFloat vz = VelSetZ != null ? VelSetZ.Run(c).ToF() : c.Vel.Z;
+                c.Vel = new FVector3(vx, vy, vz);
+            }
+            if (Anim != null)
+            {
+                int animNo = Anim.Run(c).ToI();
+                if (animNo != -1)
+                {
+                    c.PrevAnimNo = c.AnimNo;
+                    c.AnimNo = animNo;   // 动画重置由 MAnimSystem 按 AnimRunningNo 变化处理（M8）
+                }
+            }
+            if (Ctrl != null)
+            {
+                c.Ctrl = Ctrl.Run(c).ToB();
+            }
+            if (PowerAdd != null)
+            {
+                int p = c.Power + PowerAdd.Run(c).ToI();
+                c.Power = p < 0 ? 0 : (p > c.PowerMax ? c.PowerMax : p);
+            }
+        }
     }
 
     /// <summary>

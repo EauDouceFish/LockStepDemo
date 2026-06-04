@@ -19,8 +19,25 @@ namespace Lockstep.Tests.Mugen
             Assert.That(s.StateType, Is.EqualTo(4), "type=A → 4");
             Assert.That(s.MoveType, Is.EqualTo(4));
             Assert.That(s.Physics, Is.EqualTo(16), "physics=N → 16");
-            Assert.That(s.Ctrl, Is.EqualTo(0));
-            Assert.That(s.Anim, Is.EqualTo(200));
+            // ctrl/anim 现为编译表达式，进入状态时求值（对齐 Ikemen）。
+            MChar probe = new MChar();
+            Assert.That(s.Ctrl.Run(probe).ToB(), Is.False, "ctrl=0 求值为 false");
+            Assert.That(s.Anim.Run(probe).ToI(), Is.EqualTo(200), "anim=200 求值为 200");
+        }
+
+        [Test]
+        public void StatedefHeader_EvaluatesAnimExpression()
+        {
+            // 关键回归：anim=40+var(11) 这类表达式必须在进入状态时按角色上下文求值（jump/land 状态用）。
+            string cns = "[Statedef 40]\ntype = S\nanim = 40+var(11)\nctrl = 0\n";
+            MStateDef s = MugenCnsParser.Parse(cns)[40];
+            MChar c = new MChar();                       // var(11)=0 → anim 40
+            s.RunInit(c);
+            Assert.That(c.AnimNo, Is.EqualTo(40), "anim=40+var(11)，var11=0 → 动画 40");
+            Assert.That(c.Ctrl, Is.False, "ctrl=0");
+            c.IntVars[11] = 1;                           // var(11)=1 → anim 41（调色板变体）
+            s.RunInit(c);
+            Assert.That(c.AnimNo, Is.EqualTo(41), "var11=1 → 动画 41");
         }
 
         [Test]

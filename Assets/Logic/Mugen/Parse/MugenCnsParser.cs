@@ -76,7 +76,7 @@ namespace Lockstep.Mugen.Parse
 
                 if (mode == Mode.Statedef && current != null)
                 {
-                    ApplyStatedefField(current, key, val);
+                    ApplyStatedefField(comp, current, key, val);
                 }
                 else if (mode == Mode.State)
                 {
@@ -110,15 +110,28 @@ namespace Lockstep.Mugen.Parse
         }
 
         // ───────── 状态头部 ─────────
-        static void ApplyStatedefField(MStateDef s, string key, string val)
+        // type/movetype/physics 是字母枚举（字面量码）；其余参数在 MUGEN 可为表达式（anim=40+var(11)），
+        // 编译后存 BytecodeExp，进入状态时由 MStateDef.RunInit 用角色上下文求值（对齐 Ikemen stateDef.Run）。
+        static void ApplyStatedefField(MugenExprCompiler comp, MStateDef s, string key, string val)
         {
             switch (key)
             {
                 case "type": s.StateType = MugenCodes.StateType(val); break;
                 case "movetype": s.MoveType = MugenCodes.MoveType(val); break;
                 case "physics": s.Physics = MugenCodes.Physics(val); break;
-                case "ctrl": s.Ctrl = ParseFirstInt(val, -1); break;
-                case "anim": s.Anim = ParseFirstInt(val, -1); break;
+                case "ctrl": s.Ctrl = comp.Compile(val); break;
+                case "anim": s.Anim = comp.Compile(val); break;
+                case "facep2": s.Facep2 = comp.Compile(val); break;
+                case "juggle": s.Juggle = comp.Compile(val); break;
+                case "poweradd": s.PowerAdd = comp.Compile(val); break;
+                case "velset":
+                {
+                    string[] parts = val.Split(',');
+                    if (parts.Length > 0 && parts[0].Trim().Length > 0) { s.VelSetX = comp.Compile(parts[0].Trim()); }
+                    if (parts.Length > 1 && parts[1].Trim().Length > 0) { s.VelSetY = comp.Compile(parts[1].Trim()); }
+                    if (parts.Length > 2 && parts[2].Trim().Length > 0) { s.VelSetZ = comp.Compile(parts[2].Trim()); }
+                    break;
+                }
             }
         }
 

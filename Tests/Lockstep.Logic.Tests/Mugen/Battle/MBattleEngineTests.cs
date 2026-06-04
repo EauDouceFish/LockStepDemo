@@ -244,6 +244,31 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
         }
 
         [Test]
+        public void RealKfm_JumpThenRecoversToStandAndCanActAgain()
+        {
+            // 关键回归：修了 statedef 头部表达式（anim=47+var(11)）后，落地态 52 的动画能正确播放并退出，
+            // 角色回到站立(0)、恢复 ctrl，能再次行动（之前卡在落地态/空中，anim 取不到）。
+            MBattleEngine engine = LoadKfmEngine();
+            MChar kfm = engine.Chars[0];
+            List<MInput> up = new List<MInput> { MInput.Up };
+            List<MInput> none = new List<MInput> { MInput.None };
+            for (int f = 0; f < 2; f++) { engine.Tick(up); }
+            bool recovered = false;
+            for (int f = 0; f < 150; f++)
+            {
+                engine.Tick(none);
+                if (kfm.StateNo == 0 && kfm.StateType == 1 && f > 20) { recovered = true; break; }
+            }
+            Assert.That(recovered, Is.True, "跳跃落地后恢复到站立态 0（未卡在落地/空中态）");
+            Assert.That(kfm.Ctrl, Is.True, "落地恢复后重获控制权");
+            // 还能再走：恢复后持前进应再次进走路态
+            List<MInput> right = new List<MInput> { MInput.Right };
+            bool walkAgain = false;
+            for (int f = 0; f < 10; f++) { engine.Tick(right); if (kfm.StateNo == 20) { walkAgain = true; } }
+            Assert.That(walkAgain, Is.True, "落地恢复后能再次行走");
+        }
+
+        [Test]
         public void RealKfm_WalkThenRelease_BrakesBackToStand()
         {
             MBattleEngine engine = LoadKfmEngine();

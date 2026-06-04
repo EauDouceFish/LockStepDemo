@@ -24,7 +24,7 @@ namespace Lockstep.Tests.Mugen
 
         static Dictionary<int, MStateDef> StandWalk()
         {
-            MStateDef stand = new MStateDef { No = 0, StateType = 1, Ctrl = 1 };
+            MStateDef stand = new MStateDef { No = 0, StateType = 1, Ctrl = Comp.Compile("1") };
             stand.Controllers.Add(ChangeState(20, "time >= 2"));   // 站立 2 帧后走
             MStateDef walk = new MStateDef { No = 20, StateType = 1 };
             walk.Controllers.Add(ChangeState(0, "time >= 3"));     // 走 3 帧后回站立
@@ -58,7 +58,7 @@ namespace Lockstep.Tests.Mugen
             MStateMachine sm = new MStateMachine();
             MStateDef a = new MStateDef { No = 0 };
             a.Controllers.Add(ChangeState(100, "1"));   // 恒切到 100
-            MStateDef b = new MStateDef { No = 100, StateType = 2, MoveType = 1, Ctrl = 0 };
+            MStateDef b = new MStateDef { No = 100, StateType = 2, MoveType = 1, Ctrl = Comp.Compile("0") };
             Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = a, [100] = b };
             MChar c = new MChar { StateNo = 0, Ctrl = true };
 

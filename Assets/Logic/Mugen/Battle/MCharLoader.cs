@@ -83,11 +83,7 @@ namespace Lockstep.Mugen.Battle
             {
                 return;
             }
-            if (def.StateType >= 0) { c.StateType = def.StateType; }
-            if (def.MoveType >= 0) { c.MoveType = def.MoveType; }
-            if (def.Physics >= 0) { c.Physics = def.Physics; }
-            if (def.Ctrl >= 0) { c.Ctrl = def.Ctrl != 0; }
-            if (def.Anim >= 0) { c.AnimNo = def.Anim; }
+            def.RunInit(c);   // 头部：type/movetype/physics + anim/ctrl/velset 表达式求值（对齐 ApplyTransition）
         }
 
         static void MergeStates(Dictionary<int, MStateDef> into, Dictionary<int, MStateDef> from)

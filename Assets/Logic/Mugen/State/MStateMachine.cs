@@ -233,11 +233,7 @@ namespace Lockstep.Mugen.State
             {
                 return;
             }
-            if (def.StateType >= 0) { c.StateType = def.StateType; }
-            if (def.MoveType >= 0) { c.MoveType = def.MoveType; }
-            if (def.Physics >= 0) { c.Physics = def.Physics; }
-            if (def.Ctrl >= 0) { c.Ctrl = def.Ctrl != 0; }
-            if (def.Anim >= 0) { c.AnimNo = def.Anim; }
+            def.RunInit(c);   // 应用头部：type/movetype/physics（字面量）+ anim/ctrl/velset/...（表达式求值）
         }
 
         // 状态查找：先查角色自身状态表，未命中再回退 common states（common1.cns 共享状态）。
