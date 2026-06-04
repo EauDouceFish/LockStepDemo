@@ -25,6 +25,7 @@ namespace Lockstep.Mugen.Hit
         AT = NT | ST | HT,
         AP = NP | SP | HP,
         All = AA | AT | AP,
+        Hyper = HA | HT | HP,   // 超必杀类（对齐 Ikemen AT_AH，能量获取/给予默认值分支用）
     }
 
     /// <summary>2D 轴对齐包围盒（横 X × 高度 Y）。</summary>
@@ -146,6 +147,20 @@ namespace Lockstep.Mugen.Hit
         public bool FallRecover = true;     // fall.recover 默认 1
         public int FallRecoverTime = 4;     // fall.recovertime 默认 4
 
+        // KO 阻止（kill=0：本次伤害不会致死，最多打到剩 1 血；对齐 char.go:8453 computeDamage）
+        public bool Kill = true;        // kill 默认 1
+        public bool GuardKill = true;   // guard.kill 默认 1
+        public bool FallKill = true;    // fall.kill 默认 1（落地 fall.damage 是否可致死，归后续 HitFallDamage）
+
+        // 强制站立/下蹲反应（forcestand：有 Y 击退速度时默认开，char.go:911）
+        public bool ForceStand;
+
+        // 能量获取/给予（命中→攻方/守方加能量；默认按 lifetopowermul 常量，char.go:931-961）
+        public int HitGetPower;     // 命中时攻方 +power（默认 0.7×damage，超必杀 0）
+        public int HitGivePower;    // 命中时守方 +power（默认 0.6×damage）
+        public int GuardGetPower;   // 被防时攻方 +power（默认 hitgetpower×0.5）
+        public int GuardGivePower;  // 被防时守方 +power（默认 hitgivepower×0.5）
+
         public MHitDef Clone()
         {
             return (MHitDef)MemberwiseClone();
@@ -166,6 +181,9 @@ namespace Lockstep.Mugen.Hit
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddInt32(NumHits);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime);
+            hash.AddBool(Kill); hash.AddBool(GuardKill); hash.AddBool(FallKill); hash.AddBool(ForceStand);
+            hash.AddInt32(HitGetPower); hash.AddInt32(HitGivePower);
+            hash.AddInt32(GuardGetPower); hash.AddInt32(GuardGivePower);
         }
     }
 }

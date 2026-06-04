@@ -69,8 +69,13 @@ namespace Lockstep.Mugen.Hit
         // 守招结算：chip 伤害 + 守方击退 + ghv.guarded + 攻方 moveguarded（不进受击 5000，不失 movetype）。
         static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd)
         {
-            int newLife = defender.Life - hd.GuardDamage;
-            defender.Life = newLife < 0 ? 0 : (newLife > defender.LifeMax ? defender.LifeMax : newLife);
+            // 守招 chip 伤害（guard.kill=0 时不致死，char.go:10587/10589）
+            int dealt = ComputeDamage(defender.Life, hd.GuardDamage, hd.GuardKill);
+            defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
+
+            // 能量结算（被防：攻方 +guardgetpower、守方 +guardgivepower）
+            attacker.Power = AddPower(attacker.Power, hd.GuardGetPower, attacker.PowerMax);
+            defender.Power = AddPower(defender.Power, hd.GuardGivePower, defender.PowerMax);
 
             defender.Facing = -attacker.Facing;
             defender.Vel = new FVector3(hd.GuardVelX, FFloat.Zero, FFloat.Zero);
@@ -79,7 +84,7 @@ namespace Lockstep.Mugen.Hit
             defender.Hitstop = hd.P2PauseTime;
 
             MGetHitVar ghv = defender.Ghv;
-            ghv.Damage = hd.GuardDamage;
+            ghv.Damage = dealt;
             ghv.HitTime = hd.GuardHitTime;
             ghv.CtrlTime = hd.GuardCtrlTime;
             ghv.HitShakeTime = hd.P2PauseTime;
@@ -110,9 +115,13 @@ namespace Lockstep.Mugen.Hit
             int stateType = defender.StateType;
             bool isAir = stateType == 4;
 
-            // 伤害
-            int newLife = defender.Life - hd.HitDamage;
-            defender.Life = newLife < 0 ? 0 : (newLife > defender.LifeMax ? defender.LifeMax : newLife);
+            // 伤害（kill=0 时不会致死，最多打到剩 1 血；对齐 char.go:8433 computeDamage + :12252 蹲被击致死改站立倒下）
+            int dealt = ComputeDamage(defender.Life, hd.HitDamage, hd.Kill);
+            defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
+
+            // 能量结算（命中：攻方 +getpower、守方 +givepower；char.go:931-961 + powerAdd）
+            attacker.Power = AddPower(attacker.Power, hd.HitGetPower, attacker.PowerMax);
+            defender.Power = AddPower(defender.Power, hd.HitGivePower, defender.PowerMax);
 
             // 守方转向面对攻方 + 击退速度（连续量；vx/vy 与 ghv.xvel/yvel 同惯例，物理积分时乘 facing）
             defender.Facing = -attacker.Facing;
@@ -127,7 +136,9 @@ namespace Lockstep.Mugen.Hit
 
             // GetHitVar 填值（char.go:10790-10924）
             MGetHitVar ghv = defender.Ghv;
-            ghv.Damage = hd.HitDamage;
+            ghv.Damage = dealt;
+            ghv.Kill = hd.Kill;
+            ghv.ForceStand = hd.ForceStand;
             ghv.XVel = vx;
             ghv.YVel = vy;
             ghv.SlideTime = hd.GroundSlideTime;
@@ -192,6 +203,11 @@ namespace Lockstep.Mugen.Hit
             {
                 return 5070;
             }
+            // forcestand：蹲被击改判站立反应（char.go:12241 changeStateType(ST_S)）
+            if (ghv.ForceStand && defender.StateType == 2)
+            {
+                defender.StateType = 1;
+            }
             switch (defender.StateType)
             {
                 case 1:   // ST_S 立
@@ -201,6 +217,50 @@ namespace Lockstep.Mugen.Hit
                 default:  // ST_A 空中
                     return 5020;
             }
+        }
+
+        // 计算实际造成的伤害（移植 char.go:8433 computeDamage 的离散部分；攻防倍率归后续 R-CTRL-hit）。
+        // kill=false 且伤害足以致死时，最多打到剩 1 血（char.go:8453）。
+        static int ComputeDamage(int life, int damage, bool kill)
+        {
+            int dealt = damage;
+            if (dealt < 0)
+            {
+                dealt = 0;
+            }
+            if (dealt > life)
+            {
+                dealt = life;   // 伤害不超过剩余血量
+            }
+            if (!kill && dealt >= life && life > 0)
+            {
+                dealt = life - 1;   // 不可致死：保底剩 1 血
+            }
+            return dealt;
+        }
+
+        static int ClampLife(int life, int lifeMax)
+        {
+            if (life < 0)
+            {
+                return 0;
+            }
+            return life > lifeMax ? lifeMax : life;
+        }
+
+        // 能量增减（powerAdd）：累加后夹到 [0, PowerMax]。
+        static int AddPower(int current, int add, int powerMax)
+        {
+            long value = (long)current + add;
+            if (value < 0)
+            {
+                value = 0;
+            }
+            if (value > powerMax)
+            {
+                value = powerMax;
+            }
+            return (int)value;
         }
     }
 }

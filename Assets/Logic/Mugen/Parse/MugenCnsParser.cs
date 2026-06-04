@@ -305,7 +305,68 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall", out string fl)) { hd.Fall = EvalI(comp, fl) != 0; }
             if (p.TryGetValue("p1stateno", out string p1s)) { hd.P1StateNo = EvalI(comp, p1s); }
             if (p.TryGetValue("p2stateno", out string p2s)) { hd.P2StateNo = EvalI(comp, p2s); }
+
+            // 空中/fall 反应字段（air.type 默认随 ground.type，char.go:907；air.animtype 默认随 animtype）。
+            hd.AirType = hd.GroundType;
+            hd.AirAnimType = hd.AnimType;
+            if (p.TryGetValue("air.type", out string aty)) { hd.AirType = ParseHitType(aty); }
+            if (p.TryGetValue("air.animtype", out string aat)) { hd.AirAnimType = ParseReaction(aat); }
+            // fall.animtype 默认：air.animtype 为 Up 则 Up，否则 Back（MUGEN 规范）。
+            hd.FallAnimType = hd.AirAnimType == MReaction.Up ? MReaction.Up : MReaction.Back;
+            if (p.TryGetValue("fall.animtype", out string fat)) { hd.FallAnimType = ParseReaction(fat); }
+            if (p.TryGetValue("yaccel", out string ya)) { hd.YAccel = EvalF(comp, ya); }
+            if (p.TryGetValue("fall.xvelocity", out string fxv)) { hd.FallXVel = EvalF(comp, fxv); }
+            if (p.TryGetValue("fall.yvelocity", out string fyv)) { hd.FallYVel = EvalF(comp, fyv); }
+            if (p.TryGetValue("fall.recover", out string frc)) { hd.FallRecover = EvalI(comp, frc) != 0; }
+            if (p.TryGetValue("fall.recovertime", out string frt)) { hd.FallRecoverTime = EvalI(comp, frt); }
+
+            // forcestand：默认 = 有 Y 击退速度（char.go:911）。
+            hd.ForceStand = hd.GroundVelY != FFloat.Zero;
+            if (p.TryGetValue("forcestand", out string fs)) { hd.ForceStand = EvalI(comp, fs) != 0; }
+
+            // KO 阻止标志（默认全 1，char.go:774/775/792）。
+            if (p.TryGetValue("kill", out string kl)) { hd.Kill = EvalI(comp, kl) != 0; }
+            if (p.TryGetValue("guard.kill", out string gkl)) { hd.GuardKill = EvalI(comp, gkl) != 0; }
+            if (p.TryGetValue("fall.kill", out string fkl)) { hd.FallKill = EvalI(comp, fkl) != 0; }
+
+            FillPowerDefaults(comp, p, hd);
             return hd;
+        }
+
+        // 能量获取/给予（char.go:931-961）：getpower/givepower 各为 "命中值[,被防值]"；
+        // 未显式给出则按 lifetopowermul 常量推默认：命中攻方 0.7×dmg（超必杀 0）、命中守方 0.6×dmg、
+        // 被防值 = 命中值×0.5。整数截断（Go int32() 向零取整）。
+        static void FillPowerDefaults(MugenExprCompiler comp, Dictionary<string, string> p, MHitDef hd)
+        {
+            bool hyper = (hd.Attr & (int)MAttackType.Hyper) != 0;
+            int defHitGet = hyper ? 0 : TruncMul(hd.HitDamage, 7, 10);   // default.attack.lifetopowermul=0.7（超必杀 super=0）
+            int defHitGive = TruncMul(hd.HitDamage, 6, 10);              // default/super.gethit.lifetopowermul=0.6
+
+            hd.HitGetPower = defHitGet;
+            hd.HitGivePower = defHitGive;
+            bool getGuardSet = false;
+            bool giveGuardSet = false;
+            if (p.TryGetValue("getpower", out string gp))
+            {
+                string[] parts = gp.Split(',');
+                hd.HitGetPower = EvalI(comp, parts[0]);
+                if (parts.Length > 1) { hd.GuardGetPower = EvalI(comp, parts[1]); getGuardSet = true; }
+            }
+            if (p.TryGetValue("givepower", out string gvp))
+            {
+                string[] parts = gvp.Split(',');
+                hd.HitGivePower = EvalI(comp, parts[0]);
+                if (parts.Length > 1) { hd.GuardGivePower = EvalI(comp, parts[1]); giveGuardSet = true; }
+            }
+            if (!getGuardSet) { hd.GuardGetPower = TruncMul(hd.HitGetPower, 1, 2); }    // ×0.5
+            if (!giveGuardSet) { hd.GuardGivePower = TruncMul(hd.HitGivePower, 1, 2); } // ×0.5
+        }
+
+        // 整数 value×num/den 向零取整（对齐 Go int32(float×int) 截断语义；value 可负）。
+        static int TruncMul(int value, int num, int den)
+        {
+            long scaled = (long)value * num;
+            return (int)(scaled / den);
         }
 
         static void ParseVel(MugenExprCompiler comp, Dictionary<string, string> p, string key, out FFloat x, out FFloat y)

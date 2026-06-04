@@ -39,6 +39,8 @@ namespace Lockstep.Mugen.Char
         public bool Fall;            // gethitvar(fall)：是否击倒/浮空（= Ikemen fallflag）
         public bool Guarded;         // 是否被防御
         public bool Up;              // 是否处于击倒上升段（fall.recover 判定用）
+        public bool ForceStand;      // HitDef forcestand：蹲被击改判站立反应（char.go:12241）
+        public bool Kill = true;     // 本次受击是否可致死（HitDef kill；后续 fall 伤害沿用，char.go:10579）
 
         // 重力 / 击飞（fall 分支用，common1 5030 读 gethitvar(yaccel)、5050 读 fall.*）
         public FFloat YAccel;        // gethitvar(yaccel)：浮空下落加速度
@@ -57,7 +59,7 @@ namespace Lockstep.Mugen.Char
                 CtrlTime = CtrlTime, Damage = Damage, HitCount = HitCount, FallCount = FallCount,
                 AnimType = AnimType, AttrType = AttrType, GroundType = GroundType, AirType = AirType,
                 GroundAnimType = GroundAnimType, AirAnimType = AirAnimType, FallAnimType = FallAnimType,
-                Fall = Fall, Guarded = Guarded, Up = Up,
+                Fall = Fall, Guarded = Guarded, Up = Up, ForceStand = ForceStand, Kill = Kill,
                 YAccel = YAccel, FallXVel = FallXVel, FallYVel = FallYVel,
                 FallRecover = FallRecover, FallRecoverTime = FallRecoverTime, DownRecoverTime = DownRecoverTime,
             };
@@ -71,6 +73,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(AnimType); hash.AddInt32(AttrType); hash.AddInt32(GroundType); hash.AddInt32(AirType);
             hash.AddInt32(GroundAnimType); hash.AddInt32(AirAnimType); hash.AddInt32(FallAnimType);
             hash.AddBool(Fall); hash.AddBool(Guarded); hash.AddBool(Up);
+            hash.AddBool(ForceStand); hash.AddBool(Kill);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(DownRecoverTime);
         }
