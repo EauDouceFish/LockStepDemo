@@ -70,6 +70,14 @@ namespace Lockstep.Mugen.Char
         // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
         public Command.MCommandList CommandList;
 
+        // 输入边沿缓冲（移植 Ikemen InputBuffer）：引擎硬编码基础动作读 Fb/Bb/Ub/Db 边沿。每帧 Update。
+        public Command.MInputBuffer Input = new Command.MInputBuffer();
+
+        // 是否玩家按键控制（= Ikemen keyctrl[0]）：引擎硬编码基础动作仅对受控角色生效。
+        public bool KeyCtrl;
+        // 空中跳跃已用次数（= Ikemen airJumpCount）：stateType != A 时清零，airjump 上限判定用。
+        public int AirJumpCount;
+
         // 角色常量（[Data]/[Size]/[Velocity]/[Movement]）：const(...) 的取值来源。
         // 加载后不可变 → Clone 浅拷引用、WriteHash 不混入（与状态表同属配置，不进回滚快照）。可为 null。
         public MConstants Constants;
@@ -109,6 +117,12 @@ namespace Lockstep.Mugen.Char
 
         public bool Alive => Life > 0;
 
+        /// <summary>是否有控制权（移植 Ikemen ctrl()）。standby/dizzy/guardbreak 等状态机后置，暂仅 Ctrl 位。</summary>
+        public bool Control()
+        {
+            return Ctrl;
+        }
+
         // ───────── 回滚支持 ─────────
 
         public MChar Clone()
@@ -129,6 +143,8 @@ namespace Lockstep.Mugen.Char
                 AnimLoopEnd = AnimLoopEnd, AnimRunningNo = AnimRunningNo,
                 Ghv = Ghv.Clone(),
                 CommandList = CommandList != null ? CommandList.Clone() : null,
+                Input = Input != null ? Input.Clone() : null,
+                KeyCtrl = KeyCtrl, AirJumpCount = AirJumpCount,
                 Constants = Constants,   // 不可变配置，浅拷引用
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
@@ -160,6 +176,8 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(AnimLoopEnd); hash.AddInt32(AnimRunningNo);
             Ghv.WriteHash(ref hash);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
+            if (Input != null) { Input.WriteHash(ref hash); }
+            hash.AddBool(KeyCtrl); hash.AddInt32(AirJumpCount);
             HitDef.WriteHash(ref hash);
             hash.AddBool(Guarding); hash.AddInt32(HitByAttr); hash.AddInt32(HitByTime); hash.AddBool(HitByIsNot);
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);

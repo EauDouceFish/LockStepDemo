@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Parse;
@@ -157,6 +158,120 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
                 }
             }, "KFM + 公共状态连跑 60 帧不崩");
             Assert.That(engine.Chars[0].Alive, Is.True);
+        }
+
+        // ───────── 模块 E：引擎硬编码基础动作端到端（真实 KFM 走/跳）─────────
+
+        static MBattleEngine LoadKfmEngine()
+        {
+            string kfmDir = TestAssets.KfmDir();
+            string common = TestAssets.Common1Cns();
+            string cns = Path.Combine(kfmDir, "kfm.cns");
+            string cmd = Path.Combine(kfmDir, "kfm.cmd");
+            string air = Path.Combine(kfmDir, "kfm.air");
+            if (!File.Exists(cns) || !File.Exists(air) || !File.Exists(common) || !File.Exists(cmd))
+            {
+                Assert.Ignore("KFM/common1 素材缺失，跳过。");
+            }
+            MCharData data = MCharLoader.Load(
+                new[] { File.ReadAllText(cns) }, File.ReadAllText(cns),
+                File.ReadAllText(common), File.ReadAllText(air), File.ReadAllText(cmd), "kfm");
+            MChar kfm = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
+            MBattleEngine engine = new MBattleEngine();
+            engine.Add(kfm, data);
+            engine.LinkPair();
+            engine.StartRound();   // 授予 ctrl/keyctrl，引擎硬编码键才生效
+            return engine;
+        }
+
+        [Test]
+        public void RealKfm_HoldForward_EntersWalkAndMovesForward()
+        {
+            MBattleEngine engine = LoadKfmEngine();
+            MChar kfm = engine.Chars[0];
+            bool sawWalk = false;
+            List<MInput> inputs = new List<MInput> { MInput.Right };   // 面右持前进
+            for (int f = 0; f < 30; f++)
+            {
+                engine.Tick(inputs);
+                if (kfm.StateNo == 20) { sawWalk = true; }
+            }
+            Assert.That(sawWalk, Is.True, "持前进 → 引擎硬编码键进走路状态 20");
+            Assert.That(kfm.Pos.X.Raw, Is.GreaterThan(0), "走路使 KFM 前移（pos.x>0）");
+        }
+
+        [Test]
+        public void RealKfm_HoldUp_EntersJumpAndRises()
+        {
+            MBattleEngine engine = LoadKfmEngine();
+            MChar kfm = engine.Chars[0];
+            bool sawAirborne = false;   // 跳跃起始(40)经同帧重入直接转空中(50, type=A)，40 仅 1 帧不易观测，验空中态即可
+            FFloat minY = FFloat.Zero;   // 记录最高点（y 最负）
+            List<MInput> inputs = new List<MInput> { MInput.Up };
+            for (int f = 0; f < 30; f++)
+            {
+                engine.Tick(inputs);
+                if (kfm.StateType == 4) { sawAirborne = true; }   // ST_A
+                if (kfm.Pos.Y < minY) { minY = kfm.Pos.Y; }
+            }
+            Assert.That(sawAirborne, Is.True, "持上 → 引擎硬编码键起跳进入空中态(type=A)");
+            Assert.That(minY.Raw, Is.LessThan(0), "跳跃使 KFM 升空（pos.y<0，MUGEN 上为负）");
+        }
+
+        [Test]
+        public void RealKfm_JumpArc_RisesThenLandsBackToGround()
+        {
+            MBattleEngine engine = LoadKfmEngine();
+            MChar kfm = engine.Chars[0];
+            // 起跳：按一下上（边沿）即可，之后松开，让重力把它带回地面。
+            List<MInput> up = new List<MInput> { MInput.Up };
+            List<MInput> none = new List<MInput> { MInput.None };
+            for (int f = 0; f < 3; f++) { engine.Tick(up); }
+            FFloat apex = FFloat.Zero;
+            bool landed = false;
+            for (int f = 0; f < 120; f++)   // 给足时间走完整段抛物线
+            {
+                engine.Tick(none);
+                if (kfm.Pos.Y < apex) { apex = kfm.Pos.Y; }
+                if (apex.Raw < 0 && kfm.StateType == 1 && kfm.Pos.Y.Raw <= 0)
+                {
+                    landed = true;   // 已升空过且回到地面站立类
+                }
+            }
+            Assert.That(apex.Raw, Is.LessThan(0), "确实升空过");
+            Assert.That(landed, Is.True, "落地：升空后回到地面站立态（pos.y 不再无限下落）");
+            Assert.That(kfm.Pos.Y.Raw, Is.LessThanOrEqualTo(8), "落地后 y 收敛在地面附近（非无限穿地）");
+        }
+
+        [Test]
+        public void RealKfm_WalkThenRelease_BrakesBackToStand()
+        {
+            MBattleEngine engine = LoadKfmEngine();
+            MChar kfm = engine.Chars[0];
+            List<MInput> fwd = new List<MInput> { MInput.Right };
+            for (int f = 0; f < 8; f++) { engine.Tick(fwd); }
+            Assert.That(kfm.StateNo, Is.EqualTo(20), "持前进时在走路态");
+            List<MInput> none = new List<MInput> { MInput.None };
+            for (int f = 0; f < 8; f++) { engine.Tick(none); }
+            Assert.That(kfm.StateNo, Is.EqualTo(0), "松开 → 刹车回站立(0)");
+        }
+
+        [Test]
+        public void RealKfm_ActionPipeline_IsDeterministic()
+        {
+            ulong RunOnce()
+            {
+                MBattleEngine engine = LoadKfmEngine();
+                List<MInput> seq = new List<MInput> { MInput.Right };
+                for (int f = 0; f < 40; f++)
+                {
+                    if (f == 15) { seq[0] = MInput.Up; }
+                    if (f == 25) { seq[0] = MInput.None; }
+                    engine.Tick(seq);
+                }
+                return engine.ComputeHash();
+            }
+            Assert.That(RunOnce(), Is.EqualTo(RunOnce()), "含硬编码动作的管线逐帧确定性一致");
         }
     }
 }

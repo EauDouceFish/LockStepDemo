@@ -357,6 +357,13 @@ namespace Lockstep.Mugen.Parse
                 case "noko": return (int)MAssertFlag.NoKO;
                 case "noshadow": return (int)MAssertFlag.NoShadow;
                 case "noautoguard": return (int)MAssertFlag.NoAutoGuard;
+                case "nojump": return (int)MAssertFlag.NoJump;
+                case "nocrouch": return (int)MAssertFlag.NoCrouch;
+                case "nostand": return (int)MAssertFlag.NoStand;
+                case "noairjump": return (int)MAssertFlag.NoAirJump;
+                case "nobrake": return (int)MAssertFlag.NoBrake;
+                case "nohardcodedkeys": return (int)MAssertFlag.NoHardcodedKeys;
+                case "postroundinput": return (int)MAssertFlag.PostRoundInput;
                 default: return 0;
             }
         }

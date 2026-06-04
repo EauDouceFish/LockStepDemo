@@ -39,39 +39,66 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
-        /// <summary>推进一帧。inputs[i] 对应 Chars[i] 本帧输入。</summary>
+        /// <summary>
+        /// 回合开始：给玩家控制角色授予按键控制权 + ctrl（faithful shim，对应 Ikemen RoundState 进入战斗活动期）。
+        /// 完整回合状态机（intro/5900/fight/KO）后置；此处只把"该读键且有控制权"的初始态摆正，
+        /// 否则直接 spawn 进 state 0 的角色 ctrl=false → 引擎硬编码基础动作（走/跳/蹲）全被挡。
+        /// </summary>
+        public void StartRound()
+        {
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                Chars[i].KeyCtrl = true;
+                Chars[i].Ctrl = true;
+            }
+        }
+
+        /// <summary>推进一帧。inputs[i] 对应 Chars[i] 本帧输入。
+        /// 顺序对齐 Ikemen 每帧：输入缓冲 → actionPrepare(硬编码基础动作) → actionRun(状态机) → update(物理/动画) → 命中。</summary>
         public void Tick(IReadOnlyList<MInput> inputs)
         {
-            // 1) 命令缓冲 + 匹配
+            // 1) 输入缓冲：命令匹配环形缓冲（搓招）+ 边沿计数缓冲（引擎硬编码键读 Fb/Bb/Ub/Db）。
             for (int i = 0; i < Chars.Count; i++)
             {
                 MChar c = Chars[i];
+                MInput input = inputs != null && i < inputs.Count ? inputs[i] : MInput.None;
+                bool facingRight = c.Facing.Raw >= 0;
                 if (c.CommandList != null)
                 {
-                    MInput input = inputs != null && i < inputs.Count ? inputs[i] : MInput.None;
-                    c.CommandList.Update(input, c.Facing.Raw >= 0);
+                    c.CommandList.Update(input, facingRight);
+                }
+                if (c.Input != null)
+                {
+                    c.Input.Update(input, facingRight);
                 }
             }
 
-            // 2) 状态机（负状态/当前状态控制器、ChangeState 同帧重入）
+            // 2) actionPrepare：引擎硬编码基础动作（站/走/蹲/跳/刹车的状态转移，缓冲到 PendingStateNo）。
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                MActionSystem.Prepare(Chars[i]);
+            }
+
+            // 3) 状态机（应用 Pending 切换、负状态/当前状态控制器、ChangeState 同帧重入）
             for (int i = 0; i < Chars.Count; i++)
             {
                 _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates);
             }
 
-            // 3) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate；落地由公共状态检测）
+            // 4) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate）+ 空中落地检测（硬编码 → 状态 52）
             for (int i = 0; i < Chars.Count; i++)
             {
                 MPhysics.Step(Chars[i]);
+                MActionSystem.LandCheck(Chars[i]);
             }
 
-            // 4) 动画推进（M8）+ 派生 Clsn
+            // 5) 动画推进（M8）+ 派生 Clsn
             for (int i = 0; i < Chars.Count; i++)
             {
                 MAnimSystem.Action(Chars[i], Data[i].Anims);
             }
 
-            // 5) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）
+            // 6) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）
             if (Chars.Count == 2)
             {
                 MHitSystem.TryHit(Chars[0], Chars[1]);

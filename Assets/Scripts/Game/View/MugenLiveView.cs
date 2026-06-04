@@ -66,6 +66,8 @@ namespace Lockstep.View
             MChar kfm = MCharLoader.SpawnChar(_data, 0, startStateNo: 0, startAnimNo: 0);
             _engine = new MBattleEngine();
             _engine.Add(kfm, _data);
+            _engine.LinkPair();
+            _engine.StartRound();   // 授予 ctrl/keyctrl，引擎硬编码基础动作（走/跳/蹲）才生效
 
             // 表现层精灵：打开 SFF，动画按需懒构建（复用已测的 MugenSpriteLoader）。
             _source = MugenSpriteLoader.Open(sffPath, PixelsPerUnit);
