@@ -82,6 +82,10 @@ namespace Lockstep.Mugen.Char
         // 加载后不可变 → Clone 浅拷引用、WriteHash 不混入（与状态表同属配置，不进回滚快照）。可为 null。
         public MConstants Constants;
 
+        // 角色动画表（动画号→动画）：不可变配置引用，由 SpawnChar 接入（与 Constants 同属配置，
+        // Clone 浅拷引用、WriteHash 不混入、不进回滚快照）。用于 ChangeAnim 存在性守卫与 animexist trigger。可为 null。
+        public System.Collections.Generic.IReadOnlyDictionary<int, Anim.MAnimData> AnimTable;
+
         // 命中系统（M7）：当前 HitDef + 本帧 Clsn 框（Clsn 为动画派生，由 Anim 系统 M8 填，Clone 浅拷不哈希）。
         public Hit.MHitDef HitDef = new Hit.MHitDef();
         public Hit.MClsnBox[] Clsn1;   // 攻击框
@@ -123,6 +127,21 @@ namespace Lockstep.Mugen.Char
             return Ctrl;
         }
 
+        /// <summary>动画表中是否存在该动画号（无表则 false；animexist/selfanimexist trigger 用）。</summary>
+        public bool AnimExists(int animNo)
+        {
+            return AnimTable != null && AnimTable.ContainsKey(animNo);
+        }
+
+        /// <summary>
+        /// 是否允许把当前动画切到该号（对齐 Ikemen changeAnimEx：目标动画不存在则不切、保留当前动画，避免冻结）。
+        /// 无表（裸构造的单测）时放行，以保持既有行为。
+        /// </summary>
+        public bool CanChangeAnimTo(int animNo)
+        {
+            return AnimTable == null || AnimTable.ContainsKey(animNo);
+        }
+
         // ───────── 回滚支持 ─────────
 
         public MChar Clone()
@@ -146,6 +165,7 @@ namespace Lockstep.Mugen.Char
                 Input = Input != null ? Input.Clone() : null,
                 KeyCtrl = KeyCtrl, AirJumpCount = AirJumpCount,
                 Constants = Constants,   // 不可变配置，浅拷引用
+                AnimTable = AnimTable,   // 不可变配置，浅拷引用（同 Constants，不进哈希）
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,

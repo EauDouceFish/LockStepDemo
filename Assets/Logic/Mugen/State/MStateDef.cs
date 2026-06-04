@@ -118,7 +118,8 @@ namespace Lockstep.Mugen.State
             if (Anim != null)
             {
                 int animNo = Anim.Run(c).ToI();
-                if (animNo != -1)
+                // -1=不改；目标动画不存在则不切（对齐 changeAnimEx，避免进状态即冻结到无效动画）。
+                if (animNo != -1 && c.CanChangeAnimTo(animNo))
                 {
                     c.PrevAnimNo = c.AnimNo;
                     c.AnimNo = animNo;   // 动画重置由 MAnimSystem 按 AnimRunningNo 变化处理（M8）
@@ -170,7 +171,7 @@ namespace Lockstep.Mugen.State
             {
                 c.Ctrl = Ctrl != 0;
             }
-            if (Anim >= 0)
+            if (Anim >= 0 && c.CanChangeAnimTo(Anim))
             {
                 c.AnimNo = Anim;
             }
@@ -196,7 +197,7 @@ namespace Lockstep.Mugen.State
             {
                 c.Ctrl = Ctrl != 0;
             }
-            if (Anim >= 0)
+            if (Anim >= 0 && c.CanChangeAnimTo(Anim))
             {
                 c.AnimNo = Anim;
             }

@@ -88,8 +88,13 @@ namespace Lockstep.Mugen.StateCtrl
         {
             if (Value != null)
             {
-                c.PrevAnimNo = c.AnimNo;
-                c.AnimNo = Value.Run(c).ToI();
+                int animNo = Value.Run(c).ToI();
+                // 目标动画不存在则不切（对齐 Ikemen changeAnimEx：a==nil → 保留当前动画，避免冻结）。
+                if (c.CanChangeAnimTo(animNo))
+                {
+                    c.PrevAnimNo = c.AnimNo;
+                    c.AnimNo = animNo;
+                }
             }
             return false;
         }

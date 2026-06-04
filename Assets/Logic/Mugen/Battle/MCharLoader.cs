@@ -66,6 +66,7 @@ namespace Lockstep.Mugen.Battle
                 Power = 0,
                 PowerMax = data.Constants.Power,
                 Constants = data.Constants,
+                AnimTable = data.Anims,   // 动画存在性守卫 + animexist trigger 用（须在 RunInit 前接好）
                 StateNo = startStateNo,
                 AnimNo = startAnimNo,
                 CommandList = new MCommandList { Commands = data.Commands },

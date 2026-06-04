@@ -121,9 +121,17 @@ namespace Lockstep.View
         void Render()
         {
             MChar c = _engine.Chars[0];
+            _renderer.flipX = c.Facing.Raw < 0;
+
+            // 位置始终更新——即使动画/精灵缺失也绝不冻结角色（曾因切到不存在的动画号 return 致"浮空"）。
+            // 定点 → float 仅在此转换。MUGEN 坐标 Y 向下为正、地面 y=0 → Unity 取负；除 PPU 归一到精灵尺度。
+            float unitX = c.Pos.X.ToFloat() / PixelsPerUnit;
+            float unitY = -c.Pos.Y.ToFloat() / PixelsPerUnit;
+            transform.position = new Vector3(unitX, unitY, 0f);
+
             if (!_data.Anims.TryGetValue(c.AnimNo, out MAnimData anim) || anim.Frames.Length == 0)
             {
-                return;
+                return;   // 仅跳过精灵刷新，位置已更新
             }
             int elem = Mathf.Clamp(c.AnimElem, 0, anim.Frames.Length - 1);
             MAnimFrame frame = anim.Frames[elem];
@@ -134,12 +142,6 @@ namespace Lockstep.View
             {
                 _renderer.sprite = sprite;
             }
-            _renderer.flipX = c.Facing.Raw < 0;
-
-            // 定点 → float 仅在此转换。MUGEN 坐标 Y 向下为正、地面 y=0 → Unity 取负；除 PPU 归一到精灵尺度。
-            float unitX = c.Pos.X.ToFloat() / PixelsPerUnit;
-            float unitY = -c.Pos.Y.ToFloat() / PixelsPerUnit;
-            transform.position = new Vector3(unitX, unitY, 0f);
         }
 
         // 某动画号首次显示时才构建其精灵（懒加载，避免一次性建全角色上千张）。

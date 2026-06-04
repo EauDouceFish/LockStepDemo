@@ -66,6 +66,36 @@ namespace Lockstep.Tests.Mugen
             Assert.That(c.PrevAnimNo, Is.EqualTo(0), "记录前一动画号");
         }
 
+        // 切到不存在的动画号：保留当前动画（对齐 Ikemen changeAnimEx a==nil → return）。
+        // 这是 KFM"跳起浮空"bug 的根因——借用的 common1 切到 KFM 没有的 anim 44，曾把动画运行态冻死。
+        static System.Collections.Generic.Dictionary<int, Lockstep.Mugen.Anim.MAnimData> AnimTableWith(params int[] nos)
+        {
+            System.Collections.Generic.Dictionary<int, Lockstep.Mugen.Anim.MAnimData> table =
+                new System.Collections.Generic.Dictionary<int, Lockstep.Mugen.Anim.MAnimData>();
+            for (int k = 0; k < nos.Length; k++)
+            {
+                table[nos[k]] = new Lockstep.Mugen.Anim.MAnimData { No = nos[k], Frames = new Lockstep.Mugen.Anim.MAnimFrame[1] };
+            }
+            return table;
+        }
+
+        [Test]
+        public void ChangeAnim_ToMissingAnim_IsNoOp_WhenTablePresent()
+        {
+            MChar c = new MChar { AnimNo = 41, AnimTable = AnimTableWith(41, 43) };
+            new ChangeAnimController { Value = E("44") }.Run(c);   // 44 不在表中
+            Assert.That(c.AnimNo, Is.EqualTo(41), "切到不存在的动画应 no-op，保留 41（不冻结）");
+        }
+
+        [Test]
+        public void ChangeAnim_ToExistingAnim_Switches_WhenTablePresent()
+        {
+            MChar c = new MChar { AnimNo = 41, AnimTable = AnimTableWith(41, 43, 44) };
+            new ChangeAnimController { Value = E("44") }.Run(c);
+            Assert.That(c.AnimNo, Is.EqualTo(44), "存在则正常切换");
+            Assert.That(c.PrevAnimNo, Is.EqualTo(41));
+        }
+
         [Test]
         public void CtrlSet_SetsControl()
         {
