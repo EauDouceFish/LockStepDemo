@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
+using Lockstep.Mugen.Hit;
 using Lockstep.Mugen.State;
 
 namespace Lockstep.Mugen.StateCtrl
@@ -29,11 +30,66 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
+    /// <summary>Shared PalFX parameter bag (bytecode.go palFX_time..palFX_hue).</summary>
+    public sealed class PalFXParamSet
+    {
+        public BytecodeExp Time;
+        public BytecodeExp Color;
+        public BytecodeExp[] Add;
+        public BytecodeExp[] Mul;
+        public BytecodeExp[] SinAdd;
+        public BytecodeExp[] SinMul;
+        public BytecodeExp[] SinColor;
+        public BytecodeExp[] SinHue;
+        public BytecodeExp InvertAll;
+        public BytecodeExp InvertBlend;
+        public BytecodeExp Hue;
+    }
+
+    /// <summary>Shared AfterImage parameter bag (bytecode.go afterImage_time..afterImage_ignorehitpause).</summary>
+    public sealed class AfterImageParamSet
+    {
+        public BytecodeExp Time;
+        public BytecodeExp[] Trans;
+        public BytecodeExp Length;
+        public BytecodeExp TimeGap;
+        public BytecodeExp FrameGap;
+        public BytecodeExp PalColor;
+        public BytecodeExp PalHue;
+        public BytecodeExp PalInvertAll;
+        public BytecodeExp PalInvertBlend;
+        public BytecodeExp[] PalBright;
+        public BytecodeExp[] PalContrast;
+        public BytecodeExp[] PalPostBright;
+        public BytecodeExp[] PalAdd;
+        public BytecodeExp[] PalMul;
+        public BytecodeExp IgnoreHitPause;
+    }
+
+    /// <summary>Explod interpolation parameter bag.</summary>
+    public sealed class ExplodInterpolationParamSet
+    {
+        public BytecodeExp Time;
+        public BytecodeExp AnimElem;
+        public BytecodeExp[] Position;
+        public BytecodeExp[] Scale;
+        public BytecodeExp Angle;
+        public BytecodeExp[] Alpha;
+        public BytecodeExp FocalLength;
+        public BytecodeExp XShear;
+        public BytecodeExp[] PalFXMul;
+        public BytecodeExp[] PalFXAdd;
+        public BytecodeExp PalFXColor;
+        public BytecodeExp PalFXHue;
+    }
+
     /// <summary>Pause: parser-ready placeholder until PauseTime/PauseMoveTime fields land on MChar.</summary>
     public sealed class PauseController : ParameterOnlyController
     {
         public BytecodeExp Time;
         public BytecodeExp MoveTime;
+        public BytecodeExp PauseBg;
+        public BytecodeExp EndCmdBufTime;
     }
 
     /// <summary>SuperPause: applies poweradd now; pause timers/p2defmul need MChar fields from Claude batch.</summary>
@@ -41,8 +97,16 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Time;
         public BytecodeExp MoveTime;
+        public BytecodeExp PauseBg;
+        public BytecodeExp EndCmdBufTime;
+        public BytecodeExp Darken;
+        public BytecodeExp Brightness;
+        public BytecodeExp[] Anim;
+        public BytecodeExp[] Position;
         public BytecodeExp PowerAdd;
         public BytecodeExp P2DefMul;
+        public BytecodeExp Unhittable;
+        public BytecodeExp[] Sound;
 
         public override bool Run(MChar character)
         {
@@ -104,6 +168,8 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Slot;
         public BytecodeExp StateNo;
         public BytecodeExp Time;
+        public BytecodeExp GuardFlag;
+        public BytecodeExp GuardFlagNot;
         public BytecodeExp ForceAir;
         public BytecodeExp ForceGuard;
         public BytecodeExp KeepState;
@@ -129,6 +195,10 @@ namespace Lockstep.Mugen.StateCtrl
     public sealed class ReversalDefController : ParameterOnlyController
     {
         public int Attr;
+        public int GuardFlag;
+        public int GuardFlagNot;
+        public MHitDef Template;
+        public PalFXParamSet PalFX = new PalFXParamSet();
     }
 
     /// <summary>VarRandom: var(v)=Rand(min,max), inclusive bounds, using the shared Ikemen RNG.</summary>
@@ -205,39 +275,181 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] Dest;
     }
 
-    public sealed class TransController : ParameterOnlyController { public BytecodeExp[] Trans; }
+    public sealed class TransController : ParameterOnlyController { public BytecodeExp[] Trans; public string TransText; }
     public sealed class SprPriorityController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp LayerNo; }
     public sealed class OffsetController : ParameterOnlyController { public BytecodeExp XOffset; public BytecodeExp YOffset; }
     public sealed class AngleDrawController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; public BytecodeExp[] Scale; }
     public sealed class AngleSetController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
     public sealed class AngleAddController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
     public sealed class AngleMulController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
-    public sealed class AfterImageController : ParameterOnlyController { public BytecodeExp Time; }
+    public sealed class AfterImageController : ParameterOnlyController { public AfterImageParamSet AfterImage = new AfterImageParamSet(); }
     public sealed class AfterImageTimeController : ParameterOnlyController { public BytecodeExp Time; }
-    public sealed class PalFXController : ParameterOnlyController { public BytecodeExp Time; }
-    public sealed class AllPalFXController : ParameterOnlyController { public BytecodeExp Time; }
-    public sealed class BGPalFXController : ParameterOnlyController { public BytecodeExp Time; }
+    public sealed class PalFXController : ParameterOnlyController { public PalFXParamSet PalFX = new PalFXParamSet(); }
+    public sealed class AllPalFXController : ParameterOnlyController { public PalFXParamSet PalFX = new PalFXParamSet(); }
+    public sealed class BGPalFXController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; public PalFXParamSet PalFX = new PalFXParamSet(); }
     public sealed class EnvColorController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp Time; public BytecodeExp Under; }
 
     /// <summary>PlaySnd: logic-layer no-op until R-SND connects audio events.</summary>
-    public sealed class PlaySndController : ParameterOnlyController { }
+    public sealed class PlaySndController : ParameterOnlyController
+    {
+        public BytecodeExp[] Value;
+        public BytecodeExp Channel;
+        public BytecodeExp LowPriority;
+        public BytecodeExp Pan;
+        public BytecodeExp AbsPan;
+        public BytecodeExp Volume;
+        public BytecodeExp VolumeScale;
+        public BytecodeExp FreqMul;
+        public BytecodeExp Loop;
+        public BytecodeExp Priority;
+        public BytecodeExp LoopStart;
+        public BytecodeExp LoopEnd;
+        public BytecodeExp StartPosition;
+        public BytecodeExp LoopCount;
+        public BytecodeExp StopOnGetHit;
+        public BytecodeExp StopOnChangeState;
+    }
 
     /// <summary>StopSnd: logic-layer no-op until R-SND connects audio events.</summary>
-    public sealed class StopSndController : ParameterOnlyController { }
+    public sealed class StopSndController : ParameterOnlyController { public BytecodeExp Channel; }
 
     /// <summary>SndPan: logic-layer no-op until R-SND connects audio events.</summary>
-    public sealed class SndPanController : ParameterOnlyController { }
+    public sealed class SndPanController : ParameterOnlyController { public BytecodeExp Channel; public BytecodeExp Pan; public BytecodeExp AbsPan; }
 
     /// <summary>Explod: logic-layer no-op until R-ENT introduces explod entities.</summary>
-    public sealed class ExplodController : ParameterOnlyController { }
+    public class ExplodController : ParameterOnlyController
+    {
+        public BytecodeExp[] Anim;
+        public BytecodeExp OwnPal;
+        public BytecodeExp[] RemapPal;
+        public BytecodeExp Id;
+        public BytecodeExp Facing;
+        public BytecodeExp VFacing;
+        public BytecodeExp[] Position;
+        public BytecodeExp[] Random;
+        public BytecodeExp PosType;
+        public BytecodeExp[] Velocity;
+        public BytecodeExp[] Friction;
+        public BytecodeExp[] Accel;
+        public BytecodeExp[] Scale;
+        public BytecodeExp BindTime;
+        public BytecodeExp RemoveTime;
+        public BytecodeExp SuperMove;
+        public BytecodeExp SuperMoveTime;
+        public BytecodeExp PauseMoveTime;
+        public BytecodeExp SprPriority;
+        public BytecodeExp LayerNo;
+        public BytecodeExp Under;
+        public BytecodeExp OnTop;
+        public BytecodeExp[] Shadow;
+        public BytecodeExp RemoveOnGetHit;
+        public BytecodeExp RemoveOnChangeState;
+        public BytecodeExp HideWithBars;
+        public BytecodeExp[] Trans;
+        public BytecodeExp AnimElem;
+        public BytecodeExp AnimElemTime;
+        public BytecodeExp AnimFreeze;
+        public BytecodeExp Angle;
+        public BytecodeExp YAngle;
+        public BytecodeExp XAngle;
+        public BytecodeExp XShear;
+        public BytecodeExp Projection;
+        public BytecodeExp FocalLength;
+        public BytecodeExp ExplodIgnoreHitPause;
+        public BytecodeExp BindId;
+        public BytecodeExp Space;
+        public BytecodeExp[] Window;
+        public ExplodInterpolationParamSet Interpolation = new ExplodInterpolationParamSet();
+        public BytecodeExp AnimPlayerNo;
+        public BytecodeExp SpritePlayerNo;
+        public BytecodeExp SyncParams;
+        public BytecodeExp SyncLayer;
+        public BytecodeExp SyncId;
+        public BytecodeExp Shader;
+        public BytecodeExp[] ShaderParam;
+        public AfterImageParamSet AfterImage = new AfterImageParamSet();
+        public PalFXParamSet PalFX = new PalFXParamSet();
+    }
 
-    public sealed class ModifyExplodController : ParameterOnlyController { }
+    public sealed class ModifyExplodController : ExplodController { public BytecodeExp Index; }
     public sealed class RemoveExplodController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; }
-    public sealed class MakeDustController : ParameterOnlyController { }
-    public sealed class GameMakeAnimController : ParameterOnlyController { }
-    public sealed class EnvShakeController : ParameterOnlyController { }
+    public sealed class MakeDustController : ParameterOnlyController { public BytecodeExp Spacing; public BytecodeExp[] Position; public BytecodeExp[] Position2; }
+    public sealed class GameMakeAnimController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp[] Position; public BytecodeExp Under; }
+    public sealed class EnvShakeController : ParameterOnlyController
+    {
+        public BytecodeExp Time;
+        public BytecodeExp Amplitude;
+        public BytecodeExp Frequency;
+        public BytecodeExp Multiplier;
+        public BytecodeExp Phase;
+        public BytecodeExp Direction;
+    }
     public sealed class FallEnvShakeController : ParameterOnlyController { }
-    public sealed class ForceFeedbackController : ParameterOnlyController { }
-    public sealed class DisplayToClipboardController : ParameterOnlyController { }
+    public sealed class ForceFeedbackController : ParameterOnlyController
+    {
+        public BytecodeExp Time;
+        public BytecodeExp Waveform;
+        public BytecodeExp Intensity;
+    }
+    public class DisplayToClipboardController : ParameterOnlyController { public BytecodeExp[] Params; public BytecodeExp Text; }
+    public sealed class AppendToClipboardController : DisplayToClipboardController { }
+    public sealed class ClearClipboardController : ParameterOnlyController { }
     public sealed class VictoryQuoteController : ParameterOnlyController { public BytecodeExp Value; }
+
+    /// <summary>Text controller parameter capture. Logic-layer no-op until text entities exist.</summary>
+    public class TextController : ParameterOnlyController
+    {
+        public BytecodeExp Removetime;
+        public BytecodeExp LayerNo;
+        public BytecodeExp[] Params;
+        public BytecodeExp[] Font;
+        public BytecodeExp[] LocalCoord;
+        public BytecodeExp Bank;
+        public BytecodeExp Align;
+        public BytecodeExp[] TextSpacing;
+        public BytecodeExp TextDelay;
+        public BytecodeExp Text;
+        public BytecodeExp[] Position;
+        public BytecodeExp[] Velocity;
+        public BytecodeExp[] MaxDist;
+        public BytecodeExp[] Friction;
+        public BytecodeExp[] Accel;
+        public BytecodeExp Angle;
+        public BytecodeExp XAngle;
+        public BytecodeExp YAngle;
+        public BytecodeExp Projection;
+        public BytecodeExp FocalLength;
+        public BytecodeExp[] Scale;
+        public BytecodeExp[] Color;
+        public BytecodeExp XShear;
+        public BytecodeExp HideWithBars;
+        public BytecodeExp Id;
+        public PalFXParamSet PalFX = new PalFXParamSet();
+    }
+
+    public sealed class ModifyTextController : TextController { public BytecodeExp Index; }
+    public sealed class RemoveTextController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; }
+
+    public sealed class TagInController : ParameterOnlyController
+    {
+        public BytecodeExp StateNo;
+        public BytecodeExp PartnerStateNo;
+        public BytecodeExp Self;
+        public BytecodeExp Partner;
+        public BytecodeExp Ctrl;
+        public BytecodeExp PartnerCtrl;
+        public BytecodeExp Leader;
+        public BytecodeExp MemberNo;
+    }
+
+    public sealed class TagOutController : ParameterOnlyController
+    {
+        public BytecodeExp Self;
+        public BytecodeExp Partner;
+        public BytecodeExp StateNo;
+        public BytecodeExp PartnerStateNo;
+        public BytecodeExp MemberNo;
+    }
+
+    public sealed class ModifyStageVarController : ParameterOnlyController { }
 }

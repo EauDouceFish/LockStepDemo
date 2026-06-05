@@ -237,14 +237,28 @@ namespace Lockstep.Mugen.Parse
                 case "hitfalldamage": return new HitFallDamageController();
                 case "gravity": return new GravityController();
                 case "pause":
-                    return WithParams(new PauseController { Time = Expr(comp, p, "time"), MoveTime = Expr(comp, p, "movetime") }, p);
+                    return WithParams(new PauseController
+                    {
+                        Time = Expr(comp, p, "time"),
+                        MoveTime = Expr(comp, p, "movetime"),
+                        PauseBg = Expr(comp, p, "pausebg"),
+                        EndCmdBufTime = Expr(comp, p, "endcmdbuftime"),
+                    }, p);
                 case "superpause":
                     return WithParams(new SuperPauseController
                     {
                         Time = Expr(comp, p, "time"),
                         MoveTime = Expr(comp, p, "movetime"),
+                        PauseBg = Expr(comp, p, "pausebg"),
+                        EndCmdBufTime = Expr(comp, p, "endcmdbuftime"),
+                        Darken = Expr(comp, p, "darken"),
+                        Brightness = Expr(comp, p, "brightness"),
+                        Anim = ExprList(comp, p, "anim"),
+                        Position = ExprList(comp, p, "pos"),
                         PowerAdd = Expr(comp, p, "poweradd"),
                         P2DefMul = Expr(comp, p, "p2defmul"),
+                        Unhittable = Expr(comp, p, "unhittable"),
+                        Sound = ExprList(comp, p, "sound"),
                     }, p);
                 case "posfreeze":
                     return WithParams(new PosFreezeController { Value = Expr(comp, p, "value") }, p);
@@ -283,6 +297,8 @@ namespace Lockstep.Mugen.Parse
                         Slot = Expr(comp, p, "slot"),
                         StateNo = Expr(comp, p, "stateno"),
                         Time = Expr(comp, p, "time"),
+                        GuardFlag = Expr(comp, p, "guardflag"),
+                        GuardFlagNot = Expr(comp, p, "guardflag.not"),
                         ForceAir = Expr(comp, p, "forceair"),
                         ForceGuard = Expr(comp, p, "forceguard"),
                         KeepState = Expr(comp, p, "keepstate"),
@@ -292,6 +308,9 @@ namespace Lockstep.Mugen.Parse
                     return WithParams(new ReversalDefController
                     {
                         Attr = p.TryGetValue("attr", out string reversalAttr) ? MugenCodes.Attr(reversalAttr) : 0,
+                        GuardFlag = p.TryGetValue("guardflag", out string reversalGuardFlag) ? ParseHitFlagMask(reversalGuardFlag) : 0,
+                        GuardFlagNot = p.TryGetValue("guardflag.not", out string reversalGuardFlagNot) ? ParseHitFlagMask(reversalGuardFlagNot) : 0,
+                        Template = BuildHitDef(comp, p),
                     }, p);
                 case "varrandom":
                     return new VarRandomController { Index = Expr(comp, p, "v"), Range = ExprList(comp, p, "range") };
@@ -305,7 +324,7 @@ namespace Lockstep.Mugen.Parse
                     };
                 case "remappal":
                     return WithParams(new RemapPalController { Source = ExprList(comp, p, "source"), Dest = ExprList(comp, p, "dest") }, p);
-                case "trans": return WithParams(new TransController(), p);
+                case "trans": return WithParams(new TransController { Trans = ExprList(comp, p, "trans"), TransText = Get(p, "trans") }, p);
                 case "sprpriority":
                     return WithParams(new SprPriorityController { Value = Expr(comp, p, "value"), LayerNo = Expr(comp, p, "layerno") }, p);
                 case "offset":
@@ -324,27 +343,94 @@ namespace Lockstep.Mugen.Parse
                     return WithParams(new AngleAddController { Value = Expr(comp, p, "value"), XAngle = Expr(comp, p, "x"), YAngle = Expr(comp, p, "y") }, p);
                 case "anglemul":
                     return WithParams(new AngleMulController { Value = Expr(comp, p, "value"), XAngle = Expr(comp, p, "x"), YAngle = Expr(comp, p, "y") }, p);
-                case "afterimage": return WithParams(new AfterImageController { Time = Expr(comp, p, "time") }, p);
+                case "afterimage": return WithParams(FillAfterImage(new AfterImageController(), comp, p), p);
                 case "afterimagetime": return WithParams(new AfterImageTimeController { Time = Expr(comp, p, "time") }, p);
-                case "palfx": return WithParams(new PalFXController { Time = Expr(comp, p, "time") }, p);
-                case "allpalfx": return WithParams(new AllPalFXController { Time = Expr(comp, p, "time") }, p);
-                case "bgpalfx": return WithParams(new BGPalFXController { Time = Expr(comp, p, "time") }, p);
+                case "palfx": return WithParams(FillPalFX(new PalFXController(), comp, p), p);
+                case "allpalfx": return WithParams(FillPalFX(new AllPalFXController(), comp, p), p);
+                case "bgpalfx":
+                    return WithParams(FillPalFX(new BGPalFXController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index") }, comp, p), p);
                 case "envcolor":
                     return WithParams(new EnvColorController { Value = ExprList(comp, p, "value"), Time = Expr(comp, p, "time"), Under = Expr(comp, p, "under") }, p);
-                case "playsnd": return WithParams(new PlaySndController(), p);
-                case "stopsnd": return WithParams(new StopSndController(), p);
-                case "sndpan": return WithParams(new SndPanController(), p);
-                case "explod": return WithParams(new ExplodController(), p);
-                case "modifyexplod": return WithParams(new ModifyExplodController(), p);
+                case "playsnd": return WithParams(FillPlaySnd(new PlaySndController(), comp, p), p);
+                case "stopsnd": return WithParams(new StopSndController { Channel = Expr(comp, p, "channel") }, p);
+                case "sndpan":
+                    return WithParams(new SndPanController { Channel = Expr(comp, p, "channel"), Pan = Expr(comp, p, "pan"), AbsPan = Expr(comp, p, "abspan") }, p);
+                case "explod": return WithParams(FillExplod(new ExplodController(), comp, p), p);
+                case "modifyexplod": return WithParams(FillExplod(new ModifyExplodController { Index = Expr(comp, p, "index") }, comp, p), p);
                 case "removeexplod":
                     return WithParams(new RemoveExplodController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index") }, p);
-                case "makedust": return WithParams(new MakeDustController(), p);
-                case "gamemakeanim": return WithParams(new GameMakeAnimController(), p);
-                case "envshake": return WithParams(new EnvShakeController(), p);
+                case "makedust":
+                    return WithParams(new MakeDustController { Spacing = Expr(comp, p, "spacing"), Position = ExprList(comp, p, "pos"), Position2 = ExprList(comp, p, "pos2") }, p);
+                case "gamemakeanim":
+                    return WithParams(new GameMakeAnimController { Value = ExprList(comp, p, "value"), Position = ExprList(comp, p, "pos"), Under = Expr(comp, p, "under") }, p);
+                case "envshake":
+                    return WithParams(new EnvShakeController
+                    {
+                        Time = Expr(comp, p, "time"),
+                        Amplitude = Expr(comp, p, "ampl"),
+                        Frequency = Expr(comp, p, "freq"),
+                        Multiplier = Expr(comp, p, "mul"),
+                        Phase = Expr(comp, p, "phase"),
+                        Direction = Expr(comp, p, "dir"),
+                    }, p);
                 case "fallenvshake": return WithParams(new FallEnvShakeController(), p);
-                case "forcefeedback": return WithParams(new ForceFeedbackController(), p);
-                case "displaytoclipboard": return WithParams(new DisplayToClipboardController(), p);
+                case "forcefeedback":
+                    return WithParams(new ForceFeedbackController { Time = Expr(comp, p, "time"), Waveform = Expr(comp, p, "waveform"), Intensity = Expr(comp, p, "intensity") }, p);
+                case "displaytoclipboard":
+                    return WithParams(new DisplayToClipboardController { Params = ExprList(comp, p, "params"), Text = Expr(comp, p, "text") }, p);
+                case "appendtoclipboard":
+                    return WithParams(new AppendToClipboardController { Params = ExprList(comp, p, "params"), Text = Expr(comp, p, "text") }, p);
+                case "clearclipboard": return WithParams(new ClearClipboardController(), p);
                 case "victoryquote": return WithParams(new VictoryQuoteController { Value = Expr(comp, p, "value") }, p);
+                case "targetstate":
+                    return new TargetStateController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Value = Expr(comp, p, "value") };
+                case "targetlifeadd":
+                    return new TargetLifeAddController
+                    {
+                        Id = Expr(comp, p, "id"),
+                        Index = Expr(comp, p, "index"),
+                        Absolute = Expr(comp, p, "absolute"),
+                        Kill = Expr(comp, p, "kill"),
+                        Dizzy = Expr(comp, p, "dizzy"),
+                        RedLife = Expr(comp, p, "redlife"),
+                        Value = Expr(comp, p, "value"),
+                    };
+                case "targetpoweradd":
+                    return new TargetPowerAddController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Value = Expr(comp, p, "value") };
+                case "targetvelset":
+                    return new TargetVelSetController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
+                case "targetveladd":
+                    return new TargetVelAddController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
+                case "targetfacing":
+                    return new TargetFacingController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Value = Expr(comp, p, "value") };
+                case "targetdrop":
+                    return new TargetDropController { ExcludeId = Expr(comp, p, "excludeid"), KeepOne = Expr(comp, p, "keepone") };
+                case "text": return WithParams(FillText(new TextController(), comp, p), p);
+                case "modifytext": return WithParams(FillText(new ModifyTextController { Index = Expr(comp, p, "index") }, comp, p), p);
+                case "removetext":
+                    return WithParams(new RemoveTextController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index") }, p);
+                case "tagin":
+                    return WithParams(new TagInController
+                    {
+                        StateNo = Expr(comp, p, "stateno"),
+                        PartnerStateNo = Expr(comp, p, "partnerstateno"),
+                        Self = Expr(comp, p, "self"),
+                        Partner = Expr(comp, p, "partner"),
+                        Ctrl = Expr(comp, p, "ctrl"),
+                        PartnerCtrl = Expr(comp, p, "partnerctrl"),
+                        Leader = Expr(comp, p, "leader"),
+                        MemberNo = Expr(comp, p, "memberno"),
+                    }, p);
+                case "tagout":
+                    return WithParams(new TagOutController
+                    {
+                        Self = Expr(comp, p, "self"),
+                        Partner = Expr(comp, p, "partner"),
+                        StateNo = Expr(comp, p, "stateno"),
+                        PartnerStateNo = Expr(comp, p, "partnerstateno"),
+                        MemberNo = Expr(comp, p, "memberno"),
+                    }, p);
+                case "modifystagevar": return WithParams(new ModifyStageVarController(), p);
                 default: return new NullController();   // 未知控制器降级（容错）
             }
         }
@@ -612,9 +698,201 @@ namespace Lockstep.Mugen.Parse
             return values;
         }
 
-        static T WithParams<T>(T controller, Dictionary<string, string> p) where T : ParameterOnlyController
+        static TController WithParams<TController>(TController controller, Dictionary<string, string> p) where TController : ParameterOnlyController
         {
             controller.Parameters = new Dictionary<string, string>(p);
+            return controller;
+        }
+
+        static int ParseHitFlagMask(string text)
+        {
+            MugenCodes.HitFlags(text, out bool high, out bool low, out bool air, out bool down);
+            int mask = 0;
+            if (high) { mask |= 1; }
+            if (low) { mask |= 2; }
+            if (air) { mask |= 4; }
+            if (down) { mask |= 8; }
+            return mask;
+        }
+
+        static PalFXController FillPalFX(PalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            FillPalFXParams(controller.PalFX, comp, p);
+            return controller;
+        }
+
+        static AllPalFXController FillPalFX(AllPalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            FillPalFXParams(controller.PalFX, comp, p);
+            return controller;
+        }
+
+        static BGPalFXController FillPalFX(BGPalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            FillPalFXParams(controller.PalFX, comp, p);
+            return controller;
+        }
+
+        static void FillPalFXParams(PalFXParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            target.Time = Expr(comp, p, "time");
+            target.Color = Expr(comp, p, "color");
+            target.Add = ExprList(comp, p, "add");
+            target.Mul = ExprList(comp, p, "mul");
+            target.SinAdd = ExprList(comp, p, "sinadd");
+            target.SinMul = ExprList(comp, p, "sinmul");
+            target.SinColor = ExprList(comp, p, "sincolor");
+            target.SinHue = ExprList(comp, p, "sinhue");
+            target.InvertAll = Expr(comp, p, "invertall");
+            target.InvertBlend = Expr(comp, p, "invertblend");
+            target.Hue = Expr(comp, p, "hue");
+        }
+
+        static AfterImageController FillAfterImage(AfterImageController controller, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            FillAfterImageParams(controller.AfterImage, comp, p);
+            return controller;
+        }
+
+        static void FillAfterImageParams(AfterImageParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            target.Time = Expr(comp, p, "time");
+            target.Trans = ExprList(comp, p, "trans");
+            target.Length = Expr(comp, p, "length");
+            target.TimeGap = Expr(comp, p, "timegap");
+            target.FrameGap = Expr(comp, p, "framegap");
+            target.PalColor = Expr(comp, p, "palcolor");
+            target.PalHue = Expr(comp, p, "palhue");
+            target.PalInvertAll = Expr(comp, p, "palinvertall");
+            target.PalInvertBlend = Expr(comp, p, "palinvertblend");
+            target.PalBright = ExprList(comp, p, "palbright");
+            target.PalContrast = ExprList(comp, p, "palcontrast");
+            target.PalPostBright = ExprList(comp, p, "palpostbright");
+            target.PalAdd = ExprList(comp, p, "paladd");
+            target.PalMul = ExprList(comp, p, "palmul");
+            target.IgnoreHitPause = Expr(comp, p, "ignorehitpause");
+        }
+
+        static PlaySndController FillPlaySnd(PlaySndController controller, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            controller.Value = ExprList(comp, p, "value");
+            controller.Channel = Expr(comp, p, "channel");
+            controller.LowPriority = Expr(comp, p, "lowpriority");
+            controller.Pan = Expr(comp, p, "pan");
+            controller.AbsPan = Expr(comp, p, "abspan");
+            controller.Volume = Expr(comp, p, "volume");
+            controller.VolumeScale = Expr(comp, p, "volumescale");
+            controller.FreqMul = Expr(comp, p, "freqmul");
+            controller.Loop = Expr(comp, p, "loop");
+            controller.Priority = Expr(comp, p, "priority");
+            controller.LoopStart = Expr(comp, p, "loopstart");
+            controller.LoopEnd = Expr(comp, p, "loopend");
+            controller.StartPosition = Expr(comp, p, "startposition");
+            controller.LoopCount = Expr(comp, p, "loopcount");
+            controller.StopOnGetHit = Expr(comp, p, "stopongethit");
+            controller.StopOnChangeState = Expr(comp, p, "stoponchangestate");
+            return controller;
+        }
+
+        static TController FillExplod<TController>(TController controller, MugenExprCompiler comp, Dictionary<string, string> p) where TController : ExplodController
+        {
+            controller.Anim = ExprList(comp, p, "anim");
+            controller.OwnPal = Expr(comp, p, "ownpal");
+            controller.RemapPal = ExprList(comp, p, "remappal");
+            controller.Id = Expr(comp, p, "id");
+            controller.Facing = Expr(comp, p, "facing");
+            controller.VFacing = Expr(comp, p, "vfacing");
+            controller.Position = ExprList(comp, p, "pos");
+            controller.Random = ExprList(comp, p, "random");
+            controller.PosType = Expr(comp, p, "postype");
+            controller.Velocity = ExprList(comp, p, "vel");
+            controller.Friction = ExprList(comp, p, "friction");
+            controller.Accel = ExprList(comp, p, "accel");
+            controller.Scale = ExprList(comp, p, "scale");
+            controller.BindTime = Expr(comp, p, "bindtime");
+            controller.RemoveTime = Expr(comp, p, "removetime");
+            controller.SuperMove = Expr(comp, p, "supermove");
+            controller.SuperMoveTime = Expr(comp, p, "supermovetime");
+            controller.PauseMoveTime = Expr(comp, p, "pausemovetime");
+            controller.SprPriority = Expr(comp, p, "sprpriority");
+            controller.LayerNo = Expr(comp, p, "layerno");
+            controller.Under = Expr(comp, p, "under");
+            controller.OnTop = Expr(comp, p, "ontop");
+            controller.Shadow = ExprList(comp, p, "shadow");
+            controller.RemoveOnGetHit = Expr(comp, p, "removeongethit");
+            controller.RemoveOnChangeState = Expr(comp, p, "removeonchangestate");
+            controller.HideWithBars = Expr(comp, p, "hidewithbars");
+            controller.Trans = ExprList(comp, p, "trans");
+            controller.AnimElem = Expr(comp, p, "animelem");
+            controller.AnimElemTime = Expr(comp, p, "animelemtime");
+            controller.AnimFreeze = Expr(comp, p, "animfreeze");
+            controller.Angle = Expr(comp, p, "angle");
+            controller.YAngle = Expr(comp, p, "yangle");
+            controller.XAngle = Expr(comp, p, "xangle");
+            controller.XShear = Expr(comp, p, "xshear");
+            controller.Projection = Expr(comp, p, "projection");
+            controller.FocalLength = Expr(comp, p, "focallength");
+            controller.ExplodIgnoreHitPause = Expr(comp, p, "ignorehitpause");
+            controller.BindId = Expr(comp, p, "bindid");
+            controller.Space = Expr(comp, p, "space");
+            controller.Window = ExprList(comp, p, "window");
+            FillExplodInterpolation(controller.Interpolation, comp, p);
+            controller.AnimPlayerNo = Expr(comp, p, "animplayerno");
+            controller.SpritePlayerNo = Expr(comp, p, "spriteplayerno");
+            controller.SyncParams = Expr(comp, p, "syncparams");
+            controller.SyncLayer = Expr(comp, p, "synclayer");
+            controller.SyncId = Expr(comp, p, "syncid");
+            controller.Shader = Expr(comp, p, "shader");
+            controller.ShaderParam = ExprList(comp, p, "shaderparam");
+            FillAfterImageParams(controller.AfterImage, comp, p);
+            FillPalFXParams(controller.PalFX, comp, p);
+            return controller;
+        }
+
+        static void FillExplodInterpolation(ExplodInterpolationParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            target.Time = Expr(comp, p, "interpolation.time");
+            target.AnimElem = Expr(comp, p, "interpolation.animelem");
+            target.Position = ExprList(comp, p, "interpolation.pos");
+            target.Scale = ExprList(comp, p, "interpolation.scale");
+            target.Angle = Expr(comp, p, "interpolation.angle");
+            target.Alpha = ExprList(comp, p, "interpolation.alpha");
+            target.FocalLength = Expr(comp, p, "interpolation.focallength");
+            target.XShear = Expr(comp, p, "interpolation.xshear");
+            target.PalFXMul = ExprList(comp, p, "interpolation.pfx.mul");
+            target.PalFXAdd = ExprList(comp, p, "interpolation.pfx.add");
+            target.PalFXColor = Expr(comp, p, "interpolation.pfx.color");
+            target.PalFXHue = Expr(comp, p, "interpolation.pfx.hue");
+        }
+
+        static TController FillText<TController>(TController controller, MugenExprCompiler comp, Dictionary<string, string> p) where TController : TextController
+        {
+            controller.Removetime = Expr(comp, p, "removetime");
+            controller.LayerNo = Expr(comp, p, "layerno");
+            controller.Params = ExprList(comp, p, "params");
+            controller.Font = ExprList(comp, p, "font");
+            controller.LocalCoord = ExprList(comp, p, "localcoord");
+            controller.Bank = Expr(comp, p, "bank");
+            controller.Align = Expr(comp, p, "align");
+            controller.TextSpacing = ExprList(comp, p, "textspacing");
+            controller.TextDelay = Expr(comp, p, "textdelay");
+            controller.Text = Expr(comp, p, "text");
+            controller.Position = ExprList(comp, p, "pos");
+            controller.Velocity = ExprList(comp, p, "velocity");
+            controller.MaxDist = ExprList(comp, p, "maxdist");
+            controller.Friction = ExprList(comp, p, "friction");
+            controller.Accel = ExprList(comp, p, "accel");
+            controller.Angle = Expr(comp, p, "angle");
+            controller.XAngle = Expr(comp, p, "xangle");
+            controller.YAngle = Expr(comp, p, "yangle");
+            controller.Projection = Expr(comp, p, "projection");
+            controller.FocalLength = Expr(comp, p, "focallength");
+            controller.Scale = ExprList(comp, p, "scale");
+            controller.Color = ExprList(comp, p, "color");
+            controller.XShear = Expr(comp, p, "xshear");
+            controller.HideWithBars = Expr(comp, p, "hidewithbars");
+            controller.Id = Expr(comp, p, "id");
+            FillPalFXParams(controller.PalFX, comp, p);
             return controller;
         }
 
