@@ -301,6 +301,18 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            if (name == "partner" && (IsOp("(") || IsOp(",")))
+            {
+                EmitIndexedRedirect(name);
+                return;
+            }
+
+            if ((name == "helper" || name == "target") && (IsOp("(") || IsOp(",")))
+            {
+                EmitTwoArgRedirect(name);
+                return;
+            }
+
             // R-ENT entity count predicates must run before function parsing,
             // otherwise numhelper(5) is consumed as an unknown function.
             if (name == "numhelper" || name == "numproj" || name == "numexplod" || name == "ishelper")
@@ -710,6 +722,74 @@ namespace Lockstep.Mugen.Expr
             List<byte> outer = _out;
             _out = new List<byte>();
             ParseUnary();           // 重定向后的单值
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;
+            _out.Add((byte)op);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
+        }
+
+        void EmitIndexedRedirect(string name)
+        {
+            if (IsOp("("))
+            {
+                Next();
+                ParseBoolOr();
+                Expect(")");
+            }
+            else
+            {
+                EmitInt(0);
+            }
+            Expect(",");
+
+            OpCode op = name == "partner" ? OpCode.OC_partner : OpCode.OC_enemy;
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            ParseUnary();
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;
+            _out.Add((byte)op);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
+        }
+
+        void EmitTwoArgRedirect(string name)
+        {
+            if (IsOp("("))
+            {
+                Next();
+                ParseBoolOr();
+                if (IsOp(","))
+                {
+                    Next();
+                    ParseBoolOr();
+                }
+                else
+                {
+                    EmitInt(0);
+                }
+                Expect(")");
+            }
+            else
+            {
+                EmitInt(-1);
+                EmitInt(0);
+            }
+            Expect(",");
+
+            OpCode op = name == "target" ? OpCode.OC_target : OpCode.OC_helper;
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            ParseUnary();
             List<byte> sub = _out;
             _out = outer;
 

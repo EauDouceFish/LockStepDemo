@@ -227,6 +227,7 @@ namespace Lockstep.Mugen.Char
         public MChar Root;                   // 根角色（非 helper 时通常 = 自身）
         public MChar StateOwner;             // 自定义状态归属（投技 p2getp1state）：非 null 时本角色跑该角色的状态表；SelfState 复位
         public MChar Parent;                 // 父角色（helper 的创建者；root 为 null）
+        public MChar Partner;                // 同队 partner；v1 无组队时为空，partner redirect 用
         public List<MChar> Targets = new List<MChar>();   // 本角色 HitDef 命中的目标
 
         public bool Alive => Life > 0;
@@ -474,7 +475,7 @@ namespace Lockstep.Mugen.Char
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
                 // redirect 链接是结构性引用：浅拷引用本身（指向旧图），由 World 在快照后统一重链到克隆图，
                 // 避免在此深拷造成无限递归。Targets 列表新建容器但元素仍为旧引用，同样待重链。
-                P2 = P2, Root = Root, Parent = Parent, StateOwner = StateOwner,
+                P2 = P2, Root = Root, Parent = Parent, Partner = Partner, StateOwner = StateOwner,
                 Targets = new List<MChar>(Targets),
             };
             return c;
@@ -520,6 +521,7 @@ namespace Lockstep.Mugen.Char
             HashFloatVars(ref hash, FloatVars);
             // redirect 链接不递归哈希（被引 Char 各自 WriteHash）；混入 target id + 自定义状态归属 id（影响跑哪张状态表）
             hash.AddInt32(StateOwner != null ? StateOwner.Id : -1);
+            hash.AddInt32(Partner != null ? Partner.Id : -1);
             hash.AddInt32(Targets.Count);
             for (int t = 0; t < Targets.Count; t++)
             {
@@ -811,9 +813,53 @@ namespace Lockstep.Mugen.Char
                     }
                     return null;
                 }
+                case OpCode.OC_helper:
+                {
+                    int matchIndex = Pop(stack).ToI();
+                    int helperType = Pop(stack).ToI();
+                    return FindHelperRedirect(helperType, matchIndex);
+                }
+                case OpCode.OC_partner:
+                {
+                    int index = Pop(stack).ToI();
+                    return index == 0 ? Partner : null;
+                }
                 default:
                     return null;   // 其余 redirect（helper/enemy/partner/...）后续补
             }
+        }
+
+        IExprContext FindHelperRedirect(int helperType, int matchIndex)
+        {
+            if (matchIndex < 0 || World == null)
+            {
+                return null;
+            }
+            MChar root = Root ?? this;
+            int seen = 0;
+            for (int index = 0; index < World.Helpers.Count; index++)
+            {
+                MChar helper = World.Helpers[index];
+                if (helper == null || helper.Destroyed)
+                {
+                    continue;
+                }
+                MChar helperRoot = helper.Root ?? helper;
+                if (!ReferenceEquals(helperRoot, root))
+                {
+                    continue;
+                }
+                if (helperType > 0 && helper.HelperType != helperType)
+                {
+                    continue;
+                }
+                if (seen == matchIndex)
+                {
+                    return helper;
+                }
+                seen++;
+            }
+            return null;
         }
 
         static BytecodeValue Pop(List<BytecodeValue> stack)
