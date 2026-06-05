@@ -42,7 +42,7 @@ namespace Lockstep.Mugen.Expr
         OC_camerapos_x, OC_camerapos_y, OC_camerazoom,
         OC_gamewidth, OC_gameheight, OC_screenwidth, OC_screenheight,
         OC_stateno, OC_prevstateno, OC_id, OC_playeridexist, OC_gametime,
-        OC_numtarget, OC_numenemy, OC_numpartner, OC_ailevel, OC_palno,
+        OC_numtarget, OC_jugglepoints, OC_numenemy, OC_numpartner, OC_ailevel, OC_palno,
         OC_hitcount, OC_uniqhitcount, OC_hitpausetime,
         OC_hitover, OC_hitshakeover, OC_hitfall,
         OC_hitvel_x, OC_hitvel_y, OC_hitvel_z,

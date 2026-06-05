@@ -72,17 +72,50 @@ namespace Lockstep.Mugen.Anim
         /// <summary>把角色切到指定动画并复位运行态（不推进）。供加载初始化或显式置帧用。</summary>
         public static void Play(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table)
         {
+            PlayAt(c, animNo, table, 0, 0);
+        }
+
+        /// <summary>切到指定动画的指定元素/元素时间，并立即刷新 AnimTime/AnimElem/Clsn（不推进）。</summary>
+        public static void PlayAt(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table, int elem, int elemTime)
+        {
             c.PrevAnimNo = c.AnimNo;
             c.AnimNo = animNo;
             if (table != null && table.TryGetValue(animNo, out MAnimData a) && a != null && a.Frames != null && a.Frames.Length > 0)
             {
-                Reinit(c, a);
+                c.AnimRunningNo = animNo;
+                c.AnimElem = Clamp(elem, 0, a.Frames.Length - 1);
+                c.AnimElemTime = elemTime < 0 ? 0 : elemTime;
+                c.AnimCurTime = SumTimeBefore(a, c.AnimElem) + c.AnimElemTime;
+                c.AnimLoopEnd = false;
                 DeriveAndPopulate(c, a);
             }
             else
             {
                 c.AnimRunningNo = animNo;
             }
+        }
+
+        static int SumTimeBefore(MAnimData anim, int elem)
+        {
+            int time = 0;
+            for (int i = 0; i < elem && i < anim.Frames.Length; i++)
+            {
+                int frameTime = anim.Frames[i].Time;
+                if (frameTime > 0)
+                {
+                    time += frameTime;
+                }
+            }
+            return time;
+        }
+
+        static int Clamp(int value, int min, int max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+            return value > max ? max : value;
         }
 
         // 元素前进（移植 Ikemen Action 内 next 闭包）：跳过 0 时长帧；永久动画停在末元素。
@@ -128,6 +161,12 @@ namespace Lockstep.Mugen.Anim
             c.AnimElemNo = elem + 1;                 // 1-based（对齐 Ikemen AnimElemNo 简单情形）
             c.AnimTime = c.AnimCurTime - a.TotalTime;   // 惯例 ≤0（末帧到时为 0）
             MAnimFrame frame = a.Frames[elem];
+            if (frame == null)
+            {
+                c.Clsn1 = null;
+                c.Clsn2 = null;
+                return;
+            }
             c.Clsn1 = frame.Clsn1;
             c.Clsn2 = frame.Clsn2;
         }

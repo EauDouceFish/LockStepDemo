@@ -5,6 +5,7 @@
 // See Docs/移植方案_Ikemen.md.
 using Lockstep.Core;
 using Lockstep.Math;
+using System.Collections.Generic;
 
 namespace Lockstep.Mugen.Char
 {
@@ -14,6 +15,12 @@ namespace Lockstep.Mugen.Char
     /// </summary>
     public sealed class MGetHitVar
     {
+        public struct MJugglePoint
+        {
+            public int PlayerId;
+            public int Points;
+        }
+
         // 击退速度
         public FFloat XVel;
         public FFloat YVel;
@@ -51,10 +58,36 @@ namespace Lockstep.Mugen.Char
         public int DownRecoverTime;  // 倒地起身计时（5110 读，逐帧递减）
         public int FallDamage;       // gethitvar(fall.damage)：落地时受到的伤害（HitFallDamage 控制器应用，char.go:9109）
         public bool FallKill = true; // fall.damage 是否可致死（HitDef fall.kill）
+        public List<MJugglePoint> JugglePoints = new List<MJugglePoint>(); // Ikemen ghv.targetedBy: attacker id + remaining juggle points.
+
+        public int GetJuggle(int playerId, int defaultJuggle)
+        {
+            for (int i = 0; i < JugglePoints.Count; i++)
+            {
+                if (JugglePoints[i].PlayerId == playerId)
+                {
+                    return JugglePoints[i].Points;
+                }
+            }
+            return defaultJuggle;
+        }
+
+        public void SetJuggle(int playerId, int points)
+        {
+            for (int i = 0; i < JugglePoints.Count; i++)
+            {
+                if (JugglePoints[i].PlayerId == playerId)
+                {
+                    JugglePoints[i] = new MJugglePoint { PlayerId = playerId, Points = points };
+                    return;
+                }
+            }
+            JugglePoints.Add(new MJugglePoint { PlayerId = playerId, Points = points });
+        }
 
         public MGetHitVar Clone()
         {
-            return new MGetHitVar
+            MGetHitVar clone = new MGetHitVar
             {
                 XVel = XVel, YVel = YVel, ZVel = ZVel,
                 HitShakeTime = HitShakeTime, HitTime = HitTime, SlideTime = SlideTime,
@@ -66,6 +99,8 @@ namespace Lockstep.Mugen.Char
                 FallRecover = FallRecover, FallRecoverTime = FallRecoverTime, DownRecoverTime = DownRecoverTime,
                 FallDamage = FallDamage, FallKill = FallKill,
             };
+            clone.JugglePoints.AddRange(JugglePoints);
+            return clone;
         }
 
         public void WriteHash(ref Hash64 hash)
@@ -80,6 +115,12 @@ namespace Lockstep.Mugen.Char
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(DownRecoverTime);
             hash.AddInt32(FallDamage); hash.AddBool(FallKill);
+            hash.AddInt32(JugglePoints.Count);
+            for (int i = 0; i < JugglePoints.Count; i++)
+            {
+                hash.AddInt32(JugglePoints[i].PlayerId);
+                hash.AddInt32(JugglePoints[i].Points);
+            }
         }
     }
 }

@@ -44,13 +44,18 @@ namespace Lockstep.Mugen.Hit
             {
                 return false;
             }
-            if (defender.Guarding && GuardFlagAllows(hd, defender.StateType))
+            bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
+            if (!guarded && !CanJuggle(attacker, defender, hd, false))
+            {
+                return false;
+            }
+            if (guarded)
             {
                 ApplyGuard(attacker, defender, hd, deferDamage);
             }
             else
             {
-                ApplyHit(attacker, defender, hd, deferDamage);
+                ApplyHit(attacker, defender, hd, deferDamage, false);
             }
             return true;
         }
@@ -86,6 +91,10 @@ namespace Lockstep.Mugen.Hit
             }
             proj.ContactCount++;
             bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
+            if (!guarded && !CanJuggle(proj.Owner, defender, hd, true))
+            {
+                return false;
+            }
             if (proj.Owner != null)
             {
                 proj.Owner.RecordProjectileContact(proj.ProjId, guarded);
@@ -96,7 +105,7 @@ namespace Lockstep.Mugen.Hit
             }
             else
             {
-                ApplyHit(proj.Owner, defender, hd, deferDamage);
+                ApplyHit(proj.Owner, defender, hd, deferDamage, true);
                 proj.HitCount++;
             }
             return true;
@@ -164,6 +173,34 @@ namespace Lockstep.Mugen.Hit
             }
         }
 
+        static bool CanJuggle(MChar attacker, MChar defender, MHitDef hd, bool projectile)
+        {
+            if (!NeedsJuggleCheck(defender))
+            {
+                return true;
+            }
+            if ((attacker.AssertFlags & (int)MAssertFlag.NoJuggleCheck) != 0)
+            {
+                return true;
+            }
+            int cost = projectile ? hd.AirJuggle : attacker.Juggle;
+            if (cost <= 0)
+            {
+                return true;
+            }
+            return cost <= defender.Ghv.GetJuggle(attacker.Id, AirJuggleMax(attacker));
+        }
+
+        static bool NeedsJuggleCheck(MChar defender)
+        {
+            return defender.StateType == 4 || defender.StateType == 8 || defender.Ghv.Fall;
+        }
+
+        static int AirJuggleMax(MChar character)
+        {
+            return character.Constants != null ? character.Constants.Airjuggle : 15;
+        }
+
         // 命中结算（移植 Ikemen char.go getHitVarSet + 受击状态路由 char.go:12195-12259）。
         //
         // R-DMG-PIPELINE：
@@ -171,10 +208,11 @@ namespace Lockstep.Mugen.Hit
         //   再在防守方自身 update 循环里「一次性应用」(char.go:11743 lifeAdd(-ghv.damage, kill, absolute=true))。
         //   本引擎在 battle 路径传 deferDamage=true，累计 PendingLifeDamage，帧内 hit/projectile 全部结算后统一扣血。
         //   直接调用 MHitSystem 的既有单测默认即时应用，保持旧行为；KO 排序细节后续由 R-ORACLE trace 精确化。
-        static void ApplyHit(MChar attacker, MChar defender, MHitDef hd, bool deferDamage)
+        static void ApplyHit(MChar attacker, MChar defender, MHitDef hd, bool deferDamage, bool projectile)
         {
             int stateType = defender.StateType;
             bool isAir = stateType == 4;
+            bool wasFalling = defender.Ghv.Fall;
 
             // 守方先进受击态 H（受击当帧成立）：使 DefenceMulSet onHit 的 customDefense 对本次命中即生效
             // （对齐 char.go finalDefense 在 movetype==MT_H 下取 customDefense）。
@@ -249,6 +287,7 @@ namespace Lockstep.Mugen.Hit
             ghv.FallDamage = hd.FallDamage;   // 落地伤害（HitFallDamage 控制器读取，char.go:10842）
             ghv.FallKill = hd.FallKill;
             ghv.Fall = hd.Fall || isAir;
+            UpdateJuggleAfterHit(attacker, defender, hd, projectile, wasFalling || ghv.Fall);
             ghv.Guarded = false;
             ghv.HitCount++;
             defender.FallTime = 0;
@@ -286,6 +325,24 @@ namespace Lockstep.Mugen.Hit
             if (hd.P1StateNo >= 0)
             {
                 attacker.PendingStateNo = hd.P1StateNo;
+            }
+        }
+
+        static void UpdateJuggleAfterHit(MChar attacker, MChar defender, MHitDef hd, bool projectile, bool falling)
+        {
+            if (!falling)
+            {
+                return;
+            }
+            if ((attacker.AssertFlags & (int)MAssertFlag.NoJuggleCheck) == 0)
+            {
+                int cost = projectile ? hd.AirJuggle : attacker.Juggle;
+                int remaining = defender.Ghv.GetJuggle(attacker.Id, AirJuggleMax(attacker));
+                defender.Ghv.SetJuggle(attacker.Id, remaining - cost);
+            }
+            if (!projectile)
+            {
+                attacker.Juggle = 0;
             }
         }
 

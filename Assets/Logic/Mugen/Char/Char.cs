@@ -689,6 +689,11 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(AnimElemNo == n && AnimElemTime == 0);
                 }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
+                case OpCode.OC_jugglepoints:
+                {
+                    int targetId = Pop(stack).ToI();
+                    return BytecodeValue.Int(JugglePoints(targetId));
+                }
                 case OpCode.OC_ishelper:
                 {
                     // 弹 id：-1=无参(只判是否 helper)；否则 IsHelper 且 HelperType==id。
@@ -791,6 +796,20 @@ namespace Lockstep.Mugen.Char
                 default:
                     return BytecodeValue.Undefined();   // 尚未接入的 trigger（增量补全）
             }
+        }
+
+        int JugglePoints(int targetId)
+        {
+            int max = Constants != null ? Constants.Airjuggle : 15;
+            for (int i = 0; i < Targets.Count; i++)
+            {
+                MChar target = Targets[i];
+                if (target != null && target.Id == targetId)
+                {
+                    return target.Ghv.GetJuggle(Id, max);
+                }
+            }
+            return max;
         }
 
         // gethitvar 字段 id → Ghv 值（id 见 MugenExprCompiler.GetHitVarFieldId）。

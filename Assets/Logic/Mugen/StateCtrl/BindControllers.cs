@@ -199,21 +199,13 @@ namespace Lockstep.Mugen.StateCtrl
             {
                 return false;
             }
-            character.PrevAnimNo = character.AnimNo;
-            character.AnimNo = animNo;
             if (sourceTable != null)
             {
                 character.AnimTable = sourceTable;
             }
-            if (Elem != null)
-            {
-                character.AnimElem = System.Math.Max(0, Elem.Run(character).ToI() - 1);
-                character.AnimElemNo = character.AnimElem + 1;
-            }
-            if (ElemTime != null)
-            {
-                character.AnimElemTime = ElemTime.Run(character).ToI();
-            }
+            int elem = Elem != null ? Elem.Run(character).ToI() - 1 : 0;
+            int elemTime = ElemTime != null ? ElemTime.Run(character).ToI() : 0;
+            MAnimSystem.PlayAt(character, animNo, sourceTable, elem, elemTime);
             return false;
         }
     }

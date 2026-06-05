@@ -4,6 +4,7 @@
 // Adapted to fixed-point. 朝向语义照搬 Ikemen：PosAdd X 乘 facing、PosSet 绝对、VelSet 存原始值(facing 积分时应用)。
 // See Docs/移植方案_Ikemen.md.
 using Lockstep.Math;
+using Lockstep.Mugen.Anim;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.State;
@@ -92,8 +93,7 @@ namespace Lockstep.Mugen.StateCtrl
                 // 目标动画不存在则不切（对齐 Ikemen changeAnimEx：a==nil → 保留当前动画，避免冻结）。
                 if (c.CanChangeAnimTo(animNo))
                 {
-                    c.PrevAnimNo = c.AnimNo;
-                    c.AnimNo = animNo;
+                    MAnimSystem.Play(c, animNo, c.AnimTable);
                 }
             }
             return false;

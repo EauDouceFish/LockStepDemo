@@ -598,6 +598,7 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall.recover", out string frc)) { hd.FallRecover = EvalI(comp, frc) != 0; }
             if (p.TryGetValue("fall.recovertime", out string frt)) { hd.FallRecoverTime = EvalI(comp, frt); }
             if (p.TryGetValue("fall.damage", out string fdmg)) { hd.FallDamage = EvalI(comp, fdmg); }
+            if (p.TryGetValue("air.juggle", out string aj)) { hd.AirJuggle = EvalI(comp, aj); }
 
             // 击打倒地分支：down.velocity 默认随 air.velocity（char.go:892-894）；down.hittime 默认 20；down.bounce 默认 0。
             hd.DownVelX = hd.AirVelX;

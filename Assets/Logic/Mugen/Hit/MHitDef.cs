@@ -150,6 +150,7 @@ namespace Lockstep.Mugen.Hit
         public bool FallRecover = true;     // fall.recover 默认 1
         public int FallRecoverTime = 4;     // fall.recovertime 默认 4
         public int FallDamage;              // fall.damage：受击方落地时受到的伤害（默认 0，char.go:9109）
+        public int AirJuggle;               // air.juggle：弹幕/Ikemen 扩展用空中连段点消耗，默认 0（char.go:997）。
 
         // 击打倒地对手（受击方 statetype=L）分支（char.go:10859-10871）
         public FFloat DownVelX, DownVelY;   // down.velocity（默认随 air.velocity，char.go:892-894）
@@ -189,7 +190,7 @@ namespace Lockstep.Mugen.Hit
             hash.AddInt32((int)GroundType); hash.AddInt32((int)AirType);
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddBool(P2GetP1State); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
-            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage);
+            hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage); hash.AddInt32(AirJuggle);
             hash.AddFixed(DownVelX); hash.AddFixed(DownVelY); hash.AddInt32(DownHitTime); hash.AddBool(DownBounce);
             hash.AddBool(Kill); hash.AddBool(GuardKill); hash.AddBool(FallKill); hash.AddBool(ForceStand);
             hash.AddInt32(HitGetPower); hash.AddInt32(HitGivePower);

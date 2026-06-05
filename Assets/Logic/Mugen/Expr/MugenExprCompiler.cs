@@ -440,6 +440,13 @@ namespace Lockstep.Mugen.Expr
                 _out.Add((byte)GetHitVarFieldId(field));
                 return;
             }
+            if (name == "jugglepoints")
+            {
+                ParseBoolOr();
+                Expect(")");
+                Emit(OpCode.OC_jugglepoints);
+                return;
+            }
             // var(n) / fvar(n)：压 index 再发 opcode
             if (name == "var" || name == "fvar" || name == "sysvar" || name == "sysfvar")
             {
