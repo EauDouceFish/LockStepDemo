@@ -88,6 +88,36 @@ namespace Lockstep.Mugen.Battle
                 _helperData.Add(ownerData);
             }
             World.SpawnQueue.Clear();
+
+            for (int q = 0; q < World.ProjSpawnQueue.Count; q++)
+            {
+                MProjectileRequest req = World.ProjSpawnQueue[q];
+                int facingSign = req.Owner.Facing.Raw >= 0 ? 1 : -1;
+                World.Projectiles.Add(new MProjectile
+                {
+                    Id = World.AllocId(), OwnerId = req.Owner.Id, ProjId = req.ProjId,
+                    Facing = FFloat.FromInt(facingSign),
+                    Vel = new FVector3(req.VelX, req.VelY, FFloat.Zero),
+                    Accel = new FVector3(req.AccelX, req.AccelY, FFloat.Zero),
+                    Pos = new FVector3(req.Owner.Pos.X + req.PosX * FFloat.FromInt(facingSign),
+                        req.Owner.Pos.Y + req.PosY, FFloat.Zero),
+                    RemoveTime = req.RemoveTime, AnimNo = req.AnimNo,
+                });
+            }
+            World.ProjSpawnQueue.Clear();
+        }
+
+        // 推进所有弹幕实体（运动 + 生命周期）+ 移除（命中归切片 3b）。
+        void StepProjectiles()
+        {
+            for (int i = 0; i < World.Projectiles.Count; i++)
+            {
+                if (!World.Projectiles[i].Removed) { World.Projectiles[i].Step(); }
+            }
+            for (int i = World.Projectiles.Count - 1; i >= 0; i--)
+            {
+                if (World.Projectiles[i].Removed) { World.Projectiles.RemoveAt(i); }
+            }
         }
 
         // 移除 DestroySelf 标记的 helper（帧末）。
@@ -185,8 +215,9 @@ namespace Lockstep.Mugen.Battle
                 if (!Helpers[i].PauseBool) { MAnimSystem.Action(Helpers[i], _helperData[i].Anims); }
             }
 
-            // 5b) 排空 spawn 队列（本帧状态机里 Helper 控制器请求的实体，下帧起跑）。
+            // 5b) 排空 spawn 队列（本帧状态机里 Helper/Projectile 控制器请求的实体，下帧起跑）+ 推进现有弹幕。
             DrainSpawns();
+            if (!anyPause) { StepProjectiles(); }
 
             // 6) 命中（1v1 玩家双向；helper 命中归后续切片）。暂停期间不结算。
             if (Chars.Count == 2 && !anyPause)
@@ -224,6 +255,11 @@ namespace Lockstep.Mugen.Battle
             for (int i = 0; i < Helpers.Count; i++)
             {
                 Helpers[i].WriteHash(ref hash);
+            }
+            hash.AddInt32(World.Projectiles.Count);   // 弹幕实体
+            for (int i = 0; i < World.Projectiles.Count; i++)
+            {
+                World.Projectiles[i].WriteHash(ref hash);
             }
             hash.AddInt32(Random.Seed);   // 共享随机源种子：模拟状态，全场混入一次（不在 per-char 哈希以免重复计数）
             PauseState.WriteHash(ref hash);   // 共享全局暂停态：同理全场混入一次

@@ -198,6 +198,24 @@ namespace Lockstep.Mugen.Parse
                     };
                 }
                 case "destroyself": return new DestroySelfController();
+                case "projectile":
+                {
+                    BytecodeExp[] vel = ExprList(comp, p, "velocity");
+                    BytecodeExp[] accel = ExprList(comp, p, "accel");
+                    BytecodeExp[] off = ExprList(comp, p, "offset");
+                    return new ProjectileController
+                    {
+                        ProjId = Expr(comp, p, "projid"),
+                        VelX = vel != null && vel.Length > 0 ? vel[0] : null,
+                        VelY = vel != null && vel.Length > 1 ? vel[1] : null,
+                        AccelX = accel != null && accel.Length > 0 ? accel[0] : null,
+                        AccelY = accel != null && accel.Length > 1 ? accel[1] : null,
+                        PosX = off != null && off.Length > 0 ? off[0] : null,
+                        PosY = off != null && off.Length > 1 ? off[1] : null,
+                        RemoveTime = Expr(comp, p, "projremovetime"),
+                        ProjAnim = Expr(comp, p, "projanim"),
+                    };
+                }
                 case "changestate":
                     return new ChangeStateController { Value = Expr(comp, p, "value"), Ctrl = IntP(p, "ctrl", -1), Anim = IntP(p, "anim", -1) };
                 case "selfstate":

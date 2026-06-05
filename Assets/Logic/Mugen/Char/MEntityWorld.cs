@@ -21,6 +21,16 @@ namespace Lockstep.Mugen.Char
         public bool KeyCtrl;    // 是否受键控（多数 helper 否）
     }
 
+    /// <summary>projectile spawn 请求（Projectile 控制器入队，引擎 DrainSpawns 时造弹幕实体）。</summary>
+    public struct MProjectileRequest
+    {
+        public MChar Owner;
+        public int ProjId;
+        public FFloat VelX, VelY, AccelX, AccelY, PosX, PosY;
+        public int RemoveTime;
+        public int AnimNo;
+    }
+
     /// <summary>
     /// 实体世界（共享）：helper/projectile/explod 的 spawn 队列 + 确定性实体 id 计数。引擎持单例、各角色共享引用。
     /// 实体列表本身存在引擎（MBattleEngine.Helpers）；本对象只承载"跨控制器→引擎"的请求通道 + id 分配。
@@ -28,9 +38,13 @@ namespace Lockstep.Mugen.Char
     public sealed class MEntityWorld
     {
         public readonly List<MHelperRequest> SpawnQueue = new List<MHelperRequest>();
+        public readonly List<MProjectileRequest> ProjSpawnQueue = new List<MProjectileRequest>();
 
         // 当前存活 helper 实体（引擎维护；char 经共享 World 数 numhelper/ishelper）。与引擎 _helperData 平行。
         public readonly List<MChar> Helpers = new List<MChar>();
+
+        // 当前存活弹幕实体（char 经共享 World 数 numproj/projcontact/projhit）。
+        public readonly List<MProjectile> Projectiles = new List<MProjectile>();
 
         // 实体 id 分配（确定性递增，模拟状态 → 入哈希）。玩家用 0/1，helper/proj/explod 从此起。
         public int NextEntityId = 1000;
@@ -45,6 +59,11 @@ namespace Lockstep.Mugen.Char
             SpawnQueue.Add(request);
         }
 
+        public void RequestProjectile(MProjectileRequest request)
+        {
+            ProjSpawnQueue.Add(request);
+        }
+
         /// <summary>helper 计数（numhelper trigger）。helperType&lt;0 表全部，否则按 type 计。</summary>
         public int CountHelpers(int helperType)
         {
@@ -53,6 +72,18 @@ namespace Lockstep.Mugen.Char
             for (int i = 0; i < Helpers.Count; i++)
             {
                 if (Helpers[i].HelperType == helperType) { n++; }
+            }
+            return n;
+        }
+
+        /// <summary>弹幕计数（numproj trigger）。projId&lt;0 表全部，否则按 ProjId 计。</summary>
+        public int CountProjectiles(int projId)
+        {
+            if (projId < 0) { return Projectiles.Count; }
+            int n = 0;
+            for (int i = 0; i < Projectiles.Count; i++)
+            {
+                if (Projectiles[i].ProjId == projId) { n++; }
             }
             return n;
         }

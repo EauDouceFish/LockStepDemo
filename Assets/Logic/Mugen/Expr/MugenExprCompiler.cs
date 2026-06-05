@@ -741,8 +741,9 @@ namespace Lockstep.Mugen.Expr
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
             ["numtarget"] = OpCode.OC_numtarget, ["roundstate"] = OpCode.OC_roundstate,
             ["inguarddist"] = OpCode.OC_inguarddist,
-            // R-ENT：无参形（ishelper(id)/numhelper(id) 参数形归后续切片）。
+            // R-ENT：无参形（ishelper(id)/numhelper(id)/numproj(id) 参数形归后续切片）。
             ["ishelper"] = OpCode.OC_ishelper, ["numhelper"] = OpCode.OC_numhelper,
+            ["numproj"] = OpCode.OC_numproj,
             // 受击触发器（common1 5000-5160 用）
             ["hitshakeover"] = OpCode.OC_hitshakeover, ["hitover"] = OpCode.OC_hitover,
             ["hitfall"] = OpCode.OC_hitfall, ["canrecover"] = OpCode.OC_canrecover,

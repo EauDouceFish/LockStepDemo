@@ -165,6 +165,19 @@ namespace Lockstep.Mugen.Char
             });
         }
 
+        /// <summary>请求发射一个弹幕（移植 Projectile 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
+        public void RequestProjectile(int projId, FFloat velX, FFloat velY, FFloat accelX, FFloat accelY,
+            FFloat posX, FFloat posY, int removeTime, int animNo)
+        {
+            if (World == null) { return; }
+            World.RequestProjectile(new MProjectileRequest
+            {
+                Owner = this, ProjId = projId, VelX = velX, VelY = velY,
+                AccelX = accelX, AccelY = accelY, PosX = posX, PosY = posY,
+                RemoveTime = removeTime, AnimNo = animNo,
+            });
+        }
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -609,6 +622,8 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(IsHelper);
                 case OpCode.OC_numhelper:
                     return BytecodeValue.Int(World != null ? World.CountHelpers(-1) : 0);
+                case OpCode.OC_numproj:
+                    return BytecodeValue.Int(World != null ? World.CountProjectiles(-1) : 0);
                 case OpCode.OC_roundstate: return BytecodeValue.Int(RoundState);
                 case OpCode.OC_inguarddist:
                     // 简化：对手在攻击态(MoveType=A=4)且水平体距在守备范围内 → 可进入守招判定。

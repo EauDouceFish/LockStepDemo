@@ -48,4 +48,36 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
     }
+
+    /// <summary>
+    /// Projectile：发射弹幕实体（移植 bytecode.go projectile.Run）。捕获运动/生命周期参数（projid/velocity/accel/
+    /// offset/projremovetime/projanim）。HitDef 命中归切片 3b。
+    /// </summary>
+    public sealed class ProjectileController : MStateController
+    {
+        public BytecodeExp ProjId;
+        public BytecodeExp VelX;
+        public BytecodeExp VelY;
+        public BytecodeExp AccelX;
+        public BytecodeExp AccelY;
+        public BytecodeExp PosX;
+        public BytecodeExp PosY;
+        public BytecodeExp RemoveTime;
+        public BytecodeExp ProjAnim;
+
+        public override bool Run(MChar character)
+        {
+            int projId = ProjId != null ? ProjId.Run(character).ToI() : 0;
+            FFloat vx = VelX != null ? VelX.Run(character).ToF() : FFloat.Zero;
+            FFloat vy = VelY != null ? VelY.Run(character).ToF() : FFloat.Zero;
+            FFloat ax = AccelX != null ? AccelX.Run(character).ToF() : FFloat.Zero;
+            FFloat ay = AccelY != null ? AccelY.Run(character).ToF() : FFloat.Zero;
+            FFloat px = PosX != null ? PosX.Run(character).ToF() : FFloat.Zero;
+            FFloat py = PosY != null ? PosY.Run(character).ToF() : FFloat.Zero;
+            int removeTime = RemoveTime != null ? RemoveTime.Run(character).ToI() : -1;
+            int animNo = ProjAnim != null ? ProjAnim.Run(character).ToI() : 0;
+            character.RequestProjectile(projId, vx, vy, ax, ay, px, py, removeTime, animNo);
+            return false;
+        }
+    }
 }
