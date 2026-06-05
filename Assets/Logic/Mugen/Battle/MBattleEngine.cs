@@ -219,15 +219,43 @@ namespace Lockstep.Mugen.Battle
             DrainSpawns();
             if (!anyPause) { StepProjectiles(); }
 
-            // 6) 命中（1v1 玩家双向；helper 命中归后续切片）。暂停期间不结算。
-            if (Chars.Count == 2 && !anyPause)
+            // 6) 命中：全 MChar 实体（玩家 + helper）跨队两两尝试。暂停期间不结算。
+            //    队伍 = Root.Id（helper 继承 owner 的 Root）；只在不同队之间判定，避免打自己人。
+            if (!anyPause)
             {
-                MHitSystem.TryHit(Chars[0], Chars[1]);
-                MHitSystem.TryHit(Chars[1], Chars[0]);
+                RunHits();
             }
 
             // 7) 移除 DestroySelf 的 helper。
             RemoveDestroyed();
+        }
+
+        // 队伍归属（移植 Ikemen teamside 简化）：Root 玩家的 id（0/1）。helper.Root=owner 玩家 → 与 owner 同队。
+        static int TeamOf(MChar c)
+        {
+            return c.Root != null ? c.Root.Id : c.Id;
+        }
+
+        // 全实体跨队命中：把玩家与 helper 合到一个列表，攻防两两尝试（TryHit 内部做 active/重叠/同招一次判定）。
+        readonly List<MChar> _hitEntities = new List<MChar>();
+        void RunHits()
+        {
+            _hitEntities.Clear();
+            _hitEntities.AddRange(Chars);
+            _hitEntities.AddRange(Helpers);
+            for (int a = 0; a < _hitEntities.Count; a++)
+            {
+                MChar attacker = _hitEntities[a];
+                for (int d = 0; d < _hitEntities.Count; d++)
+                {
+                    if (a == d) { continue; }
+                    MChar defender = _hitEntities[d];
+                    if (TeamOf(attacker) != TeamOf(defender))
+                    {
+                        MHitSystem.TryHit(attacker, defender);
+                    }
+                }
+            }
         }
 
         // 单实体物理一相：PauseBool 冻结跳过；PosFreeze 跳积分；否则积分 + 落地检测。
