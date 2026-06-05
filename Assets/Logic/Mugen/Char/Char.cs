@@ -114,6 +114,35 @@ namespace Lockstep.Mugen.Char
         public int HitByTime;
         public bool HitByIsNot;
 
+        // ───────── Tier B 控制器运行态（影响模拟，入 Clone/Hash）。表现态（Trans/Angle/PalFX 等）不在此，待表现层。─────────
+        // Pause/SuperPause（移植 char.go setPauseTime/setSuperPauseTime）：引擎据此冻结对局，pausing 方仍可动 movetime 帧。
+        public int PauseTime;
+        public int PauseMoveTime;
+        public int SuperPauseTime;
+        public int SuperPauseMoveTime;
+        public bool SuperPauseUnhittable;
+        // PosFreeze：本帧冻结位置（物理跳过积分）。每帧由控制器重新断言，物理后清零。
+        public bool PosFreeze;
+        // Width（移植 Width 控制器）：角色推挤宽度（player）与边界宽度（edge），前/后。每帧重新断言（默认取 size box）。
+        public FFloat WidthPlayerFront;
+        public FFloat WidthPlayerBack;
+        public FFloat WidthEdgeFront;
+        public FFloat WidthEdgeBack;
+        // PlayerPush：是否参与角色间推挤（默认 true）+ 优先级 + 影响队伍。每帧重新断言。
+        public bool PlayerPushEnabled = true;
+        public int PushPriority;
+        public int PushAffectTeam;
+        // ScreenBound：是否受屏幕/舞台边界约束 + 相机跟随。每帧重新断言。
+        public bool ScreenBoundEnabled;
+        public bool ScreenBoundMoveCameraX;
+        public bool ScreenBoundMoveCameraY;
+        public bool ScreenBoundStageBound;
+        // MoveContactTime（= Ikemen mctime）+ CounterHit：MoveHitReset 清零；movecontact/movehit 触发器的底层计数。
+        public int MoveContactTime;
+        public bool CounterHit;
+        // HitOverride 槽（8 个，对齐 Ikemen c.ho[8]）：受击改写。命中系统据此改受击方目标态。
+        public MHitOverride[] HitOverrides = new MHitOverride[8];
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -268,6 +297,16 @@ namespace Lockstep.Mugen.Char
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,
+                PauseTime = PauseTime, PauseMoveTime = PauseMoveTime,
+                SuperPauseTime = SuperPauseTime, SuperPauseMoveTime = SuperPauseMoveTime,
+                SuperPauseUnhittable = SuperPauseUnhittable, PosFreeze = PosFreeze,
+                WidthPlayerFront = WidthPlayerFront, WidthPlayerBack = WidthPlayerBack,
+                WidthEdgeFront = WidthEdgeFront, WidthEdgeBack = WidthEdgeBack,
+                PlayerPushEnabled = PlayerPushEnabled, PushPriority = PushPriority, PushAffectTeam = PushAffectTeam,
+                ScreenBoundEnabled = ScreenBoundEnabled, ScreenBoundMoveCameraX = ScreenBoundMoveCameraX,
+                ScreenBoundMoveCameraY = ScreenBoundMoveCameraY, ScreenBoundStageBound = ScreenBoundStageBound,
+                MoveContactTime = MoveContactTime, CounterHit = CounterHit,
+                HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -301,6 +340,16 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(KeyCtrl); hash.AddInt32(AirJumpCount);
             HitDef.WriteHash(ref hash);
             hash.AddBool(Guarding); hash.AddInt32(HitByAttr); hash.AddInt32(HitByTime); hash.AddBool(HitByIsNot);
+            hash.AddInt32(PauseTime); hash.AddInt32(PauseMoveTime);
+            hash.AddInt32(SuperPauseTime); hash.AddInt32(SuperPauseMoveTime); hash.AddBool(SuperPauseUnhittable);
+            hash.AddBool(PosFreeze);
+            hash.AddFixed(WidthPlayerFront); hash.AddFixed(WidthPlayerBack);
+            hash.AddFixed(WidthEdgeFront); hash.AddFixed(WidthEdgeBack);
+            hash.AddBool(PlayerPushEnabled); hash.AddInt32(PushPriority); hash.AddInt32(PushAffectTeam);
+            hash.AddBool(ScreenBoundEnabled); hash.AddBool(ScreenBoundMoveCameraX);
+            hash.AddBool(ScreenBoundMoveCameraY); hash.AddBool(ScreenBoundStageBound);
+            hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit);
+            for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);
