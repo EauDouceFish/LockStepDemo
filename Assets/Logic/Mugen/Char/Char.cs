@@ -115,12 +115,13 @@ namespace Lockstep.Mugen.Char
         public bool HitByIsNot;
 
         // ───────── Tier B 控制器运行态（影响模拟，入 Clone/Hash）。表现态（Trans/Angle/PalFX 等）不在此，待表现层。─────────
-        // Pause/SuperPause（移植 char.go setPauseTime/setSuperPauseTime）：引擎据此冻结对局，pausing 方仍可动 movetime 帧。
-        public int PauseTime;
-        public int PauseMoveTime;
-        public int SuperPauseTime;
-        public int SuperPauseMoveTime;
-        public bool SuperPauseUnhittable;
+        // Pause/SuperPause（移植 char.go:8920/8941 + 11421）：全局时长在共享 Pause；本角色只持「暂停期还能动多久」与门控标志。
+        public MPauseState Pause;       // 共享全局暂停态引用（引擎装配；同 Rng 浅拷+引擎重链）
+        public int PauseMovetime;       // c.pauseMovetime：Pause 期间本角色可动帧
+        public int SuperMovetime;       // c.superMovetime：SuperPause 期间本角色可动帧
+        public bool PauseBool;          // c.pauseBool：本帧是否被暂停冻结
+        public int Acttmp;              // c.acttmp：1 unpaused / 0 default / -2 pause（物理/动画门控）
+        public int UnhittableTime;      // c.unhittableTime：SuperPause unhittable 期间不可被击
         // PosFreeze：本帧冻结位置（物理跳过积分）。每帧由控制器重新断言，物理后清零。
         public bool PosFreeze;
         // Width（移植 Width 控制器）：角色推挤宽度（player）与边界宽度（edge），前/后。每帧重新断言（默认取 size box）。
@@ -194,6 +195,64 @@ namespace Lockstep.Mugen.Char
         public bool Control()
         {
             return Ctrl;
+        }
+
+        // ───────── Pause/SuperPause（移植 char.go:8920 setPauseTime / 8941 setSuperPauseTime / 11421 pauseBool）─────────
+        // 注：省略 Ikemen 的 c.playerNo != c.ss.sb.playerNo 条件（自定义态归属，本范围恒等 → 该项恒 false），用 Id 当 playerNo。
+
+        /// <summary>Pause 控制器调用：写共享 buffer（带 playerno 优先级）+ 本角色 movetime 钳制。</summary>
+        public void SetPause(int pausetime, int movetime)
+        {
+            if (Pause == null) { return; }
+            if (~pausetime < Pause.PauseTimeBuffer || Pause.PausePlayerNo == Id)
+            {
+                Pause.PauseTimeBuffer = ~pausetime;
+                Pause.PausePlayerNo = Id;
+            }
+            PauseMovetime = movetime > 0 ? movetime : 0;
+            if (PauseMovetime > pausetime) { PauseMovetime = 0; }
+            else if (Pause.PauseTime > 0 && PauseMovetime > 0) { PauseMovetime--; }
+        }
+
+        /// <summary>SuperPause 控制器调用（unhittable 延 1 帧因暂停下一帧才生效）。</summary>
+        public void SetSuperPause(int pausetime, int movetime, bool unhittable)
+        {
+            if (Pause == null) { return; }
+            if (~pausetime < Pause.SuperTimeBuffer || Pause.SuperPlayerNo == Id)
+            {
+                Pause.SuperTimeBuffer = ~pausetime;
+                Pause.SuperPlayerNo = Id;
+            }
+            SuperMovetime = movetime > 0 ? movetime : 0;
+            if (SuperMovetime > pausetime) { SuperMovetime = 0; }
+            else if (Pause.SuperTime > 0 && SuperMovetime > 0) { SuperMovetime--; }
+            if (unhittable) { UnhittableTime = pausetime + (pausetime > 0 ? 1 : 0); }
+        }
+
+        /// <summary>本帧暂停门控（移植 char.go:11421 actionPrepare 开头）：在跑各相之前由引擎调用。
+        /// Acttmp = -2(暂停) / 1(活动)；hitpause 的 acttmp=-1 由既有 hitstop 逻辑处理，不在此覆盖。</summary>
+        public void ComputePauseBool()
+        {
+            PauseBool = false;
+            if (CommandList != null && Pause != null)
+            {
+                if (Pause.SuperTime > 0) { PauseBool = SuperMovetime == 0; }
+                else if (Pause.PauseTime > 0 && PauseMovetime == 0) { PauseBool = true; }
+            }
+            Acttmp = PauseBool ? -2 : 1;
+            if (UnhittableTime > 0) { UnhittableTime--; }
+            // per-frame movetime 递减（char.go:11524-11528，在 pauseBool 计算之后）：施暂停方逐帧耗尽 movetime 后即被冻结。
+            if (Pause != null)
+            {
+                if (Pause.SuperTime > 0)
+                {
+                    if (SuperMovetime > 0) { SuperMovetime--; }
+                }
+                else if (Pause.PauseTime > 0 && PauseMovetime > 0)
+                {
+                    PauseMovetime--;
+                }
+            }
         }
 
         /// <summary>动画表中是否存在该动画号（无表则 false；animexist/selfanimexist trigger 用）。</summary>
@@ -338,9 +397,10 @@ namespace Lockstep.Mugen.Char
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,
-                PauseTime = PauseTime, PauseMoveTime = PauseMoveTime,
-                SuperPauseTime = SuperPauseTime, SuperPauseMoveTime = SuperPauseMoveTime,
-                SuperPauseUnhittable = SuperPauseUnhittable, PosFreeze = PosFreeze,
+                Pause = Pause,   // 共享全局暂停态：浅拷引用，引擎级快照统一重链（同 Rng）
+                PauseMovetime = PauseMovetime, SuperMovetime = SuperMovetime,
+                PauseBool = PauseBool, Acttmp = Acttmp, UnhittableTime = UnhittableTime,
+                PosFreeze = PosFreeze,
                 WidthPlayerFront = WidthPlayerFront, WidthPlayerBack = WidthPlayerBack,
                 WidthEdgeFront = WidthEdgeFront, WidthEdgeBack = WidthEdgeBack,
                 PlayerPushEnabled = PlayerPushEnabled, PushPriority = PushPriority, PushAffectTeam = PushAffectTeam,
@@ -381,8 +441,8 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(KeyCtrl); hash.AddInt32(AirJumpCount);
             HitDef.WriteHash(ref hash);
             hash.AddBool(Guarding); hash.AddInt32(HitByAttr); hash.AddInt32(HitByTime); hash.AddBool(HitByIsNot);
-            hash.AddInt32(PauseTime); hash.AddInt32(PauseMoveTime);
-            hash.AddInt32(SuperPauseTime); hash.AddInt32(SuperPauseMoveTime); hash.AddBool(SuperPauseUnhittable);
+            hash.AddInt32(PauseMovetime); hash.AddInt32(SuperMovetime);
+            hash.AddBool(PauseBool); hash.AddInt32(Acttmp); hash.AddInt32(UnhittableTime);
             hash.AddBool(PosFreeze);
             hash.AddFixed(WidthPlayerFront); hash.AddFixed(WidthPlayerBack);
             hash.AddFixed(WidthEdgeFront); hash.AddFixed(WidthEdgeBack);

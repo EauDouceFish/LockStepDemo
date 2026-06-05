@@ -16,8 +16,8 @@ namespace Lockstep.Tests.Mugen.Char
         {
             MChar c = new MChar
             {
-                PauseTime = 5, PauseMoveTime = 2,
-                SuperPauseTime = 30, SuperPauseMoveTime = 10, SuperPauseUnhittable = true,
+                PauseMovetime = 2, SuperMovetime = 10, UnhittableTime = 7,
+                PauseBool = true, Acttmp = -2,
                 PosFreeze = true,
                 WidthPlayerFront = FFloat.FromInt(20), WidthPlayerBack = FFloat.FromInt(18),
                 WidthEdgeFront = FFloat.FromInt(25), WidthEdgeBack = FFloat.FromInt(22),
@@ -43,9 +43,10 @@ namespace Lockstep.Tests.Mugen.Char
         {
             MChar c = MakePopulated();
             MChar clone = c.Clone();
-            Assert.That(clone.PauseTime, Is.EqualTo(5));
-            Assert.That(clone.SuperPauseTime, Is.EqualTo(30));
-            Assert.That(clone.SuperPauseUnhittable, Is.True);
+            Assert.That(clone.PauseMovetime, Is.EqualTo(2));
+            Assert.That(clone.SuperMovetime, Is.EqualTo(10));
+            Assert.That(clone.UnhittableTime, Is.EqualTo(7));
+            Assert.That(clone.PauseBool, Is.True);
             Assert.That(clone.PosFreeze, Is.True);
             Assert.That(clone.WidthPlayerFront.Raw, Is.EqualTo(FFloat.FromInt(20).Raw));
             Assert.That(clone.PlayerPushEnabled, Is.False);
@@ -78,8 +79,8 @@ namespace Lockstep.Tests.Mugen.Char
         {
             MChar a = MakePopulated();
             MChar b = MakePopulated();
-            b.SuperPauseTime = 31;   // 改一个 sim 字段
-            Assert.That(HashOf(b), Is.Not.EqualTo(HashOf(a)), "SuperPauseTime 变化必须改变哈希");
+            b.SuperMovetime = 31;   // 改一个 sim 字段
+            Assert.That(HashOf(b), Is.Not.EqualTo(HashOf(a)), "SuperMovetime 变化必须改变哈希");
         }
 
         [Test]

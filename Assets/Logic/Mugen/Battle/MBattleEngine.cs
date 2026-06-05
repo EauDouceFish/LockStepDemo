@@ -28,9 +28,13 @@ namespace Lockstep.Mugen.Battle
         public readonly MRandom Random = new MRandom(DefaultRandomSeed);
         const int DefaultRandomSeed = 1;
 
+        // 全局暂停态（= Ikemen sys.pausetime/supertime + buffer/playerno）：全场角色共享，控制器经 SetPause 写。
+        public readonly MPauseState PauseState = new MPauseState();
+
         public void Add(MChar c, MCharData data)
         {
-            c.Rng = Random;   // 接入共享随机源（对齐 Ikemen 全局种子）
+            c.Rng = Random;       // 接入共享随机源（对齐 Ikemen 全局种子）
+            c.Pause = PauseState; // 接入共享暂停态（对齐 Ikemen 全局 sys.pause）
             Chars.Add(c);
             Data.Add(data);
         }
@@ -65,23 +69,18 @@ namespace Lockstep.Mugen.Battle
         /// 仅施暂停方在其 movetime 窗口内可动；SuperPause 优先于 Pause。命中在暂停期间不结算。</summary>
         public void Tick(IReadOnlyList<MInput> inputs)
         {
-            // 0) 计算本帧全局暂停态 + 每角色是否被冻结。无暂停时所有 frozen=false → 行为与原先逐位一致。
-            int globalSuperPause = 0;
-            int globalPause = 0;
+            // 0) 全局暂停推进（移植 system.go:2562）：递减 super/pause 时长 + 应用 buffer（上一帧控制器设的暂停此刻生效）。
+            //    再对每角色算 PauseBool/Acttmp（移植 char.go:11421 + 11524 movetime 递减）。无暂停时 PauseBool 全 false → 与原逐位一致。
+            PauseState.Step();
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (Chars[i].SuperPauseTime > globalSuperPause) { globalSuperPause = Chars[i].SuperPauseTime; }
-                if (Chars[i].PauseTime > globalPause) { globalPause = Chars[i].PauseTime; }
+                Chars[i].ComputePauseBool();
             }
-            bool superActive = globalSuperPause > 0;
-            bool pauseActive = !superActive && globalPause > 0;
-            bool anyPause = superActive || pauseActive;
-
+            bool anyPause = PauseState.AnyActive;
             bool[] frozen = new bool[Chars.Count];
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (superActive) { frozen[i] = Chars[i].SuperPauseMoveTime <= 0; }
-                else if (pauseActive) { frozen[i] = Chars[i].PauseMoveTime <= 0; }
+                frozen[i] = Chars[i].PauseBool;
             }
 
             // 1) 输入缓冲：命令匹配环形缓冲（搓招）+ 边沿计数缓冲（引擎硬编码键读 Fb/Bb/Ub/Db）。
@@ -137,20 +136,11 @@ namespace Lockstep.Mugen.Battle
             }
 
             // 6) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）。暂停期间不结算命中。
+            //    （全局/movetime 计时递减已在步骤 0 的 PauseState.Step + ComputePauseBool 中完成，对齐 Ikemen 时序。）
             if (Chars.Count == 2 && !anyPause)
             {
                 MHitSystem.TryHit(Chars[0], Chars[1]);
                 MHitSystem.TryHit(Chars[1], Chars[0]);
-            }
-
-            // 7) 暂停计时递减（每角色持有自己的 super/pause 时长与 movetime；min 0）。
-            for (int i = 0; i < Chars.Count; i++)
-            {
-                MChar c = Chars[i];
-                if (c.SuperPauseTime > 0) { c.SuperPauseTime--; }
-                if (c.SuperPauseMoveTime > 0) { c.SuperPauseMoveTime--; }
-                if (c.PauseTime > 0) { c.PauseTime--; }
-                if (c.PauseMoveTime > 0) { c.PauseMoveTime--; }
             }
         }
 
@@ -164,6 +154,7 @@ namespace Lockstep.Mugen.Battle
                 Chars[i].WriteHash(ref hash);
             }
             hash.AddInt32(Random.Seed);   // 共享随机源种子：模拟状态，全场混入一次（不在 per-char 哈希以免重复计数）
+            PauseState.WriteHash(ref hash);   // 共享全局暂停态：同理全场混入一次
             return hash.Value;
         }
     }
