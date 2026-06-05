@@ -136,7 +136,7 @@ namespace Lockstep.Mugen.Battle
                     {
                         MChar target = Chars[c];
                         if (TeamOf(target) == TeamOf(proj.Owner)) { continue; }
-                        if (MHitSystem.TryProjectileHit(proj, target))
+                        if (MHitSystem.TryProjectileHit(proj, target, deferDamage: true))
                         {
                             proj.HitDone = true;
                             proj.Removed = true;
@@ -259,6 +259,7 @@ namespace Lockstep.Mugen.Battle
             if (!anyPause)
             {
                 RunHits();
+                FlushPendingDamage();
             }
 
             // 7) 移除 DestroySelf 的 helper。
@@ -306,9 +307,21 @@ namespace Lockstep.Mugen.Battle
                     MChar defender = _hitEntities[d];
                     if (TeamOf(attacker) != TeamOf(defender))
                     {
-                        MHitSystem.TryHit(attacker, defender);
+                        MHitSystem.TryHit(attacker, defender, deferDamage: true);
                     }
                 }
+            }
+        }
+
+        void FlushPendingDamage()
+        {
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                MHitSystem.ApplyPendingDamage(Chars[i]);
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                MHitSystem.ApplyPendingDamage(Helpers[i]);
             }
         }
 

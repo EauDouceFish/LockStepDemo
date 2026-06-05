@@ -50,6 +50,7 @@ namespace Lockstep.Mugen.Char
 
         // 打击感
         public int Hitstop;         // = Ikemen hitPauseTime（hitpausetime trigger）
+        public int PendingLifeDamage; // R-DMG-PIPELINE: ghv.damage accumulated during hit resolution, applied after all hits.
 
         // CharSystemVar 常用计数/标志（攻击命中统计，供 trigger 与控制器读）
         public int HitCount;        // 本招累计命中数（命中时 += HitDef.numhits，char.go:12189）
@@ -474,7 +475,7 @@ namespace Lockstep.Mugen.Char
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
                 AttackMul = AttackMul, CustomDefense = CustomDefense, SuperDefenseMul = SuperDefenseMul,
                 FallDefenseMul = FallDefenseMul, DefenseMulDelay = DefenseMulDelay,
-                Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
+                Hitstop = Hitstop, PendingLifeDamage = PendingLifeDamage, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
                 BindTarget = BindTarget, BindTime = BindTime, BindPos = BindPos, BindFacing = BindFacing,
                 HitCount = HitCount, UniqHitCount = UniqHitCount, GuardCount = GuardCount, ReceivedHits = ReceivedHits,
@@ -527,7 +528,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
             hash.AddFixed(AttackMul); hash.AddFixed(CustomDefense); hash.AddFixed(SuperDefenseMul);
             hash.AddFixed(FallDefenseMul); hash.AddBool(DefenseMulDelay);
-            hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
+            hash.AddInt32(Hitstop); hash.AddInt32(PendingLifeDamage); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
             HashVars(ref hash, PersistCounters);
             hash.AddInt32(BindTarget != null ? BindTarget.Id : -1); hash.AddInt32(BindTime); hash.AddFixed(BindPos); hash.AddInt32(BindFacing);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount); hash.AddInt32(GuardCount); hash.AddInt32(ReceivedHits);

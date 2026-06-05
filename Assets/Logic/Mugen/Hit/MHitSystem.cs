@@ -14,7 +14,7 @@ namespace Lockstep.Mugen.Hit
         public const int GetHitStateNo = 5000;   // MUGEN 默认受击状态号
 
         /// <summary>尝试让 attacker 命中 defender；命中返回 true 并完成结算。</summary>
-        public static bool TryHit(MChar attacker, MChar defender)
+        public static bool TryHit(MChar attacker, MChar defender, bool deferDamage = false)
         {
             MHitDef hd = attacker.HitDef;
             if (hd == null || !hd.Active || attacker == defender)
@@ -46,11 +46,11 @@ namespace Lockstep.Mugen.Hit
             }
             if (defender.Guarding && GuardFlagAllows(hd, defender.StateType))
             {
-                ApplyGuard(attacker, defender, hd);
+                ApplyGuard(attacker, defender, hd, deferDamage);
             }
             else
             {
-                ApplyHit(attacker, defender, hd);
+                ApplyHit(attacker, defender, hd, deferDamage);
             }
             return true;
         }
@@ -59,7 +59,7 @@ namespace Lockstep.Mugen.Hit
         /// 弹幕命中（切片 3b）：用弹幕几何(Clsn1/Pos/Facing)+弹幕 HitDef 判重叠，命中走 ApplyHit(proj.Owner,...)。
         /// 攻方侧效果(能量/movehit/targets)归 owner；返回是否命中（命中后弹幕由引擎移除/计数）。
         /// </summary>
-        public static bool TryProjectileHit(MProjectile proj, MChar defender)
+        public static bool TryProjectileHit(MProjectile proj, MChar defender, bool deferDamage = false)
         {
             MHitDef hd = proj.HitDef;
             if (hd == null || proj.Owner == defender || proj.Clsn1 == null)
@@ -92,11 +92,11 @@ namespace Lockstep.Mugen.Hit
             }
             if (guarded)
             {
-                ApplyGuard(proj.Owner, defender, hd);
+                ApplyGuard(proj.Owner, defender, hd, deferDamage);
             }
             else
             {
-                ApplyHit(proj.Owner, defender, hd);
+                ApplyHit(proj.Owner, defender, hd, deferDamage);
                 proj.HitCount++;
             }
             return true;
@@ -114,14 +114,14 @@ namespace Lockstep.Mugen.Hit
         }
 
         // 守招结算：chip 伤害 + 守方击退 + ghv.guarded + 攻方 moveguarded（不进受击 5000，不失 movetype）。
-        static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd)
+        static void ApplyGuard(MChar attacker, MChar defender, MHitDef hd, bool deferDamage)
         {
             // 守招 chip 伤害（含攻防倍率；公式对标 char.go:11074-11078 Damage on guard，computeDamage 本体 char.go:8433；
             // guard.kill 等价 Ikemen getter.ghv.kill 在守招路径，char.go:10579/10587）。
-            // 伤害应用时机同 ApplyHit 注释（R-DMG-PIPELINE）：当场扣血，单帧单次等价 Ikemen 累加→tick 应用。
+            // 伤害应用时机同 ApplyHit 注释（R-DMG-PIPELINE）：引擎路径累计，直接单测路径默认即时应用。
             int dealt = ComputeDamage(defender.Life, hd.GuardDamage, hd.GuardKill,
                 attacker.AttackDamageMul(), defender.ComputeFinalDefense());
-            defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
+            QueueLifeDamage(defender, dealt, deferDamage);
 
             // 能量结算（被防：攻方 +guardgetpower、守方 +guardgivepower）
             attacker.Power = AddPower(attacker.Power, hd.GuardGetPower, attacker.PowerMax);
@@ -166,15 +166,12 @@ namespace Lockstep.Mugen.Hit
 
         // 命中结算（移植 Ikemen char.go getHitVarSet + 受击状态路由 char.go:12195-12259）。
         //
-        // ⚠ 伤害应用时机的刻意适配（R-DMG-PIPELINE，依赖 R-ENT）：
+        // R-DMG-PIPELINE：
         //   Ikemen 是两段式——命中阶段把伤害「累加」到 getter.ghv.damage（char.go:11063/11078，不扣血），
         //   再在防守方自身 update 循环里「一次性应用」(char.go:11743 lifeAdd(-ghv.damage, kill, absolute=true))。
-        //   本引擎在命中当场直接扣血（下方 defender.Life -= dealt）。
-        //   单帧单次命中两者「逐位等价」(已验证)；仅当【同帧多次命中】(弹幕/helper，需 R-ENT) 或
-        //   【同帧读 life 的触发器】时才会分歧（第 2 次命中的 bounds/kill 保底基准、扣血差一帧）。
-        //   现作用域为 1v1 单 root、每帧至多一次命中，故安全；待 R-ENT 引入多实体时，
-        //   连同 char.go:11098-11140 的 KO 排序一并改为 ghv.damage 累加→防守方 tick 应用。离散 life 由差分对账(R-ORACLE)兜底。
-        static void ApplyHit(MChar attacker, MChar defender, MHitDef hd)
+        //   本引擎在 battle 路径传 deferDamage=true，累计 PendingLifeDamage，帧内 hit/projectile 全部结算后统一扣血。
+        //   直接调用 MHitSystem 的既有单测默认即时应用，保持旧行为；KO 排序细节后续由 R-ORACLE trace 精确化。
+        static void ApplyHit(MChar attacker, MChar defender, MHitDef hd, bool deferDamage)
         {
             int stateType = defender.StateType;
             bool isAir = stateType == 4;
@@ -186,7 +183,7 @@ namespace Lockstep.Mugen.Hit
             // 伤害（含攻防倍率；kill=0 不致死保底 1 血；对齐 char.go:8433 computeDamage + :12252 蹲被击致死改站立倒下）
             int dealt = ComputeDamage(defender.Life, hd.HitDamage, hd.Kill,
                 attacker.AttackDamageMul(), defender.ComputeFinalDefense());
-            defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
+            QueueLifeDamage(defender, dealt, deferDamage);
 
             // 能量结算（命中：攻方 +getpower、守方 +givepower；char.go:931-961 + powerAdd）
             attacker.Power = AddPower(attacker.Power, hd.HitGetPower, attacker.PowerMax);
@@ -376,6 +373,28 @@ namespace Lockstep.Mugen.Hit
             }
             int dealt = ComputeDamage(character.Life, rawDamage, kill, FFloat.One, character.ComputeFinalDefense());
             character.Life = ClampLife(character.Life - dealt, character.LifeMax);
+        }
+
+        static void QueueLifeDamage(MChar defender, int dealt, bool deferDamage)
+        {
+            if (deferDamage)
+            {
+                defender.PendingLifeDamage += dealt;
+            }
+            else
+            {
+                defender.Life = ClampLife(defender.Life - dealt, defender.LifeMax);
+            }
+        }
+
+        public static void ApplyPendingDamage(MChar character)
+        {
+            if (character.PendingLifeDamage == 0)
+            {
+                return;
+            }
+            character.Life = ClampLife(character.Life - character.PendingLifeDamage, character.LifeMax);
+            character.PendingLifeDamage = 0;
         }
 
         // 能量增减（powerAdd）：累加后夹到 [0, PowerMax]。
