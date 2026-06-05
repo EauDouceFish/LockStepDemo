@@ -329,6 +329,15 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            // animelem = n：动画到达元素 n 的「首帧」触发（AnimElemNo==n && AnimElemTime==0），
+            // 是 expValue 级原子布尔（自行消费 = / != 与操作数），对齐 MUGEN animelem 触发器语义。
+            // 大量 HitDef/取消用 `trigger1 = animelem = N` 计时——此前 animelem 未特判落到压 0 → 恒假 → 招式哑火。
+            if (name == "animelem")
+            {
+                EmitAnimElemCompare();
+                return;
+            }
+
             // redirect 前缀：p2,/root,/parent, + 单值子表达式（用 OC_run 包裹保证全程用重定向上下文）
             if ((name == "p2" || name == "root" || name == "parent") && IsOp(","))
             {
@@ -457,6 +466,27 @@ namespace Lockstep.Mugen.Expr
                 Emit(OpCode.OC_blor);
             }
             if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        // animelem = n / != n：首帧触发比较。无 =/!= 时（如 animelem >= n）退化为发当前元素号，交外层比较。
+        // 第二参形式 `animelem = n, >= m`（= 元素 n 且其已播 >= m tick）暂不支持，罕见，待 animelemtime(n) 一并补。
+        void EmitAnimElemCompare()
+        {
+            bool negate = IsOp("!=");
+            if (negate || IsOp("="))
+            {
+                Next();
+                ParseAddSub();                 // 目标元素号 n（算术级，不吞外层比较/逻辑运算）
+                Emit(OpCode.OC_animelem);      // 弹 n → bool(AnimElemNo==n && AnimElemTime==0)
+                if (negate)
+                {
+                    Emit(OpCode.OC_blnot);
+                }
+            }
+            else
+            {
+                Emit(OpCode.OC_animelemno);    // 无比较运算符：返回当前元素号，交外层处理 >= / <= 等
+            }
         }
 
         static OpCode TypeOpcode(string trigger)

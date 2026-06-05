@@ -381,6 +381,13 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_moveguarded: return BytecodeValue.Int(MoveGuarded);
                 case OpCode.OC_movereversed: return BytecodeValue.Int(MoveReversed);
                 case OpCode.OC_animtime: return BytecodeValue.Int(AnimTime);
+                case OpCode.OC_animelemno: return BytecodeValue.Int(AnimElemNo);
+                case OpCode.OC_animelem:
+                {
+                    // animelem = n：到达元素 n 的首帧（当前元素号 == n 且本元素已播 0 tick）。
+                    int n = Pop(stack).ToI();
+                    return BytecodeValue.Bool(AnimElemNo == n && AnimElemTime == 0);
+                }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
 
                 // 受击触发器（common1 5000-5160 状态机用）

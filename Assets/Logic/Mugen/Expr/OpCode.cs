@@ -24,7 +24,7 @@ namespace Lockstep.Mugen.Expr
         OC_cos, OC_sin, OC_tan, OC_acos, OC_asin, OC_atan,
         OC_floor, OC_ceil, OC_ifelse,
         // ── 以下为依赖 Char 的 trigger 读取（M3+ 接入）──
-        OC_time, OC_animtime, OC_animelemtime, OC_animelemno,
+        OC_time, OC_animtime, OC_animelemtime, OC_animelemno, OC_animelem,
         OC_statetype, OC_movetype, OC_ctrl, OC_command, OC_random,
         OC_pos_x, OC_pos_y, OC_vel_x, OC_vel_y, OC_vel_z,
         OC_screenpos_x, OC_screenpos_y, OC_facing,
