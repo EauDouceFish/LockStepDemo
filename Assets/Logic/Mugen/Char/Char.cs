@@ -167,14 +167,14 @@ namespace Lockstep.Mugen.Char
 
         /// <summary>请求发射一个弹幕（移植 Projectile 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
         public void RequestProjectile(int projId, FFloat velX, FFloat velY, FFloat accelX, FFloat accelY,
-            FFloat posX, FFloat posY, int removeTime, int animNo)
+            FFloat posX, FFloat posY, int removeTime, int animNo, Hit.MHitDef hitDef)
         {
             if (World == null) { return; }
             World.RequestProjectile(new MProjectileRequest
             {
                 Owner = this, ProjId = projId, VelX = velX, VelY = velY,
                 AccelX = accelX, AccelY = accelY, PosX = posX, PosY = posY,
-                RemoveTime = removeTime, AnimNo = animNo,
+                RemoveTime = removeTime, AnimNo = animNo, HitDef = hitDef,
             });
         }
 

@@ -55,6 +55,48 @@ namespace Lockstep.Mugen.Hit
             return true;
         }
 
+        /// <summary>
+        /// 弹幕命中（切片 3b）：用弹幕几何(Clsn1/Pos/Facing)+弹幕 HitDef 判重叠，命中走 ApplyHit(proj.Owner,...)。
+        /// 攻方侧效果(能量/movehit/targets)归 owner；返回是否命中（命中后弹幕由引擎移除/计数）。
+        /// </summary>
+        public static bool TryProjectileHit(MProjectile proj, MChar defender)
+        {
+            MHitDef hd = proj.HitDef;
+            if (hd == null || proj.Owner == defender || proj.Clsn1 == null)
+            {
+                return false;
+            }
+            if (!HitFlagMatches(hd, defender.StateType))
+            {
+                return false;
+            }
+            if (defender.HitByTime > 0)
+            {
+                bool attrMatch = (hd.Attr & defender.HitByAttr) != 0;
+                if (defender.HitByIsNot ? attrMatch : !attrMatch)
+                {
+                    return false;
+                }
+            }
+            if (!MClsn.AnyOverlap(
+                    proj.Clsn1, proj.Pos.X, proj.Pos.Y, proj.Facing,
+                    defender.Clsn2, defender.Pos.X, defender.Pos.Y, defender.Facing))
+            {
+                return false;
+            }
+            proj.ContactCount++;
+            if (defender.Guarding && GuardFlagAllows(hd, defender.StateType))
+            {
+                ApplyGuard(proj.Owner, defender, hd);
+            }
+            else
+            {
+                ApplyHit(proj.Owner, defender, hd);
+                proj.HitCount++;
+            }
+            return true;
+        }
+
         static bool GuardFlagAllows(MHitDef hd, int defenderStateType)
         {
             switch (defenderStateType)

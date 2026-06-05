@@ -29,6 +29,7 @@ namespace Lockstep.Mugen.Char
         public FFloat VelX, VelY, AccelX, AccelY, PosX, PosY;
         public int RemoveTime;
         public int AnimNo;
+        public Hit.MHitDef HitDef;   // 弹幕自带 HitDef（控制器从同段 hitdef 参数 BuildHitDef）
     }
 
     /// <summary>

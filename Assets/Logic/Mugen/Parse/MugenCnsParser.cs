@@ -218,6 +218,7 @@ namespace Lockstep.Mugen.Parse
                         PosY = off != null && off.Length > 1 ? off[1] : null,
                         RemoveTime = Expr(comp, p, "projremovetime"),
                         ProjAnim = Expr(comp, p, "projanim"),
+                        HitDef = BuildHitDef(comp, p),   // 弹幕 HitDef 从同段 hitdef 参数构建
                     };
                 }
                 case "changestate":

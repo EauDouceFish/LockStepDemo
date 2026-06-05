@@ -93,6 +93,8 @@ namespace Lockstep.Mugen.Battle
             {
                 MProjectileRequest req = World.ProjSpawnQueue[q];
                 int facingSign = req.Owner.Facing.Raw >= 0 ? 1 : -1;
+                MCharData ownerData = DataOf(req.Owner);
+                Hit.MClsnBox[] clsn1 = ProjAnimClsn1(ownerData, req.AnimNo);
                 World.Projectiles.Add(new MProjectile
                 {
                     Id = World.AllocId(), OwnerId = req.Owner.Id, ProjId = req.ProjId,
@@ -102,17 +104,46 @@ namespace Lockstep.Mugen.Battle
                     Pos = new FVector3(req.Owner.Pos.X + req.PosX * FFloat.FromInt(facingSign),
                         req.Owner.Pos.Y + req.PosY, FFloat.Zero),
                     RemoveTime = req.RemoveTime, AnimNo = req.AnimNo,
+                    HitDef = req.HitDef, Owner = req.Owner, Clsn1 = clsn1,
                 });
             }
             World.ProjSpawnQueue.Clear();
         }
 
-        // 推进所有弹幕实体（运动 + 生命周期）+ 移除（命中归切片 3b）。
+        // 弹幕 projanim 首帧的攻击框 Clsn1（弹幕攻击框来源）。无表/无帧 → null。
+        static Hit.MClsnBox[] ProjAnimClsn1(MCharData data, int animNo)
+        {
+            if (data != null && data.Anims != null && data.Anims.TryGetValue(animNo, out Anim.MAnimData anim)
+                && anim.Frames != null && anim.Frames.Length > 0)
+            {
+                return anim.Frames[0].Clsn1;
+            }
+            return null;
+        }
+
+        // 推进所有弹幕实体（运动 + 命中敌队 + 生命周期移除）。
         void StepProjectiles()
         {
             for (int i = 0; i < World.Projectiles.Count; i++)
             {
-                if (!World.Projectiles[i].Removed) { World.Projectiles[i].Step(); }
+                MProjectile proj = World.Projectiles[i];
+                if (proj.Removed) { continue; }
+                proj.Step();
+                // 命中敌队玩家（移植弹幕命中：用弹幕几何+HitDef，效果走 owner）。单段弹幕命中即移除。
+                if (!proj.HitDone && proj.HitDef != null && proj.Owner != null)
+                {
+                    for (int c = 0; c < Chars.Count; c++)
+                    {
+                        MChar target = Chars[c];
+                        if (TeamOf(target) == TeamOf(proj.Owner)) { continue; }
+                        if (MHitSystem.TryProjectileHit(proj, target))
+                        {
+                            proj.HitDone = true;
+                            proj.Removed = true;
+                            break;
+                        }
+                    }
+                }
             }
             for (int i = World.Projectiles.Count - 1; i >= 0; i--)
             {

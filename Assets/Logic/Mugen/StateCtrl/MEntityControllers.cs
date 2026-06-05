@@ -100,6 +100,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp PosY;
         public BytecodeExp RemoveTime;
         public BytecodeExp ProjAnim;
+        public Lockstep.Mugen.Hit.MHitDef HitDef;   // 弹幕自带 HitDef（parser 从同段 hitdef 参数 BuildHitDef 填）
 
         public override bool Run(MChar character)
         {
@@ -112,7 +113,9 @@ namespace Lockstep.Mugen.StateCtrl
             FFloat py = PosY != null ? PosY.Run(character).ToF() : FFloat.Zero;
             int removeTime = RemoveTime != null ? RemoveTime.Run(character).ToI() : -1;
             int animNo = ProjAnim != null ? ProjAnim.Run(character).ToI() : 0;
-            character.RequestProjectile(projId, vx, vy, ax, ay, px, py, removeTime, animNo);
+            // 每发弹幕一份独立 HitDef（克隆模板，避免共享被改）。
+            Lockstep.Mugen.Hit.MHitDef hd = HitDef != null ? HitDef.Clone() : null;
+            character.RequestProjectile(projId, vx, vy, ax, ay, px, py, removeTime, animNo, hd);
             return false;
         }
     }
