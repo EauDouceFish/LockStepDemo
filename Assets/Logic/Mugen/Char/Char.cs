@@ -169,6 +169,23 @@ namespace Lockstep.Mugen.Char
             return AnimTable != null && AnimTable.ContainsKey(animNo);
         }
 
+        // ───────── 距离（p2dist/p2bodydist；移植 char.go:8743 distX / 8787 bodyDistX 简化形）─────────
+
+        /// <summary>到对手的朝向相对水平距离（前为正）= facing*(opp.x - self.x)。
+        /// 对齐 char.go:8859 rdDistX；定点精确，省略 float 版的 |·|&lt;0.0001 噪声夹取。</summary>
+        FFloat DistX(MChar opp)
+        {
+            return Facing * (opp.Pos.X - Pos.X);
+        }
+
+        /// <summary>到对手的边到边水平距离 = p2dist X 减双方前缘半宽（MUGEN 形，char.go:8787 注释「不随 Width 变化」）。</summary>
+        FFloat BodyDistX(MChar opp)
+        {
+            FFloat selfFront = Constants != null ? Constants.SizeGroundFront : FFloat.Zero;
+            FFloat oppFront = opp.Constants != null ? opp.Constants.SizeGroundFront : FFloat.Zero;
+            return DistX(opp) - selfFront - oppFront;
+        }
+
         // ───────── 受击触发器（移植 Ikemen char.go hitOver/hitShakeOver/canRecover；HitFall=ghv.fallflag）─────────
 
         /// <summary>HitShakeOver：受击抖动结束（char.go:5342，ghv.hitshaketime &lt;= 0）。</summary>
@@ -350,6 +367,18 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_vel_y: return BytecodeValue.Float(Vel.Y);
                 case OpCode.OC_vel_z: return BytecodeValue.Float(Vel.Z);
                 case OpCode.OC_facing: return BytecodeValue.Int(Facing.Raw >= 0 ? 1 : -1);
+
+                // p2dist X/Y、p2bodydist X/Y：到 P2 的距离（1v1，无敌人 → undefined，VM 跳过整块）。
+                // 对齐 Ikemen char.go:8743 distX/rdDistX：X 朝向相对（前为正）、|·|<0.0001 归零；Y 不翻向。
+                // bodydist = 边到边（MUGEN：p2dist 减去双方前宽，char.go:8787 简化形）。
+                case OpCode.OC_p2dist_x:
+                    return P2 != null ? BytecodeValue.Float(DistX(P2)) : BytecodeValue.Undefined();
+                case OpCode.OC_p2dist_y:
+                    return P2 != null ? BytecodeValue.Float(P2.Pos.Y - Pos.Y) : BytecodeValue.Undefined();
+                case OpCode.OC_p2bodydist_x:
+                    return P2 != null ? BytecodeValue.Float(BodyDistX(P2)) : BytecodeValue.Undefined();
+                case OpCode.OC_p2bodydist_y:
+                    return P2 != null ? BytecodeValue.Float(P2.Pos.Y - Pos.Y) : BytecodeValue.Undefined();
                 case OpCode.OC_life: return BytecodeValue.Int(Life);
                 case OpCode.OC_lifemax: return BytecodeValue.Int(LifeMax);
                 case OpCode.OC_power: return BytecodeValue.Int(Power);

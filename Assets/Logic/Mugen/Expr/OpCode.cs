@@ -28,6 +28,7 @@ namespace Lockstep.Mugen.Expr
         OC_statetype, OC_movetype, OC_ctrl, OC_command, OC_random,
         OC_pos_x, OC_pos_y, OC_vel_x, OC_vel_y, OC_vel_z,
         OC_screenpos_x, OC_screenpos_y, OC_facing,
+        OC_p2dist_x, OC_p2dist_y, OC_p2bodydist_x, OC_p2bodydist_y,
         OC_anim, OC_animexist, OC_selfanimexist,
         OC_alive, OC_life, OC_lifemax, OC_power, OC_powermax, OC_canrecover,
         OC_roundstate, OC_roundswon, OC_ishelper, OC_numhelper,

@@ -345,8 +345,9 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
-            // 轴 trigger：pos x / vel y / screenpos x / hitvel z
-            if ((name == "pos" || name == "vel" || name == "screenpos" || name == "hitvel") && Cur.Kind == TokKind.Ident)
+            // 轴 trigger：pos x / vel y / screenpos x / hitvel z / p2dist x / p2bodydist y
+            if ((name == "pos" || name == "vel" || name == "screenpos" || name == "hitvel"
+                 || name == "p2dist" || name == "p2bodydist") && Cur.Kind == TokKind.Ident)
             {
                 string axis = Cur.Text;
                 Next();
@@ -668,6 +669,8 @@ namespace Lockstep.Mugen.Expr
                 case "vel": return axis == "y" ? OpCode.OC_vel_y : axis == "z" ? OpCode.OC_vel_z : OpCode.OC_vel_x;
                 case "screenpos": return axis == "y" ? OpCode.OC_screenpos_y : OpCode.OC_screenpos_x;
                 case "hitvel": return axis == "y" ? OpCode.OC_hitvel_y : axis == "z" ? OpCode.OC_hitvel_z : OpCode.OC_hitvel_x;
+                case "p2dist": return axis == "y" ? OpCode.OC_p2dist_y : OpCode.OC_p2dist_x;
+                case "p2bodydist": return axis == "y" ? OpCode.OC_p2bodydist_y : OpCode.OC_p2bodydist_x;
                 default: return OpCode.OC_pos_x;
             }
         }
