@@ -16,8 +16,8 @@ A. R-ENT 已完成（切片 1-2）
 --------------------------------------------------------------------------------
 B. R-ENT 余下切片（按依赖/价值排序）
 --------------------------------------------------------------------------------
-[⬜] 切片3 Projectile：弹幕实体（pos/vel/accel + 自带 HitDef + 命中/超时/越界移除 + projcontact/projhit/numproj 触发器）。
-     —— 建议模型：projectile 作为轻量实体纳入实体世界，命中复用 MHitSystem 对敌方判定。弹幕角色必需。
+[🔧] 切片3 Projectile：3a 已完成（commit a7be935）= MProjectile 轻量实体 motion(vel/accel)+生命周期(projremovetime/越界)
+     +Projectile 控制器+numproj 触发器+确定性。**3b 待做** = 自带 HitDef + 命中敌方(Clsn vs Clsn) + projcontact/projhit 计数 + 命中移除。
 [⬜] 切片4 Explod：表现实体（逻辑层仅追踪 numexplod；渲染归表现层）。RemoveExplod/ModifyExplod 关联。
 [⬜] 切片5 custom state（p2getp1state / TargetState 完整）：一个角色运行另一个角色的状态(状态归属 ownership)。
      —— 投技(throw)必需；HitDef 的 p1stateno/p2stateno/p2getp1state 字段驱动。
