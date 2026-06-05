@@ -236,6 +236,115 @@ namespace Lockstep.Mugen.Parse
                 case "hitfallvel": return new HitFallVelController();
                 case "hitfalldamage": return new HitFallDamageController();
                 case "gravity": return new GravityController();
+                case "pause":
+                    return WithParams(new PauseController { Time = Expr(comp, p, "time"), MoveTime = Expr(comp, p, "movetime") }, p);
+                case "superpause":
+                    return WithParams(new SuperPauseController
+                    {
+                        Time = Expr(comp, p, "time"),
+                        MoveTime = Expr(comp, p, "movetime"),
+                        PowerAdd = Expr(comp, p, "poweradd"),
+                        P2DefMul = Expr(comp, p, "p2defmul"),
+                    }, p);
+                case "posfreeze":
+                    return WithParams(new PosFreezeController { Value = Expr(comp, p, "value") }, p);
+                case "width":
+                    return WithParams(new WidthController
+                    {
+                        Value = ExprList(comp, p, "value"),
+                        Player = ExprList(comp, p, "player"),
+                        Edge = ExprList(comp, p, "edge"),
+                    }, p);
+                case "playerpush":
+                    return WithParams(new PlayerPushController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        Priority = Expr(comp, p, "priority"),
+                        AffectTeam = Expr(comp, p, "affectteam"),
+                    }, p);
+                case "screenbound":
+                    return WithParams(new ScreenBoundController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        MoveCamera = ExprList(comp, p, "movecamera"),
+                        StageBound = Expr(comp, p, "stagebound"),
+                    }, p);
+                case "attackdist":
+                    return WithParams(new AttackDistController
+                    {
+                        XValues = ExprList(comp, p, "x"),
+                        YValues = ExprList(comp, p, "y"),
+                        ZValues = ExprList(comp, p, "z"),
+                    }, p);
+                case "hitoverride":
+                    return WithParams(new HitOverrideController
+                    {
+                        Attr = p.TryGetValue("attr", out string hitOverrideAttr) ? MugenCodes.Attr(hitOverrideAttr) : 0,
+                        Slot = Expr(comp, p, "slot"),
+                        StateNo = Expr(comp, p, "stateno"),
+                        Time = Expr(comp, p, "time"),
+                        ForceAir = Expr(comp, p, "forceair"),
+                        ForceGuard = Expr(comp, p, "forceguard"),
+                        KeepState = Expr(comp, p, "keepstate"),
+                    }, p);
+                case "movehitreset": return new MoveHitResetController();
+                case "reversaldef":
+                    return WithParams(new ReversalDefController
+                    {
+                        Attr = p.TryGetValue("attr", out string reversalAttr) ? MugenCodes.Attr(reversalAttr) : 0,
+                    }, p);
+                case "varrandom":
+                    return new VarRandomController { Index = Expr(comp, p, "v"), Range = ExprList(comp, p, "range") };
+                case "varrangeset":
+                    return new VarRangeSetController
+                    {
+                        First = Expr(comp, p, "first"),
+                        Last = Expr(comp, p, "last"),
+                        Value = Expr(comp, p, "value"),
+                        FloatValue = Expr(comp, p, "fvalue"),
+                    };
+                case "remappal":
+                    return WithParams(new RemapPalController { Source = ExprList(comp, p, "source"), Dest = ExprList(comp, p, "dest") }, p);
+                case "trans": return WithParams(new TransController(), p);
+                case "sprpriority":
+                    return WithParams(new SprPriorityController { Value = Expr(comp, p, "value"), LayerNo = Expr(comp, p, "layerno") }, p);
+                case "offset":
+                    return WithParams(new OffsetController { XOffset = Expr(comp, p, "x"), YOffset = Expr(comp, p, "y") }, p);
+                case "angledraw":
+                    return WithParams(new AngleDrawController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        XAngle = Expr(comp, p, "x"),
+                        YAngle = Expr(comp, p, "y"),
+                        Scale = ExprList(comp, p, "scale"),
+                    }, p);
+                case "angleset":
+                    return WithParams(new AngleSetController { Value = Expr(comp, p, "value"), XAngle = Expr(comp, p, "x"), YAngle = Expr(comp, p, "y") }, p);
+                case "angleadd":
+                    return WithParams(new AngleAddController { Value = Expr(comp, p, "value"), XAngle = Expr(comp, p, "x"), YAngle = Expr(comp, p, "y") }, p);
+                case "anglemul":
+                    return WithParams(new AngleMulController { Value = Expr(comp, p, "value"), XAngle = Expr(comp, p, "x"), YAngle = Expr(comp, p, "y") }, p);
+                case "afterimage": return WithParams(new AfterImageController { Time = Expr(comp, p, "time") }, p);
+                case "afterimagetime": return WithParams(new AfterImageTimeController { Time = Expr(comp, p, "time") }, p);
+                case "palfx": return WithParams(new PalFXController { Time = Expr(comp, p, "time") }, p);
+                case "allpalfx": return WithParams(new AllPalFXController { Time = Expr(comp, p, "time") }, p);
+                case "bgpalfx": return WithParams(new BGPalFXController { Time = Expr(comp, p, "time") }, p);
+                case "envcolor":
+                    return WithParams(new EnvColorController { Value = ExprList(comp, p, "value"), Time = Expr(comp, p, "time"), Under = Expr(comp, p, "under") }, p);
+                case "playsnd": return WithParams(new PlaySndController(), p);
+                case "stopsnd": return WithParams(new StopSndController(), p);
+                case "sndpan": return WithParams(new SndPanController(), p);
+                case "explod": return WithParams(new ExplodController(), p);
+                case "modifyexplod": return WithParams(new ModifyExplodController(), p);
+                case "removeexplod":
+                    return WithParams(new RemoveExplodController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index") }, p);
+                case "makedust": return WithParams(new MakeDustController(), p);
+                case "gamemakeanim": return WithParams(new GameMakeAnimController(), p);
+                case "envshake": return WithParams(new EnvShakeController(), p);
+                case "fallenvshake": return WithParams(new FallEnvShakeController(), p);
+                case "forcefeedback": return WithParams(new ForceFeedbackController(), p);
+                case "displaytoclipboard": return WithParams(new DisplayToClipboardController(), p);
+                case "victoryquote": return WithParams(new VictoryQuoteController { Value = Expr(comp, p, "value") }, p);
                 default: return new NullController();   // 未知控制器降级（容错）
             }
         }
@@ -486,6 +595,27 @@ namespace Lockstep.Mugen.Parse
         static BytecodeExp Expr(MugenExprCompiler comp, Dictionary<string, string> p, string key)
         {
             return p.TryGetValue(key, out string v) ? comp.Compile(v) : null;
+        }
+
+        static BytecodeExp[] ExprList(MugenExprCompiler comp, Dictionary<string, string> p, string key)
+        {
+            if (!p.TryGetValue(key, out string v))
+            {
+                return null;
+            }
+            string[] parts = v.Split(',');
+            BytecodeExp[] values = new BytecodeExp[parts.Length];
+            for (int index = 0; index < parts.Length; index++)
+            {
+                values[index] = comp.Compile(parts[index].Trim());
+            }
+            return values;
+        }
+
+        static T WithParams<T>(T controller, Dictionary<string, string> p) where T : ParameterOnlyController
+        {
+            controller.Parameters = new Dictionary<string, string>(p);
+            return controller;
         }
 
         static string Get(Dictionary<string, string> p, string key)
