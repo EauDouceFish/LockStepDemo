@@ -1,7 +1,7 @@
 ================================================================================
 R-ENT 实体系统进度 + 到「兼容所有 MUGEN 角色导入 → 状态机可跑」的清单
 ================================================================================
-基线：2026-06-05 commit 987bb1a，dotnet test 470/470。
+基线：2026-06-05 commit aed8a8f 后续工作区，dotnet test 491/491。
 
 --------------------------------------------------------------------------------
 A. R-ENT 已完成（切片 1-2）
@@ -24,7 +24,10 @@ B. R-ENT 余下切片（按依赖/价值排序）
 [🔧] 切片6 helper 关联控制器：**ParentVarSet/Add、RootVarSet/Add 已完成（commit bc79a6c）**；
      BindToParent/Root/Target、ChangeAnim2、TargetBind 仍待（需 bind 运行态字段/anim 相对逻辑）。
 [✅] 切片7 全实体跨队命中(commit 92a1430)：玩家+helper 跨队两两 TryHit(队伍=Root.Id)，helper 能打敌队不打同队；弹幕命中走切片3b。
-[⬜] 切片8 numhelper(id)/ishelper(id)/helper(id) redirect/parent·root(helper 语义)/partner：参数形与 helper redirect。
+[🔧] 切片8 参数形触发器与 helper redirect：
+     已完成 numhelper(id)/ishelper(id)/numproj(id) 参数形，以及 projcontact/projhit/projguarded 布尔别名和
+     projcontacttime/projhittime/projguardedtime/projcanceltime 时间读取（本轮 491/491）。
+     剩余 helper(id) redirect、parent·root(helper 语义)、partner。
 
 --------------------------------------------------------------------------------
 C. R-ENT 之外、到「兼容所有角色」仍需的（审计风险表对应项）
@@ -48,11 +51,11 @@ D. 「状态机可兼容所有角色导入」的判据与现状
 现状（范围分级，对齐审计 Ikemen对照审计.txt）：
 - 范围A(1v1、无 helper/proj、无超必杀冻结依赖)：离散主干已在本地测试 + KFM 类样例范围内通过。
 - 范围B(真实角色泛用)：**审计 4 个条件高风险缺口已全部解决**——helper(切片1-2/3/6-7)、projectile 命中(切片3b)、
-  全实体跨队命中(切片7)、投技 custom state(切片5)。剩余为较小项：Explod(numexplod)、参数形触发器(切片8)、BindTo*/ChangeAnim2、
+  全实体跨队命中(切片7)、投技 custom state(切片5)。剩余为较小项：Explod(numexplod)、helper redirect/partner、BindTo*/ChangeAnim2、
   R-DMG-PIPELINE 两段式(同帧多段才分歧)、juggle、AnimTime 即刻刷新、触发器长尾、R-ORACLE 兜底。
   核心战斗状态机+实体机制已支持真实角色主干；声称「全角色导入兼容」仍待 R-ORACLE 差分 + 全角色冒烟矩阵确认。
 
-下一步执行顺序：切片3 Projectile → 切片7 全实体命中 → 切片5 custom state(投技) → R3 两段式 → 切片4 Explod →
-  切片6 helper 关联控制器 → juggle/AnimTime → 触发器长尾 → R-ORACLE 差分兜底 → 全角色导入冒烟测试矩阵。
+下一步执行顺序：切片4 Explod(numexplod 最小追踪) → helper(id) redirect/partner → BindTo*/ChangeAnim2 →
+  R3 两段式 → juggle/AnimTime → 触发器长尾 → R-ORACLE 差分兜底 → 全角色导入冒烟测试矩阵。
 
 （本清单随 R-ENT 切片推进持续更新。）

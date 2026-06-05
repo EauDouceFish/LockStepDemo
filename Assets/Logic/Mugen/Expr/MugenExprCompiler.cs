@@ -301,6 +301,33 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            // R-ENT entity count predicates must run before function parsing,
+            // otherwise numhelper(5) is consumed as an unknown function.
+            if (name == "numhelper" || name == "numproj" || name == "ishelper")
+            {
+                if (IsOp("("))
+                {
+                    Next();
+                    ParseBoolOr();
+                    Expect(")");
+                }
+                else
+                {
+                    EmitInt(-1);
+                }
+                Emit(name == "numhelper" ? OpCode.OC_numhelper
+                    : name == "numproj" ? OpCode.OC_numproj : OpCode.OC_ishelper);
+                return;
+            }
+
+            // Projectile contact aliases. Time variants are regular unary functions;
+            // old boolean forms compile to Proj*Time(id) >= 0.
+            if (name == "projhit" || name == "projcontact" || name == "projguarded")
+            {
+                EmitProjectileContactAlias(name);
+                return;
+            }
+
             // 函数调用：name(...)
             if (IsOp("("))
             {
@@ -431,6 +458,25 @@ namespace Lockstep.Mugen.Expr
                 Emit(op);
             }
             // 未知单参函数：保留参数值（不发 opcode）
+        }
+
+        void EmitProjectileContactAlias(string name)
+        {
+            if (IsOp("("))
+            {
+                Next();
+                ParseBoolOr();
+                Expect(")");
+            }
+            else
+            {
+                EmitInt(-1);
+            }
+
+            Emit(name == "projhit" ? OpCode.OC_projhittime
+                : name == "projguarded" ? OpCode.OC_projguardedtime : OpCode.OC_projcontacttime);
+            EmitInt(0);
+            Emit(OpCode.OC_ge);
         }
 
         void Expect(string op)
@@ -741,9 +787,7 @@ namespace Lockstep.Mugen.Expr
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
             ["numtarget"] = OpCode.OC_numtarget, ["roundstate"] = OpCode.OC_roundstate,
             ["inguarddist"] = OpCode.OC_inguarddist,
-            // R-ENT：无参形（ishelper(id)/numhelper(id)/numproj(id) 参数形归后续切片）。
-            ["ishelper"] = OpCode.OC_ishelper, ["numhelper"] = OpCode.OC_numhelper,
-            ["numproj"] = OpCode.OC_numproj,
+            // 注：ishelper/numhelper/numproj 在 ParseIdent 特判（统一弹 id 参数，无参压 -1=全部），不在此表。
             // 受击触发器（common1 5000-5160 用）
             ["hitshakeover"] = OpCode.OC_hitshakeover, ["hitover"] = OpCode.OC_hitover,
             ["hitfall"] = OpCode.OC_hitfall, ["canrecover"] = OpCode.OC_canrecover,
@@ -803,6 +847,10 @@ namespace Lockstep.Mugen.Expr
             ["animexist"] = OpCode.OC_animexist, ["selfanimexist"] = OpCode.OC_selfanimexist,
             // animelemtime(n)：求值元素号 n 后发 opcode，运行期 MChar 算「自元素 n 起已播 tick」。
             ["animelemtime"] = OpCode.OC_animelemtime,
+            ["projcontacttime"] = OpCode.OC_projcontacttime,
+            ["projhittime"] = OpCode.OC_projhittime,
+            ["projguardedtime"] = OpCode.OC_projguardedtime,
+            ["projcanceltime"] = OpCode.OC_projcanceltime,
         };
 
         // ───────── 字节码发射（编码与 BytecodeExp.Run 一致）─────────

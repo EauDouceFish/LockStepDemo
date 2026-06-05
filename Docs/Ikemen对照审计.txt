@@ -1,8 +1,8 @@
 ================================================================================
 LockstepActDemo Mugen 引擎  ——  逐模块逐函数对照 Ikemen GO 实现的差异审计
 ================================================================================
-生成：2026-06-05   已提交绿基线：7da5e26（dotnet test 444/444）；最新审计文档提交：afddefe
-当前工作区注意：存在未提交 Pause 字段重构，dotnet test 编译失败（旧 PauseTime/SuperPauseTime 引用尚未统一到 MPauseState）。
+生成：2026-06-05   当前绿基线：dotnet test 491/491。
+当前工作区注意：R-ENT helper/projectile/custom state 主干已完成；本轮补齐参数形实体触发器。
 Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 被审计代码：Assets/Logic/Mugen/（约 6400 行 C#）+ Assets/Logic/Framework/
 
@@ -22,7 +22,7 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
     b) bytecode 编译模型差异：Ikemen 把 CNS/表达式编译成字节码（compiler.go），运行 bytecode.go 巨型 switch；
        我方表达式同样编译字节码（Expr/），但「控制器」用一控制器一 C# 类 + 虚 Run()，非 bytecode 控制器。
        这是 CLAUDE/移植方案 §2.8 授权的适配，差分只校可观测离散量。本审计据此把「控制器派发模型差异」视为[装配]而非[偏差]。
-    c) 单角色实体模型：我方 v1 无 helper/projectile/explod 实体系统（R-ENT 未做）。凡依赖多实体的函数标[偏差·缺失]。
+    c) 实体模型：helper/projectile/custom state 主干已完成；explod、bind/redirect 长尾仍按具体条目标[偏差·缺失]。
     d) 主循环：Ikemen system.go fight()/action() 约 3000 行耦合渲染/血条/网络；我方 MBattleEngine.Tick 是重写的
        headless 装配。子系统（状态机/命中/动画/物理/表达式）逐行移植带源码行号；顶层编排为装配适配。
 
@@ -102,10 +102,9 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
     enemyname/p2dist/p2bodydist/roundstate/inguarddist/hitover/hitshakeover/hitfall/canrecover/
     animexist/selfanimexist/const(子集)/gethitvar(子集)。
   redirect 已覆盖：root/parent/p2/enemy/enemynear/target（均 1v1：enemy(0)=p2、target=Targets[]）。
-  [偏差·缺失·中] 依赖 R-ENT 实体系统的 trigger 全缺，走 default→Undefined/0：
-    ishelper(862)/numhelper(403)/helper(241,redirect)/partner(124)/numenemy(70)/numexplod/numproj/numprojid/
-    projcontact/projhit/projguarded/helperindex/root(helper 语义) 等。
-    风险：中——用到 helper 的角色（多数有超必杀的角色）这些门控误判；招式逻辑可能错乱。属 R-ENT 范畴，已登记。
+  [覆盖提升] R-ENT 高频触发器已落地：ishelper/numhelper/numproj 参数形、projcontact/projhit/projguarded 及 time 形。
+  [偏差·缺失·中] 剩余实体相关 trigger：helper(id) redirect、partner、numexplod、helperindex、root(helper 语义) 等。
+    风险：中——仍会影响部分 helper/演出脚本，但 helper/projectile/投技主干已不再是空缺。
   [偏差·缺失·低] 杂项 trigger 未覆盖：ailevel(203,返0=无AI，正确)/stagevar(58)/teammode/teamside/
     drawgame/win*/lose*/matchno/roundsexisted/gamemode/...（多为 AI/演出/系统量，战斗核心影响小）。
   [偏差·低] sysvar/sysfvar：编译器登记但与 var/fvar 共用容器（OC_var），未单独隔离系统变量空间。
@@ -189,11 +188,9 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
     风险：中——这些控制器目前对 sim 无效果，依赖它们的招式行为缺失（如超必杀不冻结对方、投技反击 ReversalDef 不生效）。
   [偏差·缺失·低] 纯表现控制器(PlaySnd/Explod/PalFX/AfterImage/Trans/Angle/EnvShake/MakeDust...)逻辑层 no-op，
     对确定性 sim 无影响（设计如此），渲染待表现层。
-  [偏差·缺失·中] 实体类控制器(Helper/Projectile/BindTo*/ParentVar*/DestroySelf)未做——R-ENT 范畴。
-    TargetState/TargetLifeAdd/TargetPowerAdd/TargetVelSet/TargetVelAdd/TargetFacing/TargetDrop 已在 Codex 独立分支
-    `codex-tierb-nonentity` commit 1e4845e 完成并测试，尚未合入 master；TargetBind 仍依赖 bind 状态字段。
-  [覆盖提升·待合入] Codex 1e4845e 同时补了 Explod/PalFX/AfterImage/Text/声音/冷门控制器的大量强类型参数捕获；
-    master 当前仍停在 8ae6874 的较小 parse-only 子集。
+  [覆盖提升] Helper/DestroySelf、Projectile、ParentVarSet/Add、RootVarSet/Add、Target*、custom state 投技已落地。
+    剩余实体类控制器主要是 BindTo*/TargetBind/ChangeAnim2 与 Explod 追踪/表现层。
+  [覆盖提升] Codex 1e4845e 的 Explod/PalFX/AfterImage/Text/声音/冷门控制器强类型参数捕获已合入 master。
 
 [4.5] HitDefController + HitDef 字段（见模块 6）
 
@@ -377,11 +374,11 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
     范围A = 当前受限 demo：1v1、无 helper/projectile/explod、无同帧多段、无超必杀冻结依赖。
     范围B = 真实 MUGEN/Ikemen 角色泛用兼容（导入任意角色即战）。
 
-【条件高风险（范围B 下为高；范围A 下不触发）】
-  H1. R-ENT 缺失：helper/projectile/explod 及其全部 trigger(ishelper/numhelper/numproj...)与控制器(Helper/Projectile/
-      Target/Bind*/ParentVar*/DestroySelf)无效。
-      —— 范围B 评级【高】：海量真实角色的超必杀/弹幕/投技建在 helper/proj 上，缺则招式逻辑直接错乱，是最大功能坎。
-      —— 范围A 评级：不触发（demo 不含这类角色）。
+【已解除的原条件高风险】
+  H1. R-ENT 主干缺失：helper/projectile/全实体命中/投技 custom state 曾是范围B最大风险。
+      —— 2026-06-05 已完成 helper 生命周期、自跑、命中、变量回传，projectile 运动+命中，全实体跨队命中，
+         p2getp1state custom state，以及 numhelper/ishelper/numproj/proj*time 参数形触发器。
+      —— 剩余风险降为中：Explod(numexplod)、BindTo*/TargetBind/ChangeAnim2、helper redirect/partner 与表现层。
 
 【中风险（特定招式/角色/多实体分歧）】
   R2. Pause/SuperPause 装配近似(模块9.4)：多施放者/受击叠加/pausetime 触发器/off-by-one 与 Ikemen 分歧。
@@ -405,7 +402,7 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 ================================================================================
 口径声明：以下"通过"= 对应提交时的本地 dotnet test 单元/集成测试 + 个别 Unity MCP 手动样例；
   【尚未】通过 Ikemen 逐帧差分 trace（R-ORACLE 未做）证明与 Ikemen 位级/帧级一致。Ikemen 版本/commit 未锚定。
-  当前主工作区因未提交 Pause 字段重构处于编译失败状态；下列证据以最近绿基线 7da5e26 及各功能提交当时测试为准。
+  当前证据以本轮 dotnet test 491/491 及各功能提交当时测试为准。
 
   验证项                     | 证据形式                                   | 断言的离散量            | 范围/局限
   --------------------------|-------------------------------------------|-----------------------|------------------------------------
@@ -418,7 +415,9 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
    name/roundstate/animelemtime)|                                          | 值逐位等价              |   运行期 trace
   确定性                     | 各 *IsDeterministic 测试                    | 同输入同 ComputeHash    | 仅"自洽确定性"，非与 Ikemen 跨实现一致
   暂停冻结                   | PauseFreezeTests(5例，字段重构前/过程中)    | 冻结方Time不变/计时递减  | 当前主工作区未绿；需 MPauseState 收口后重跑
-  Target 控制器               | Codex 分支 TargetControllersTests(7例)      | target life/power/vel/state/drop | commit 1e4845e，尚未合入 master
+  Target 控制器               | TargetControllersTests(7例)                 | target life/power/vel/state/drop | 已合入 master
+  R-ENT 实体主干              | R-ENT 切片测试集合                          | helper/proj/投技/跨队命中         | 本地 TDD，非 Ikemen trace
+  实体参数形触发器             | EntityParamTriggerTests(5例)                | numhelper/ishelper/numproj/proj*time | 491/491
 
   尚【未】有的证据：Ikemen headless 帧 trace 对账(R-ORACLE)、真实角色"完整招式集"端到端、长序列回放、
     连续量(pos/vel)对 Ikemen 的容差量化、跨实现确定性(双端同 hash)。
@@ -429,7 +428,7 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 - 离散主干（命中→受击态 5000 系→恢复→扣血→KO、搓招→招式态、走跳蹲、伤害公式、随机、距离/名字/动画触发器）：
   在【范围A：1v1、无 helper、无多段同帧、无超必杀冻结依赖】下，离散可观测量在【本地单元/集成测试 + KFM 类样例范围内】
   通过；【尚未】经 Ikemen 逐帧差分 trace 证明与 Ikemen 一致（R-ORACLE 未做）。不宜表述为"已对 Ikemen 全量验证"。
-- 范围B（真实角色泛用兼容）下，R-ENT 缺失为高风险，叠加 R2-R8 后大量真实角色行为会偏离。
+- 范围B（真实角色泛用兼容）下，R-ENT 主干缺失风险已解除；剩余 R3-R8 与表现/长尾 trigger 仍会让部分真实角色偏离。
 - 连续量(位置/速度)为定点容差，漂移量未量化，需 R-ORACLE 真 trace。
 
 到达"与 Ikemen 离散全等"的必要工作（按依赖）：

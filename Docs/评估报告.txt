@@ -2,12 +2,10 @@
 • 结论
   当前已经从“Ikemen/MUGEN 战斗内核的早期骨架”推进到“1v1 根角色战斗主干可验证”的阶段，但还不是可兼容任意 MUGEN
   角色的完整引擎。按“能导入真实角色并可靠战斗”的目标，整体进度约 30-35%；按“两个 KFM 能在 Unity 里站、走、跳、
-  出招、发生命中、进入受击与回合结算”的最小 playable 目标，大概 55-60%。真正卡点已经从受击状态机转移到
-  Pause 字段重构收口、Target/控制器接线、R-ENT 实体系统、表现事件与回滚确定性。
+  出招、发生命中、进入受击与回合结算”的最小 playable 目标，大概 70% 左右。真正卡点已经从受击状态机/R-ENT 主干转移到
+  Explod/表现事件、BindTo*/ChangeAnim2、两段式伤害、juggle、AnimTime 即刻刷新、R-ORACLE 与回滚确定性。
 
-  最近已提交绿基线：7da5e26，dotnet test 444/444。
-  当前主工作区不是绿的：存在未提交 Pause 字段重构，dotnet test 编译失败；旧代码仍引用 MChar.PauseTime/SuperPauseTime，
-  但 Char.cs 正在改为 MPauseState Pause 聚合模型。先恢复编译绿是下一步第一优先级。
+  当前测试基线：dotnet test 491/491。
 
   离目标还差多远
   最大缺口不是架构壳，而是 MUGEN 战斗语义密度：
@@ -146,6 +144,5 @@
   正的结构风险是 状态块扁平化。如果目标是“兼容大量 MUGEN 角色”，以后大概率要补一个能表达 Ikemen StateBlock 嵌套语义的中
   间层；如果目标先是“KFM/常规角色能打”，当前扁平模型可以继续顶一段。
 
-  下一步优先级已经变化：先把当前 Pause 字段重构收口，让主工作区恢复 dotnet test 全绿；然后合入 Codex 分支的
-  Target* 与 Tier B 参数捕获；随后把 Pause/Width/ScreenBound/HitOverride/ReversalDef 等控制器接到 MChar 字段。
-  这些完成后再开 R-ENT，因为 helper/projectile/explod/custom state 是“真实角色泛用兼容”的最大地基。
+  下一步优先级已经变化：先做 Explod(numexplod) 最小追踪，再补 helper(id) redirect/partner 和 BindTo*/ChangeAnim2；
+  随后做 R-DMG-PIPELINE 两段式、juggle、AnimTime 即刻刷新与 R-ORACLE。R-ENT 的硬骨头已经完成，后面主要是覆盖面和差分验证。

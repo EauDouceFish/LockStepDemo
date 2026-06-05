@@ -199,6 +199,8 @@ namespace Lockstep.Mugen.Battle
             PauseState.Step();
             for (int i = 0; i < Chars.Count; i++) { Chars[i].ComputePauseBool(); }
             for (int i = 0; i < Helpers.Count; i++) { Helpers[i].ComputePauseBool(); }
+            for (int i = 0; i < Chars.Count; i++) { StepProjectileContactTime(Chars[i]); }
+            for (int i = 0; i < Helpers.Count; i++) { StepProjectileContactTime(Helpers[i]); }
             bool anyPause = PauseState.AnyActive;
 
             // 1) 输入缓冲（仅玩家；helper 不读键）。
@@ -261,6 +263,14 @@ namespace Lockstep.Mugen.Battle
 
             // 7) 移除 DestroySelf 的 helper。
             RemoveDestroyed();
+        }
+
+        static void StepProjectileContactTime(MChar character)
+        {
+            if (character.ProjectileContactTime >= 0)
+            {
+                character.ProjectileContactTime++;
+            }
         }
 
         // 队伍归属（移植 Ikemen teamside 简化）：Root 玩家的 id（0/1）。helper.Root=owner 玩家 → 与 owner 同队。

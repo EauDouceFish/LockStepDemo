@@ -85,7 +85,12 @@ namespace Lockstep.Mugen.Hit
                 return false;
             }
             proj.ContactCount++;
-            if (defender.Guarding && GuardFlagAllows(hd, defender.StateType))
+            bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
+            if (proj.Owner != null)
+            {
+                proj.Owner.RecordProjectileContact(proj.ProjId, guarded);
+            }
+            if (guarded)
             {
                 ApplyGuard(proj.Owner, defender, hd);
             }

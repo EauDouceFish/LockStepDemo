@@ -153,6 +153,10 @@ namespace Lockstep.Mugen.Char
         public bool IsHelper;        // 本实体是否为 helper（ishelper trigger）
         public int HelperType;       // helper id（= Helper 控制器 id 参数；ishelper(id)/numhelper(id) 匹配）
         public bool Destroyed;       // DestroySelf 标记；引擎帧末移除（仅 helper 等实体，玩家不受影响）
+        // Projectile contact trigger state: pcid/pctype/pctime in Ikemen char.go.
+        public int ProjectileContactId;
+        public int ProjectileContactType; // 0=hit, 1=guarded, 2=cancel
+        public int ProjectileContactTime = -1;
 
         /// <summary>请求创建一个 helper（移植 Helper 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
         public void RequestHelper(int stateNo, int helperType, FFloat posX, FFloat posY, int facing, bool keyCtrl)
@@ -176,6 +180,29 @@ namespace Lockstep.Mugen.Char
                 AccelX = accelX, AccelY = accelY, PosX = posX, PosY = posY,
                 RemoveTime = removeTime, AnimNo = animNo, HitDef = hitDef,
             });
+        }
+
+        public void RecordProjectileContact(int projId, bool guarded)
+        {
+            ProjectileContactId = projId;
+            ProjectileContactType = guarded ? 1 : 0;
+            ProjectileContactTime = 0;
+        }
+
+        public BytecodeValue ProjectileContactTimeValue(int projId, int wantedType)
+        {
+            if (ProjectileContactTime < 0)
+            {
+                return BytecodeValue.Int(-1);
+            }
+            if (projId > 0 && projId != ProjectileContactId)
+            {
+                return BytecodeValue.Int(-1);
+            }
+            bool matched = wantedType == 3
+                ? ProjectileContactType != 2
+                : ProjectileContactType == wantedType;
+            return BytecodeValue.Int(matched ? ProjectileContactTime : -1);
         }
 
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
@@ -439,6 +466,8 @@ namespace Lockstep.Mugen.Char
                 ScreenBoundMoveCameraY = ScreenBoundMoveCameraY, ScreenBoundStageBound = ScreenBoundStageBound,
                 MoveContactTime = MoveContactTime, CounterHit = CounterHit, RoundState = RoundState,
                 World = World, IsHelper = IsHelper, HelperType = HelperType, Destroyed = Destroyed,
+                ProjectileContactId = ProjectileContactId, ProjectileContactType = ProjectileContactType,
+                ProjectileContactTime = ProjectileContactTime,
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
@@ -483,6 +512,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(ScreenBoundMoveCameraY); hash.AddBool(ScreenBoundStageBound);
             hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit); hash.AddInt32(RoundState);
             hash.AddBool(IsHelper); hash.AddInt32(HelperType); hash.AddBool(Destroyed);
+            hash.AddInt32(ProjectileContactId); hash.AddInt32(ProjectileContactType); hash.AddInt32(ProjectileContactTime);
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
@@ -619,13 +649,41 @@ namespace Lockstep.Mugen.Char
                 }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
                 case OpCode.OC_ishelper:
-                    // ishelper 无参=是否 helper；ishelper(id) 由编译器压参数后到此（弹参数比对 HelperType）。
-                    // 当前编译器把 ishelper 当无参 trigger（见编译器登记），无参形返回 IsHelper。
-                    return BytecodeValue.Bool(IsHelper);
+                {
+                    // 弹 id：-1=无参(只判是否 helper)；否则 IsHelper 且 HelperType==id。
+                    int id = Pop(stack).ToI();
+                    return BytecodeValue.Bool(IsHelper && (id < 0 || HelperType == id));
+                }
                 case OpCode.OC_numhelper:
-                    return BytecodeValue.Int(World != null ? World.CountHelpers(-1) : 0);
+                {
+                    int id = Pop(stack).ToI();
+                    return BytecodeValue.Int(World != null ? World.CountHelpers(id) : 0);
+                }
                 case OpCode.OC_numproj:
-                    return BytecodeValue.Int(World != null ? World.CountProjectiles(-1) : 0);
+                {
+                    int id = Pop(stack).ToI();
+                    return BytecodeValue.Int(World != null ? World.CountProjectiles(id) : 0);
+                }
+                case OpCode.OC_projcontacttime:
+                {
+                    int id = Pop(stack).ToI();
+                    return ProjectileContactTimeValue(id, 3);
+                }
+                case OpCode.OC_projhittime:
+                {
+                    int id = Pop(stack).ToI();
+                    return ProjectileContactTimeValue(id, 0);
+                }
+                case OpCode.OC_projguardedtime:
+                {
+                    int id = Pop(stack).ToI();
+                    return ProjectileContactTimeValue(id, 1);
+                }
+                case OpCode.OC_projcanceltime:
+                {
+                    int id = Pop(stack).ToI();
+                    return ProjectileContactTimeValue(id, 2);
+                }
                 case OpCode.OC_roundstate: return BytecodeValue.Int(RoundState);
                 case OpCode.OC_inguarddist:
                     // 简化：对手在攻击态(MoveType=A=4)且水平体距在守备范围内 → 可进入守招判定。
