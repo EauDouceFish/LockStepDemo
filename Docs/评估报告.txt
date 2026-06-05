@@ -1,9 +1,10 @@
 
 • 结论
-  当前已经从“Ikemen/MUGEN 战斗内核的早期骨架”推进到“1v1 根角色战斗主干可验证”的阶段，但还不是可兼容任意 MUGEN
-  角色的完整引擎。按“能导入真实角色并可靠战斗”的目标，整体进度约 30-35%；按“两个 KFM 能在 Unity 里站、走、跳、
-  出招、发生命中、进入受击与回合结算”的最小 playable 目标，大概 70% 左右。真正卡点已经从受击状态机/R-ENT 主干转移到
-  Explod/表现事件、BindTo*/ChangeAnim2、两段式伤害、juggle、AnimTime 即刻刷新、R-ORACLE 与回滚确定性。
+  当前已经从“Ikemen/MUGEN 战斗内核的早期骨架”推进到“真实角色战斗状态机主干可验证”的阶段。按“任意 MUGEN 角色
+  导入后所有招式都能出、离散行为对 Ikemen 对齐”的最终目标，整体进度约 50% 左右；按“普通 1v1 角色的根角色招式、
+  helper、projectile、投技主干能跑”的招式执行目标，大概 65-70%。真正卡点已经从受击状态机/R-ENT 主干转移到
+  Explod/numexplod、helper redirect/partner、BindTo*/TargetBind/ChangeAnim2、两段式伤害、juggle、AnimTime 即刻刷新、
+  trigger 长尾、localcoord/palette/sound 表现与 R-ORACLE 差分。
 
   当前测试基线：dotnet test 491/491。
 
@@ -12,24 +13,23 @@
 
    模块                                                   当前状态    距 Ikemen/MUGEN 兼容还差
   ━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Char 运行态    有核心字段、Clone/Hash、P2/Target/Root、Ghv、Round    helper/projectile/explod、bind/custom state、
-                  State、Tier B 字段批一部分；Pause 正在重构             camera、team/localcoord、表现态仍缺；当前 Pause
-                                                                      字段模型半落地导致测试红
+   Char 运行态    有核心字段、Clone/Hash、P2/Target/Root/Parent、Ghv、  explod/表现态、bind 运行态、camera/team/
+                  RoundState、Pause、Tier B 字段、helper/projectile      localcoord、palette/sound 队列仍缺或未系统化
   ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
    状态机           可跑 -3/-2/-1、当前状态、triggerall/triggerN、    没有 Ikemen 嵌套 StateBlock 树、if/else/loop/
                        persistent、ignorehitpause、common fallback    for；custom state ownership/target state 语义不完
                                                                       整
   ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
-   控制器          基础/生命能量/HitDef/受击 hit 控制器可运行；Tier B  Ikemen bytecode.go 里上百个；helper/projectile/
-                  非实体 parse-only 子集已入 master；Codex 分支已补     bind/ParentVar/TargetBind 仍缺，Pause/Width/
-                  Target* 与大量参数捕获，待合入                       ScreenBound/HitOverride 等还要接线到运行态
+   控制器          基础/生命能量/HitDef/受击 hit、Pause/Width/          BindTo*/TargetBind/ChangeAnim2、Explod 真追踪、
+                  ScreenBound、Target*、Helper/DestroySelf、Projectile、ReversalDef/HitOverride 边角、表现事件仍待补
+                  ParentVar/RootVar 已运行或可解析
   ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
-   HitDef/命中    有 Clsn1×Clsn2、hitflag/guardflag、伤害公式、       投技 p2getp1state/custom state、juggle、两段式
-                  攻防倍率、numhits/hitonce、fall.damage/down.*、      伤害管线、spark/sound/envshake/cornerpush 等仍缺
-                  守招与 Target 记录
+   HitDef/命中    有 Clsn1×Clsn2、hitflag/guardflag、伤害公式、       juggle、两段式伤害管线、spark/sound/envshake/
+                  攻防倍率、numhits/hitonce、fall.damage/down.*、      cornerpush、gethitvar 长尾仍缺或未对账
+                  守招、Target 记录、projectile 命中、投技 custom state
   ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
-   受击机          5000-5160 主干已完成：命中进入受击、hitshake/slide/  仍需更多 gethitvar 字段、juggle、防御边角、投技
-                  recover、倒地/起身、10 角色站立受击 TDD 通过         与真实角色完整招式集差分
+   受击机          5000-5160 主干已完成：命中进入受击、hitshake/slide/  仍需更多 gethitvar 字段、juggle、防御边角和真实
+                  recover、倒地/起身、10 角色站立受击 TDD 通过         角色完整招式集差分
   ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
    命令系统        CMD parser、输入缓冲、方向相对、蓄力/释放等已较    复杂角色 command 边角仍需真实角色差分验证
                                                               扎实
@@ -89,16 +89,16 @@
      顶住，兼容复杂角色时会遇到结构性缺口。
 
   2. Char 运行态不是 Ikemen 完整 Char
-     当前 MChar 已不只是核心子集，受击、倍率、roundstate、Tier B 字段批已有一部分。但 helper、projectile、explod、
-     target bind、custom state、camera/team/localcoord/表现态仍要进入运行态并纳入 Clone/Hash。当前 Pause 字段重构要先收口。
+     当前 MChar 已不只是核心子集，受击、倍率、roundstate、Pause、Tier B 字段、helper/projectile、custom state 已有。
+     explod、target bind、camera/team/localcoord/表现态仍要进入运行态或表现事件，并纳入 Clone/Hash 或引擎快照。
 
   3. HitDef/GetHitVar 字段不完整
      当前命中已覆盖伤害公式、攻防倍率、numhits/hitonce、fall.damage/down.* 等主干，但 MUGEN 角色大量依赖 p2getp1state、
      spark/sound/envshake、cornerpush、完整 gethitvar()。这会直接卡投技、打击感和复杂连段。
 
   4. 实体系统缺失
-     Ikemen 的 helper/projectile/explod 是大量角色的基础。当前只有两个 root char。没有实体生命周期、owner/root/parent/
-     target 体系，很多控制器无法真实实现。
+     Ikemen 的 helper/projectile/explod 是大量角色的基础。当前 helper/projectile/custom state 主干已打通，owner/root/
+     parent/target 基本可用；剩 explod 追踪、helper redirect、bind 类控制器和 partner/team 扩展。
 
   5. 回合/系统层缺失
      RoundState 主干已进来，但 lifebar、win pose、round intro 细节、camera、screenbound/stage 边界仍没系统化。
@@ -117,8 +117,8 @@
    状态机        char.go actionRun + bytecode.go    State/MStateMachine.cs +           行为骨架可用，结构未 1:1
                  StateBlock                         MStateDef.cs
   ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
-   控制器        bytecode.go 上百个 controller      StateCtrl/*.cs 基础+Hit+Tier B      覆盖度提升，但实体/表现/写态仍未
-                                                    子集，Codex 分支有待合入扩展       到真实角色泛用
+   控制器        bytecode.go 上百个 controller      StateCtrl/*.cs 基础+Hit+Tier B      覆盖度明显提升；bind/explod/表现和
+                                                    +Target+R-ENT 主干                 冷门长尾仍未到全角色泛用
   ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
    角色运行态    char.go Char 巨大状态体            Char/Char.cs 子集                  需要继续扩字段，但要守 Clone/
                                                                                        Hash
@@ -127,7 +127,8 @@
   ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
    动画          anim.go                            Anim/MAnimSystem.cs                基础动作可跑
   ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
-   命中          char.go hit/gethit                 Hit/MHitSystem.cs + MHitDef.cs     1v1 主干可用，不到投技/多实体兼容
+   命中          char.go hit/gethit                 Hit/MHitSystem.cs + MHitDef.cs     根角色/helper/proj/投技主干可用；
+                                                                                       两段式/juggle/长尾未全
   ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
    角色加载      DEF/CNS/CMD/AIR/SFF load           Battle/MCharLoader.cs + Parse/     可加载 KFM 级别，完整角色不足
                                                     Import
@@ -144,5 +145,6 @@
   正的结构风险是 状态块扁平化。如果目标是“兼容大量 MUGEN 角色”，以后大概率要补一个能表达 Ikemen StateBlock 嵌套语义的中
   间层；如果目标先是“KFM/常规角色能打”，当前扁平模型可以继续顶一段。
 
-  下一步优先级已经变化：先做 Explod(numexplod) 最小追踪，再补 helper(id) redirect/partner 和 BindTo*/ChangeAnim2；
-  随后做 R-DMG-PIPELINE 两段式、juggle、AnimTime 即刻刷新与 R-ORACLE。R-ENT 的硬骨头已经完成，后面主要是覆盖面和差分验证。
+  下一步优先级已经变化：先做 Explod(numexplod) 最小追踪，再补 helper(id) redirect/partner 和 BindTo*/TargetBind/ChangeAnim2；
+  随后做 R-DMG-PIPELINE 两段式、juggle、AnimTime 即刻刷新、trigger 长尾、localcoord/palette/sound 与 R-ORACLE。
+  R-ENT 的硬骨头已经完成，后面主要是覆盖面、表现事件和差分验证。

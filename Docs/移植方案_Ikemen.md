@@ -92,15 +92,32 @@ Assets/Logic/Mugen/
 | **M2** 编译器 | `compiler.go`(+functions)：CNS trigger 字符串 → BytecodeExp | M1 | ✅ 核心完成(`6a67038`): tokenizer+完整优先级链+字面量/括号/一元/算术/比较/逻辑/位+无参&轴 trigger+函数(abs/floor/trig/ifelse/log)+var/fvar + **statetype/movetype 字母枚举(S/C/A/L,OR列表,!=)** + **`=[a,b]`/`(a,b]` 区间语法** + **redirect 编译(p2/root/parent, OC_run 包裹)**。dotnet test 127/127。**待补(后续里程碑)**: 字符串 `command=`(→M6)、`const(...)`/常量(→M9 角色加载)、p2statetype/prevstatetype/target 编译、更多 trigger |
 | **M3** Char 运行态 | `Char`/`CharSystemVar`(定点)、生命周期、Clone/WriteHash 接回滚 | M0 | ✅ 地基完成(`d91ab38`): 核心 trigger + **redirect 机制(VM oc/cur 双上下文+每迭代重置, OC_root/parent/p2/target + OC_run/nordrun + rdreset; MChar Id/P2/Root/Parent/Targets, Clone 浅拷结构引用待 World 重链)** + **CharSystemVar 常用字段+trigger(id/palno/hitpausetime/hit*/move*/animtime/numtarget)** + **MGetHitVar 受击容器(常用字段+Clone/Hash)**。dotnet test 121/121。**待补(→M7)**: CharSystemVar 全字段、gethitvar(...) opcode 接入、HitDef(130字段) |
 | **M4** 状态机 | `StateBytecode` + state runner + ChangeState/SelfState + common states | M1,M3 | ✅ 完成(`9584849`): **MTriggerSet(triggerall全AND + trigger1..n 组内AND/组间OR)** + 控制器 **persistent(1每帧/0一次/N每N次)** + **ignorehitpause** + **负状态 -3/-2/-1 每帧跑(移植 actionRun 顺序)** + **SelfStateController** + **common states 回退查找** + ChangeState 同帧重入/statedef 头应用/hitpause 门控。dotnet test 135/135。**待补(后续)**: 嵌套 StateBlock if/else 树、loop/for、persistent=N 精确节奏、-4/+1 Ikemen 扩展态 |
-| **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…） | M2,M4 | ✅ 核心完成 a06ebd7/431edc3/c736b13: BasicControllers(Null/Vel/Pos/ChangeAnim/Ctrl/Var/StateType) + StatControllers(Life/Power/Turn/AssertSpecial) + **MugenCnsParser 接入(Statedef/State→实例化18类控制器+编译triggerall/triggerN)**。dotnet test 159/159。**待续**: HitBy/Width/Explod/PlaySnd 等更多控制器 |
+| **M5** StateControllers | 逐个移植（changeState/vel*/pos*/hitDef/…） | M2,M4 | 🔄 主干完成，长尾进行中。已落地 Basic/Stat/HitDef/Hit 控制器、Pause/Width/ScreenBound/Target*、Helper/DestroySelf、Projectile、ParentVar/RootVar，Tier B 大量表现控制器已 field-ready 参数捕获。当前 `dotnet test 491/491`。**待续**: Explod(numexplod)、BindTo*/TargetBind/ChangeAnim2、ReversalDef/HitOverride 边角、表现事件长尾 |
 | **M6** 命令系统 | input.go：CommandList/Command/cmdElem，charge/release/4way/strict/plus 全语义 | M3 | ✅ 完成 a8ace2c/ecb2b13: MCommandModel(输入位+环形缓冲)+MCommandParser(波浪释放/数字蓄力/斜杠按住/$4way/+AND/>严格; 方向大写按钮小写)+MCommandMatcher(末步边沿+向前贪心+朝向相对+蓄力+释放+$子集)+MCommandList(每帧Update/IsActive/Clone/Hash)+MugenCmdParser([Command]段)+编译器 command=name trigger。dotnet test 173/173 |
-| **M7** 命中 | HitDef(130字段)+命中检测+GetHitVar+gethit 5000-5150 | M4,M5 | ✅ 核心完成 6c6e593: MHitDef(核心字段)+MClsn(Clsn1×Clsn2朝向镜像重叠)+HitDefController+MHitSystem(hitflag校验+结算:扣血/转向/击退/双方hitstop/GetHitVar填值/守方进5000+movetypeH/攻方movehit+target登记/同招一次)+CnsParser接入 type=HitDef。dotnet test 180/180。**待续**: 完整130字段/守招格挡/projectile/多段命中/gethit 5000-5150 数据态 |
+| **M7** 命中 | HitDef(130字段)+命中检测+GetHitVar+gethit 5000-5150 | M4,M5 | 🔄 离散主干完成。已覆盖 HitDef 关键字段、伤害公式/攻防倍率、numhits/hitonce、fall.damage/down.*、守招、5000-5160 受击主干、projectile 命中、p2getp1state custom state 投技。当前 `dotnet test 491/491`。**待续**: R-DMG-PIPELINE 两段式、juggle、cornerpush、spark/sound/envshake、gethitvar 长尾、Ikemen trace 对账 |
 | **M8** 动画/SFF 对接 | `anim.go`(AIR→Animation) + 对接 SFF 读取 → Clsn/精灵 | M3 | ✅ 完成 7f80357: Mugen/Anim/MAnim(MAnimFrame/MAnimData+ComputePacing 算 TotalTime/LoopTime/PreLoopTime)+MAnimSystem(literal 移植 Action 推进:跳零时长帧/末元素停留/循环回绕/curtime 回绕,派生 AnimElemNo/AnimTime,填 Clsn1/Clsn2,动画号变化自检重置,运行态写回 MChar 接回滚)+MAnimImport(AIR→MAnimData 桥接)。MChar 增 5 个动画运行态字段全纳入 Clone/Hash。dotnet test 229/229。**待续**: AnimElemTime(n)/AnimElemNo(time) 复杂查询、interpolate/scale/blend(纯表现)、SFF 像素加载(M11 表现层) |
-| **M9** 角色加载+整合 | DEF/CNS/CMD/AIR/SFF 全链路加载 → 跑起 KFM → **差分对账 Ikemen**（离散全等/连续容差） | M2,M5,M6,M7,M8 | 🔄 进行中。✅ M9.1 live pipeline(9c14d6f): Mugen/Battle/(MDefParser/MCharData/MCharLoader/MBattleEngine) 组装 命令→状态机→物理→动画→命中, 真实 KFM 加载并连跑60帧。✅ M9 物理+公共状态(97904e3): MPhysics(摩擦/重力, 移植 posUpdate)+SpawnChar 入场应用 Statedef 头部+接 common1(借 Terrarian)。dotnet test 240/240。**详见 Docs/M9_进度与续作.md**。**余下**: M9.2 Unity 渲染(需用户启 MCP)、物理/走跳补全、M9.3 真差分对账(查 Ikemen headless 抽 trace 可行性)、黄金哈希迁 MChar |
+| **M9** 角色加载+整合 | DEF/CNS/CMD/AIR/SFF 全链路加载 → 跑起真实角色 → **差分对账 Ikemen**（离散全等/连续容差） | M2,M5,M6,M7,M8 | 🔄 进行中，真实角色战斗状态机主干已打通。已完成 KFM live pipeline、物理/common fallback、2P、回合、受击、Pause、Target*、helper/projectile/custom state 投技、实体参数形触发器。当前 `dotnet test 491/491`。**余下**: Explod/numexplod、helper redirect/partner、BindTo*/ChangeAnim2、两段式伤害、juggle、AnimTime 即刻刷新、localcoord/palette/sound、Ikemen headless trace、全角色冒烟矩阵 |
 | **M10** 回滚 | 全 Char 状态 snapshot + RollbackPredictor + desync 哈希逐帧对账 | M9 | ⬜ |
 | **M11** Unity 表现层对接 | 移植引擎 ↔ 现有 View（精灵/Clsn gizmo/输入采集） | M9 | ⬜ |
 
 **第一个可玩里程碑** = M9（真实 KFM 能动能打、与 Ikemen 离散对账通过）。
+
+### 2026-06-05 校准：Ikemen 引擎复刻对比顺序（从“能出所有招式”倒推）
+
+当前已经完成的主干：表达式 VM/编译器、状态机、命令、动画、命中/受击、回合、Pause、Target*、helper、projectile、
+全实体跨队命中、投技 custom state、实体参数形触发器。接下来不再是“先搭大框架”，而是按真实角色招式链路补最后缺口：
+
+1. **Explod/numexplod 最小追踪**：先让 `numexplod`、Remove/ModifyExplod 在逻辑层有可数实体；渲染后置。
+2. **helper redirect / partner / root-parent 细节**：补 `helper(id), trigger`、`partner`、helper 场景下 root/parent 语义。
+3. **Bind/相对动画类控制器**：`BindToParent`、`BindToRoot`、`BindToTarget`、`TargetBind`、`ChangeAnim2`。
+4. **伤害与连段严格性**：R-DMG-PIPELINE 两段式伤害 + KO 排序、R-JUGGLE 点数扣减/检查。
+5. **动画同帧读数**：ChangeAnim 后同帧刷新 `AnimTime/AnimElem/AnimElemTime`，消除晚一相。
+6. **触发器/常量长尾**：`animelemno(time)`、完整 `gethitvar`、`const/sysvar/sysfvar`、`stagevar`、AI/胜负/队伍等冷门量。
+7. **坐标/资源/表现层**：`localcoord` 缩放、`.act` palette、PalFX、SND、HUD/camera/stage、Explod 渲染。
+8. **R-ORACLE**：改 Ikemen GO 或外挂 trace，做逐帧 stateno/anim/pos/vel/life/target/helper/proj 对账。
+9. **全角色冒烟矩阵**：把现有 10+ 角色扩成“导入即跑全招式脚本”的批量回归。
+
+判定口径：没有第 8 步以前，只能说“本地 TDD 覆盖下对齐”；不能严肃声称“任意 MUGEN 角色全招式与 Ikemen 等价”。
 
 > **⭐ M9 之后那条长尾（受击状态机/控制器补全/helper/projectile/回合机/差分对账/决斗场）已拆成可认领的
 > TDD 任务队列：见 `Docs/对战完整化路线图.md`。** 含每模块封闭验收 harness、重构评估结论（不做结构性重构，

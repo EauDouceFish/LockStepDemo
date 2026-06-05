@@ -17,7 +17,7 @@ A. R-ENT 已完成（切片 1-2）
 B. R-ENT 余下切片（按依赖/价值排序）
 --------------------------------------------------------------------------------
 [✅] 切片3 Projectile：3a(commit a7be935)motion+生命周期+numproj；3b(commit ae59d48)自带 HitDef+Clsn1+命中敌队(ApplyHit 走 owner)
-     +projcontact/projhit 计数+命中移除+确定性。弹幕角色可真正打人。(projcontact/projhit 触发器值已计数，触发器接线归切片8。)
+     +projcontact/projhit 计数+命中移除+确定性。弹幕角色可真正打人；projcontact/projhit/proj*time 触发器已于切片8 接线。
 [⬜] 切片4 Explod：表现实体（逻辑层仅追踪 numexplod；渲染归表现层）。RemoveExplod/ModifyExplod 关联。
 [✅] 切片5 custom state 投技(commit 759d948)：MChar.StateOwner+MHitDef.P2GetP1State；ApplyHit p2stateno+p2getp1state→守方跑攻方状态表；
      引擎 StateDataFor 用归属角色数据表；SelfState 释放归属。投技机制打通(P2 进 P1 投技态、P1 状态在 P2 上跑、确定性)。
