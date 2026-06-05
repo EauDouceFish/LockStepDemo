@@ -739,7 +739,8 @@ namespace Lockstep.Mugen.Expr
             ["hitcount"] = OpCode.OC_hitcount, ["uniqhitcount"] = OpCode.OC_uniqhitcount,
             ["movecontact"] = OpCode.OC_movecontact, ["movehit"] = OpCode.OC_movehit,
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
-            ["numtarget"] = OpCode.OC_numtarget,
+            ["numtarget"] = OpCode.OC_numtarget, ["roundstate"] = OpCode.OC_roundstate,
+            ["inguarddist"] = OpCode.OC_inguarddist,
             // 受击触发器（common1 5000-5160 用）
             ["hitshakeover"] = OpCode.OC_hitshakeover, ["hitover"] = OpCode.OC_hitover,
             ["hitfall"] = OpCode.OC_hitfall, ["canrecover"] = OpCode.OC_canrecover,

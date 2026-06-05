@@ -143,6 +143,10 @@ namespace Lockstep.Mugen.Char
         // HitOverride 槽（8 个，对齐 Ikemen c.ho[8]）：受击改写。命中系统据此改受击方目标态。
         public MHitOverride[] HitOverrides = new MHitOverride[8];
 
+        // 回合状态（roundstate trigger）：1 入场/2 战斗/3 已分胜负缓冲/4 胜利姿态（对齐 MUGEN roundstate）。
+        // 默认 2(Fight)：无回合系统驱动时多数 `roundstate=2` 门控即通过；MRoundSystem 驱动时每帧写入实际相位。
+        public int RoundState = 2;
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -213,6 +217,16 @@ namespace Lockstep.Mugen.Char
             FFloat selfFront = Constants != null ? Constants.SizeGroundFront : FFloat.Zero;
             FFloat oppFront = opp.Constants != null ? opp.Constants.SizeGroundFront : FFloat.Zero;
             return DistX(opp) - selfFront - oppFront;
+        }
+
+        // inguarddist 默认守备距离（MUGEN attack.dist 默认 160；逐角色 HitDef guard dist 待 AttackDist 控制器接入后替换）。
+        static readonly FFloat GuardDistDefault = FFloat.FromInt(160);
+
+        /// <summary>到对手的水平距离绝对值（inguarddist 判定用，不分前后）。</summary>
+        FFloat AbsDistX(MChar opp)
+        {
+            FFloat d = opp.Pos.X - Pos.X;
+            return d.Raw < 0 ? -d : d;
         }
 
         // ───────── 受击触发器（移植 Ikemen char.go hitOver/hitShakeOver/canRecover；HitFall=ghv.fallflag）─────────
@@ -305,7 +319,7 @@ namespace Lockstep.Mugen.Char
                 PlayerPushEnabled = PlayerPushEnabled, PushPriority = PushPriority, PushAffectTeam = PushAffectTeam,
                 ScreenBoundEnabled = ScreenBoundEnabled, ScreenBoundMoveCameraX = ScreenBoundMoveCameraX,
                 ScreenBoundMoveCameraY = ScreenBoundMoveCameraY, ScreenBoundStageBound = ScreenBoundStageBound,
-                MoveContactTime = MoveContactTime, CounterHit = CounterHit,
+                MoveContactTime = MoveContactTime, CounterHit = CounterHit, RoundState = RoundState,
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
@@ -348,7 +362,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(PlayerPushEnabled); hash.AddInt32(PushPriority); hash.AddInt32(PushAffectTeam);
             hash.AddBool(ScreenBoundEnabled); hash.AddBool(ScreenBoundMoveCameraX);
             hash.AddBool(ScreenBoundMoveCameraY); hash.AddBool(ScreenBoundStageBound);
-            hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit);
+            hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit); hash.AddInt32(RoundState);
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
@@ -476,6 +490,11 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(AnimElemNo == n && AnimElemTime == 0);
                 }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
+                case OpCode.OC_roundstate: return BytecodeValue.Int(RoundState);
+                case OpCode.OC_inguarddist:
+                    // 简化：对手在攻击态(MoveType=A=4)且水平体距在守备范围内 → 可进入守招判定。
+                    // 守备距离用 MUGEN 默认 attack.dist 160（AttackDist 控制器写入 HitDef guard dist 待后续，归 R-HITDEF 余项）。
+                    return BytecodeValue.Bool(P2 != null && P2.MoveType == 4 && AbsDistX(P2) <= GuardDistDefault);
 
                 // 受击触发器（common1 5000-5160 状态机用）
                 case OpCode.OC_hitshakeover: return BytecodeValue.Bool(HitShakeOver());
