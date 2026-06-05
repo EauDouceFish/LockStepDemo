@@ -16,14 +16,14 @@ A. R-ENT 已完成（切片 1-2）
 --------------------------------------------------------------------------------
 B. R-ENT 余下切片（按依赖/价值排序）
 --------------------------------------------------------------------------------
-[🔧] 切片3 Projectile：3a 已完成（commit a7be935）= MProjectile 轻量实体 motion(vel/accel)+生命周期(projremovetime/越界)
-     +Projectile 控制器+numproj 触发器+确定性。**3b 待做** = 自带 HitDef + 命中敌方(Clsn vs Clsn) + projcontact/projhit 计数 + 命中移除。
+[✅] 切片3 Projectile：3a(commit a7be935)motion+生命周期+numproj；3b(commit ae59d48)自带 HitDef+Clsn1+命中敌队(ApplyHit 走 owner)
+     +projcontact/projhit 计数+命中移除+确定性。弹幕角色可真正打人。(projcontact/projhit 触发器值已计数，触发器接线归切片8。)
 [⬜] 切片4 Explod：表现实体（逻辑层仅追踪 numexplod；渲染归表现层）。RemoveExplod/ModifyExplod 关联。
 [⬜] 切片5 custom state（p2getp1state / TargetState 完整）：一个角色运行另一个角色的状态(状态归属 ownership)。
      —— 投技(throw)必需；HitDef 的 p1stateno/p2stateno/p2getp1state 字段驱动。
 [🔧] 切片6 helper 关联控制器：**ParentVarSet/Add、RootVarSet/Add 已完成（commit bc79a6c）**；
      BindToParent/Root/Target、ChangeAnim2、TargetBind 仍待（需 bind 运行态字段/anim 相对逻辑）。
-[⬜] 切片7 helper/proj 参与命中：当前命中仅玩家 1v1 双向；需扩展到「全实体 vs 全实体」(helper 打人、被打)。
+[✅] 切片7 全实体跨队命中(commit 92a1430)：玩家+helper 跨队两两 TryHit(队伍=Root.Id)，helper 能打敌队不打同队；弹幕命中走切片3b。
 [⬜] 切片8 numhelper(id)/ishelper(id)/helper(id) redirect/parent·root(helper 语义)/partner：参数形与 helper redirect。
 
 --------------------------------------------------------------------------------
