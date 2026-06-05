@@ -1,0 +1,403 @@
+================================================================================
+LockstepActDemo Mugen 引擎  ——  逐模块逐函数对照 Ikemen GO 实现的差异审计
+================================================================================
+生成：2026-06-05   基线提交：f3bf6ba（dotnet test 444/444）
+Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
+被审计代码：Assets/Logic/Mugen/（约 6400 行 C#）+ Assets/Logic/Framework/
+
+--------------------------------------------------------------------------------
+0. 方法论与符号
+--------------------------------------------------------------------------------
+- 对照粒度：每个我方文件映射到 Ikemen 源文件；逐关键函数列「我方 / Ikemen源(行) / 结构差异 / 效果是否一致 / 风险」。
+- 效果一致性分级：
+    [一致]   离散可观测量（状态号/动画号/命中/帧序/KO）在支持范围内逐位等价；连续量容差内。
+    [近似]   常见路径等价，特定输入/边界分歧（注明触发条件）。
+    [偏差]   行为不同或缺失，会改变可观测结果（注明潜在风险与影响面）。
+    [装配]   我方为 headless 装配/适配层，Ikemen 对应代码耦合渲染/网络/SDL，非逐行可移植（注明这是设计决定还是简化）。
+- 风险等级：高=影响真实角色对战正确性；中=特定招式/角色分歧；低=罕见/边缘/纯表现。
+- 全局设计前提（贯穿全文，不再重复）：
+    a) 浮点→定点：Ikemen 用 float32，我方用 FFloat(Q31.32)。连续量必然有定点截断差，离散量要求等价。
+    b) bytecode 编译模型差异：Ikemen 把 CNS/表达式编译成字节码（compiler.go），运行 bytecode.go 巨型 switch；
+       我方表达式同样编译字节码（Expr/），但「控制器」用一控制器一 C# 类 + 虚 Run()，非 bytecode 控制器。
+       这是 CLAUDE/移植方案 §2.8 授权的适配，差分只校可观测离散量。本审计据此把「控制器派发模型差异」视为[装配]而非[偏差]。
+    c) 单角色实体模型：我方 v1 无 helper/projectile/explod 实体系统（R-ENT 未做）。凡依赖多实体的函数标[偏差·缺失]。
+    d) 主循环：Ikemen system.go fight()/action() 约 3000 行耦合渲染/血条/网络；我方 MBattleEngine.Tick 是重写的
+       headless 装配。子系统（状态机/命中/动画/物理/表达式）逐行移植带源码行号；顶层编排为装配适配。
+
+本审计独立评估「子系统移植质量」与「装配层等价性」两件事，不混为一谈。
+
+================================================================================
+模块 1：Expr 表达式 VM   ↔   bytecode.go（值/运算/执行器）+ compiler.go（编译）
+================================================================================
+
+[1.1] BytecodeValue.cs  ↔  bytecode.go:1074-1145 (BytecodeValue/ValueType/ToF/ToI/ToB)
+  结构差异：
+    - Ikemen：{vtype, float64 value} —— int/bool/float 全塞一个 float64；undefined = vtype 或 NaN。
+    - 我方：{vtype, long _ival, FFloat _fval} —— int/bool 存 long、float 存 FFloat；undefined 仅靠 vtype（定点无 NaN）。
+    - ValueType 枚举顺序 None=0/Float=1/Int=2/Bool=3/Undefined=4 —— 与 Ikemen 逐位一致（关键：Min(vtype) 规则依赖此序）。
+  效果：[一致]
+    - ToI：Ikemen int32(float64) 向零截断；我方 float 路径 TruncToLong 也向零截断、int 路径直取 —— 等价。
+    - ToF/ToB：undefined→0/false，定义等价。
+  风险：低。
+    - Ikemen int 存 float64：int32 在 float64 尾数(52bit)内精确，无损；我方 long 同样精确 —— int32 域内两者皆精确。
+    - 定点 vs float32 极值域不同（FFloat≈±2^31、float32≈±3e38）：超大数值溢出行为分歧，游戏量级用不到。
+
+[1.2] BytecodeOps.cs  ↔  bytecode.go:1370-1530 (add/sub/mul/div/mod/pow/cmp/range)
+  结构差异：Ikemen 用指针原地改 v1；我方不可变值返回新 BytecodeValue。语义等价。
+  效果：[一致]（除一处）
+    - 类型规则 Min(v1.vtype,v2.vtype)==Float 走浮点否则整数 —— 与 bytecode.go:1451 等逐行一致。
+    - 比较用 .Raw 整型比（定点位级）对齐 float 比较的语义。
+    - 除零：div 两边都 → Undefined（bytecode.go div 实测 *v1=BytecodeUndefined()）—— 一致。
+    - pow：任一 float 或指数<0 → 浮点幂，否则整数快速幂 —— 与 bytecode.go:1370 一致。
+  [偏差·低] 模零(mod by 0)：Ikemen 保留被除数 v1 不变 + 打印错误；我方返 Undefined。
+       风险低：真实 CNS 极少 mod 0；分歧仅在该错误表达式的后续运算，且都属"脏输入"。
+
+[1.3] BytecodeExp.cs  ↔  bytecode.go run()/evalF/evalI 执行器
+  结构：栈机，逐 OpCode 解码执行；短路 jmp/jz/jnz、redirect run/nordrun、trigger 钩子 ReadTrigger/Redirect。
+  效果：[一致]（表达式求值路径）；trigger/redirect 的"被读量是否齐全"取决于 Char.ReadTrigger 覆盖度（见模块 2）。
+  风险：见模块 2 的 trigger 覆盖清单——未覆盖的 trigger 走 default→Undefined，可能误判门控（已知风险，逐个补全中）。
+
+[1.4] MugenExprCompiler.cs (821行)  ↔  compiler.go + compiler_functions.go (约 1.5万行)
+  结构差异：[装配/简化]
+    - Ikemen：完整词法+递归下降，编译所有 trigger/函数/redirect 为 bytecode；带类型推导、常量折叠、错误定位。
+    - 我方：等价的递归下降优先级链（expBoolOr..expValue 照搬），但 trigger/函数表是"按需登记的子集"。
+  效果：[近似——覆盖度驱动]
+    - 已覆盖的运算符/优先级/区间[a,b]/redirect(p2/root/parent/enemy)/statetype 字母枚举/command/animelem/距离/name
+      等与 Ikemen 语义一致。
+    - 未登记的 trigger/函数 → 压 0 或保留参数值（容错降级），与 Ikemen "编译期报错"不同：我方不报错而是静默降级。
+  [偏差·中] 未覆盖 trigger 静默返 0：真实角色若用到未登记 trigger，门控可能误判（招式早出/不出）。
+       影响面：随覆盖度提升收敛；本会话已补 random/animelem/距离/name/roundstate/inguarddist/animelemtime。
+       风险：中——需要一份"已覆盖 trigger/函数 vs Ikemen 全集"的差集清单持续追踪（见模块 2 附表）。
+  [偏差·低] 错误处理哲学不同：Ikemen 编译期严格报错；我方运行期宽容降级。利于吃脏数据，弊在掩盖角色脚本笔误。
+
+================================================================================
+模块 2：Char（MChar + 触发器读取 + 受击/距离辅助）   ↔   char.go
+================================================================================
+
+[2.1] MChar 结构  ↔  char.go Char struct（约 200 字段）
+  结构差异：[一致·镜像] 我方 MChar 镜像 Char 的常用字段（time/stateNo/stateType/moveType/physics/ctrl/anim*/
+    life/power/pos/vel/facing/var/ghv/...）+ 本会话新增 Tier B 运行态字段。字段名多照 Ikemen 原义。
+  缺失字段（对应未做子系统，非遗漏）：helperIndex/parent 实体链(R-ENT)、localscl/localcoord(R-LOCALCOORD)、
+    palfx/aimg/各表现态(表现层)、bindToId/bindPos(bind 系统)、proj/explod 容器(R-ENT)。
+  风险：低——缺失字段都对应已登记的未做子系统；已实现字段语义对齐。
+
+[2.2] 受击/恢复辅助函数  ↔  char.go
+  - HitShakeOver() = ghv.hitshaketime<=0        ↔ char.go:5342     [一致]
+  - HitOver()      = ghv.hittime<0              ↔ char.go:5338     [一致]
+  - CanRecover()   = fall.recover 判定          ↔ char.go canRecover [一致]（落点容差内）
+  - ComputeFinalDefense() = (Defence×customDef×superDef×fallDef)/100 ↔ char.go:12081-12085 [一致]
+  - AttackDamageMul()     = AttackMul×Attack/100                     ↔ char.go atkmul   [一致]
+  - DistX/rdDistX = facing*(opp.x-self.x)        ↔ char.go:8743/8859 [一致]（省 float<0.0001 噪声夹取，定点无此噪声）
+  - BodyDistX     = distX - 双方前宽（MUGEN 边到边） ↔ char.go:8787   [近似] 见下风险
+  风险：
+    [偏差·低] BodyDistX 用 MUGEN 简化式（distX 减双方 size.ground.front）；Ikemen 还按相对朝向选前/后宽
+       (char.go:8805-8815 前后宽分支) + localscl 缩放。面对面常见情形等价；背对/不同 localscl 角色分歧。中低风险。
+
+[2.3] ReadTrigger 触发器覆盖（用量加权，基于本会话扫 12 角色真实 .cns/.cmd）
+  已覆盖且语义对齐（高频）：stateno/time/anim/animelem/animelemno/animelemtime/var/fvar/random/statetype/
+    movetype/ctrl/movecontact/movehit/moveguarded/movereversed/pos/vel/facing/life/lifemax/power/powermax/
+    palno/id/alive/anim/animtime/prevstateno/hitcount/uniqhitcount/numtarget/command/name/p1name/p2name/
+    enemyname/p2dist/p2bodydist/roundstate/inguarddist/hitover/hitshakeover/hitfall/canrecover/
+    animexist/selfanimexist/const(子集)/gethitvar(子集)。
+  redirect 已覆盖：root/parent/p2/enemy/enemynear/target（均 1v1：enemy(0)=p2、target=Targets[]）。
+  [偏差·缺失·中] 依赖 R-ENT 实体系统的 trigger 全缺，走 default→Undefined/0：
+    ishelper(862)/numhelper(403)/helper(241,redirect)/partner(124)/numenemy(70)/numexplod/numproj/numprojid/
+    projcontact/projhit/projguarded/helperindex/root(helper 语义) 等。
+    风险：中——用到 helper 的角色（多数有超必杀的角色）这些门控误判；招式逻辑可能错乱。属 R-ENT 范畴，已登记。
+  [偏差·缺失·低] 杂项 trigger 未覆盖：ailevel(203,返0=无AI，正确)/stagevar(58)/teammode/teamside/
+    drawgame/win*/lose*/matchno/roundsexisted/gamemode/...（多为 AI/演出/系统量，战斗核心影响小）。
+  [偏差·低] sysvar/sysfvar：编译器登记但与 var/fvar 共用容器（OC_var），未单独隔离系统变量空间。
+    风险低——sysvar 真实用量少；隔离待补。
+  [偏差·低] gethitvar 字段覆盖 21 项（xvel..fall.recovertime），Ikemen gethitvar 字段更多
+    (guarded/damage/isbound/fall.envshake.* 等)；缺的归 R-HITDEF/子系统余项。
+
+[2.4] Clone/WriteHash 确定性  ↔  state_clone.go（Ikemen 用代码生成的 clone）
+  结构差异：[装配] Ikemen 有 state_clone.go 自动生成的深拷；我方手写 Clone/WriteHash。
+  效果：[一致·自洽] 我方契约=每个运行态字段进 Clone(深拷)+WriteHash(混入)；redirect 链接浅拷待引擎重链。
+  风险：
+    [偏差·中] 手写 Clone/Hash 的"漏一个字段"风险：新增字段若忘记加入 Clone/Hash 会破回滚一致性。
+       缓解：本会话所有新字段都配了 Clone/Hash 往返单测（TierBFieldsCloneHashTests 等）；
+       但缺少"全字段反射校验"的自动守卫——建议补一个反射断言所有 public 字段都被 Hash 覆盖的测试（R-DET 范畴）。
+    [偏差·中] 共享可变态（Rng）只在引擎层 Hash 一次、Clone 浅拷引用：当前无回滚，正确；
+       接 R-ROLLBACK 时必须由引擎级快照统一重链 Rng + redirect 图，否则克隆体共享旧 Rng → 串状态。已在代码注释登记。
+
+================================================================================
+模块 3：State 状态机   ↔   char.go actionRun()(11610-) + bytecode.go StateBytecode/StateBlock
+================================================================================
+
+[3.1] MStateMachine.RunFrame  ↔  char.go:11610 actionRun()
+  Ikemen 真实顺序：state-4(内部,即便暂停也跑) → if !pauseBool{ state-3 → state-2 → state-1 → stateChange2(应用缓冲切换)
+    → 当前态 } → 守招指令。-3/-2/-1 各带门控：-3 需 playerNo 自有且(player或keyctrl[2])；-2 需 player或keyctrl[1]；
+    -1 需 playerNo 自有且 keyctrl[0]。
+  我方顺序：(PendingStateNo>=0→ApplyTransition) → RunNegativeState(-3,-2,-1) → ApplyTransition → RunCurrentState → Time++。
+  效果：[一致·针对玩家角色]
+    - 负状态执行顺序 -3→-2→-1→当前 与 Ikemen 一致；缓冲切换在 -1 后当前态前应用，一致。
+  [偏差·低] state -4 未实现：Ikemen -4 是引擎内部状态，标准 MUGEN 角色不定义 -4 → 对 MUGEN 数据无影响。
+  [偏差·中(helper)] -3/-2/-1 的 keyctrl/playerType 门控未复刻：我方对存在的负状态无条件跑。
+    玩家直控角色（keyctrl 全开）等价；helper（keyctrl 部分关）会多跑负状态 → 行为分歧。属 R-ENT 范畴。
+  [偏差·中] 暂停粒度：Ikemen pauseBool 只挡 -3/-2/-1/当前态（-4 仍跑、输入缓冲另算）；
+    我方在引擎层 frozen 跳过整帧（含输入缓冲、物理、动画）。详见模块 9 暂停审计——这是已知装配层近似。
+
+[3.2] persistent / ctrlsps  ↔  char.go:6500-6510 + bytecode.go StateBlock.Run
+  Ikemen：每控制器一个 ctrlsps 计数；persistent>1→执行后设大数锁定/倒计时；进状态时重建 ctrlsps 全零。
+  我方：PersistGate/ResetPersist 复合键(状态号*256+序号)倒计时模型；进状态 ClearStatePersist 清目标区间。
+  效果：[近似]——当前态的 persistent 帧冷却语义对齐。
+  [偏差·低] 负状态 ResetPersist 时序与当前态不完全一致（代码注释/memory 已登记的边界）：
+    负状态计数器从不被"进入"故不清零，长期运行的相位与 Ikemen 在 persistent=N 的精确节奏上可能差 1 帧。
+    风险低——persistent=N(非1)在负状态较少见；但属真实分歧，需差分 trace 校验（R-ORACLE）。
+
+[3.3] ChangeState 同帧重入 + hitpause  ↔  char.go stateChange1/stateChange2 + changeStateNest
+  效果：[一致] hitstop>0 冻结当前态控制器（仅 ignorehitpause 跑）、ChangeState 同帧重入上限保护、
+    statedef 头部 RunInit 求值（type/movetype/physics/anim/ctrl/velset 表达式）—— 与 Ikemen 行为对齐。
+  [偏差·低] changeStateNest 嵌套深度上限：我方用固定 MaxReentry 常量；Ikemen 有自己的嵌套计数。极深递归边界分歧，罕见。
+
+[3.4] MStateDef.RunInit（statedef 头部）  ↔  bytecode.go stateDef.Run + char.go StateBytecode.init
+  效果：[一致] type/movetype/physics 字面量 + anim/ctrl/velset/facep2/juggle/poweradd 表达式求值，
+    movetype 默认 I(bytecode.go:15139)。
+  [偏差·低] 头部 persist 标志（hitcountpersist/movehitpersist/juggle 重置等"进状态清连段计数"）部分未做。
+    风险低-中：影响连段计数在跨状态的保留，特定连段 combo 计数分歧。已登记。
+
+================================================================================
+模块 4：StateCtrl 控制器   ↔   bytecode.go StateController 各子类型
+================================================================================
+
+[4.0] 派发模型  [装配·授权]
+  Ikemen：控制器编译成 bytecode，运行期 bytecode.go 巨型 switch 派发 + run 子函数。
+  我方：一控制器一 C# 类 + 虚 Run(MChar)；MugenCnsParser.BuildController 实例化。
+  这是移植方案 §2.8 明确授权的适配——差分只校可观测离散量，bytecode 编码是内部细节。判定[装配]非[偏差]。
+
+[4.1] Basic（BasicControllers.cs）：Null/Vel(Set/Add/Mul)/Pos(Set/Add)/ChangeAnim/Ctrl/Var(Set/Add)/StateType
+  效果：[一致]——朝向语义照搬 Ikemen（PosAdd X 乘 facing、PosSet 绝对、VelSet 存原值不翻向）。
+  [一致] ChangeAnim 带 a==nil 守卫（R-FIX-1，char.go:4489 changeAnimEx）——切到不存在动画不冻结。
+  [偏差·低] ChangeAnim2/相对动画/ownpal 等变体未做（归 R-ENT/表现）。
+
+[4.2] Stat（StatControllers.cs）：LifeAdd/LifeSet/PowerAdd/PowerSet/Turn/AssertSpecial
+  效果：[一致] LifeAdd kill 限制、Power 夹取、Turn 翻向、AssertSpecial 标志每帧清。
+  [偏差·低] LifeAdd 的 absolute/防御缩放分量、AssertSpecial 部分冷门标志未全覆盖。
+
+[4.3] AttackMulSet/DefenceMulSet（AttackMulControllers.cs）
+  效果：[一致] mulType/onHit 语义、MUGEN 默认 onHit=true·mulType=0（bytecode.go:10714-10789）。
+
+[4.4] Tier B 非实体控制器（TierBNonEntityControllers.cs，Codex 落地）
+  真实执行子集：[一致] VarRandom(用共享 Rng)/VarRangeSet/MoveHitReset(清 movecontact 等)/SuperPause.poweradd。
+  [偏差·缺失·中] 大量控制器为 ParameterOnlyController（参数保留 no-op），运行期不写 MChar：
+    Pause/SuperPause(冻结)/PosFreeze/Width/PlayerPush/ScreenBound/HitOverride/ReversalDef/AttackDist。
+    现状：Pause/SuperPause/PosFreeze 的 MChar 字段+引擎消费 Claude 已落地，待 Codex 把控制器接线到字段；
+    其余(Width/PlayerPush/ScreenBound/HitOverride/ReversalDef)字段已铺、消费未做。
+    风险：中——这些控制器目前对 sim 无效果，依赖它们的招式行为缺失（如超必杀不冻结对方、投技反击 ReversalDef 不生效）。
+  [偏差·缺失·低] 纯表现控制器(PlaySnd/Explod/PalFX/AfterImage/Trans/Angle/EnvShake/MakeDust...)逻辑层 no-op，
+    对确定性 sim 无影响（设计如此），渲染待表现层。
+  [偏差·缺失·中] 实体类控制器(Helper/Projectile/Target*/BindTo*/ParentVar*/DestroySelf)未做——R-ENT 范畴。
+    Target* 本可不依赖 R-ENT（作用 MChar.Targets），已派给 Codex 第二轮。
+
+[4.5] HitDefController + HitDef 字段（见模块 6）
+
+================================================================================
+模块 5：Command 命令/搓招系统   ↔   input.go
+================================================================================
+
+[5.1] MInputBuffer  ↔  input.go InputBuffer（有符号边沿计数 Fb/Bb/Ub/Db 等）
+  效果：[一致] 边沿计数、B/F 按朝向、SOCD 处理 —— 引擎硬编码基础动作(走/跳/蹲)读它，已 Unity 实测对齐。
+
+[5.2] MCommandParser/MCommandModel  ↔  input.go cmd 解析
+  效果：[一致] ~释放/数字蓄力//按住/$4way/+AND/>严格/'|'OR；方向大写按钮小写；command.time/buffer.time。
+
+[5.3] MCommandMatcher  ↔  input.go command 匹配
+  效果：[一致] 末步边沿 + 向前贪心 + 朝向相对 B/F + 蓄力 + 释放 + $ 子集。
+
+[5.4] MCommandList  ↔  input.go CommandList Step/BufferedCmd
+  效果：[一致] 每帧递减激活计时→压本帧输入→重匹配→命中置 bufferTime；同名多条 OR。command="name" 经 IsActive 查询。
+  [偏差·低] AI 输入/网络输入注入路径未做（v1 本地）；analog/方向斜接的部分边缘语义未逐一差分。
+
+模块结论：命令系统是覆盖度最高的模块（~80%），核心搓招语义与 input.go 对齐，已通过真实 KFM 招式端到端验证。
+  主要剩余为 AI/网络输入注入与极冷门命令语法边界，风险低。
+
+================================================================================
+模块 6：Hit 命中系统   ↔   char.go (hitDetection/getHitVarSet/computeDamage/hitVelSet) + bytecode.go HitDef
+================================================================================
+
+[6.1] MClsn 重叠检测  ↔  char.go clsn 检测
+  效果：[一致] Clsn1×Clsn2 朝向镜像 AABB 重叠；HitTargetsBits 防同招多次命中。
+  [偏差·低] clsn 缩放(localscl/clsnscale)、angle/clsnangle 旋转框未做(R-LOCALCOORD/角度)；普通角色直立框等价。
+
+[6.2] MHitDef 字段  ↔  bytecode.go HitDef (约130字段)
+  已覆盖：attr/hitflag/guardflag/damage/pausetime/ground·air velocity/type/animtype/hittime/slidetime/ctrltime/
+    kill·guard·fall.kill/getpower·givepower/forcestand/numhits/hitonce/fall.*(damage/recover/recovertime/xvel/yvel)/
+    down.*(velocity/hittime/bounce)/guard.*(velocity/ctrltime/hittime/dist 部分)。
+  效果：[一致] 上述离散字段解析+决议+默认值对齐 char.go 各行（chunk-1/2/3 带行号）。
+  [偏差·缺失] 未做字段：sparkno/sparkxy/hitsound/guardsound(声音特效→R-CTRL-fx/snd)、envshake.*(屏震)、
+    p1/p2stateno·p2getp1state(投技自定义态→R-THROW)、palfx/dizzy/guardpoints/redlife 等分量、cornerpush(舞台边界)。
+    风险：中——这些字段对"打击感/投技/连段限制"重要，但不改"命中→扣血→受击态"主干离散结果。
+
+[6.3] MHitSystem.ApplyHit/getHitVarSet  ↔  char.go:10790-10924 getHitVarSet + 11xxx
+  效果：[一致] 填 GetHitVar 全字段 + 按 statetype 路由 5000/5010/5020、trip→5070、down→5080；
+    守方不进 hitpause(getter.hitPauseTime=0)、受击冻结由 ghv.HitShakeTime 驱动；forcestand 翻 statetype。
+  [一致] 伤害公式 damage×=atkMul/finalDefense→至少1→不超剩血→kill保底→四舍五入(char.go:8440-8460)。
+
+[6.4] 伤害应用时机  [偏差·中·已登记 R-DMG-PIPELINE]
+  Ikemen：命中阶段累加 getter.ghv.damage(char.go:11063)，防守方自身 tick 一次性 lifeAdd(-ghv.damage,absolute)
+    (char.go:11743) + 中间 KO 排序(11098-11140)。两段式。
+  我方：MHitSystem.ApplyHit 命中当场即扣血。
+  效果：[近似] 单帧单次命中与 Ikemen 逐位等价；
+  风险：仅"同帧多次命中(弹幕/多 helper)"或"同帧读 life 的触发器"分歧。当前无多实体故不触发；接 R-ENT 多实体时
+    必须连 KO 排序一并改为两段式，否则同帧多段伤害/KO 判定与 Ikemen 不符。已在 commit ca47a34 登记。
+
+[6.5] HitBy/NotHitBy/守招  ↔  char.go hitBy/guard
+  效果：[一致] HitBy/NotHitBy 属性过滤(time>0 按 Attr bitmask+IsNot)、守招 chip/守方击退/moveguarded/不进5000。
+  [偏差·中] inguarddist 用默认 160(模块 2)、自动守招进 120 态依赖 inguarddist+holdback，单角色 demo 未端到端验证。
+  [偏差·缺失] juggle 系统未真正生效(R-JUGGLE)——防无限连的 juggle 点扣减/检查 no-op，理论可无限连。中风险。
+
+================================================================================
+模块 7：Anim 动画系统   ↔   anim.go
+================================================================================
+
+[7.1] MAnimSystem.Action  ↔  anim.go Animation.Action（推进闭包 next/curtime/looptime）
+  效果：[一致] literal 移植：跳零时长帧/末元素停留/循环回绕/curtime 回绕/动画号变化自检重置(Reinit)；
+    AnimElemTime 在元素切换(Next)归零→animelem 首帧语义成立；AnimTime=AnimCurTime-TotalTime。
+  [一致] MAnimImport：AIR→MAnimData，TotalTime/LoopTime/PreLoopTime 预算(anim.go:337-363)。
+
+[7.2] 动画推进与状态控制器的相对时序  [偏差·中·已登记 R-FIX-ANIMTIME0]
+  Ikemen：ChangeAnim 即刻替换 c.anim，同帧后续控制器读 AnimTime/AnimElemNo 立即反映新动画。
+  我方：MAnimSystem 在 Tick 第 5 步推进，状态机在第 3 步——同帧内 ChangeAnim 后，状态控制器读到的
+    AnimTime/AnimElem 仍是上一帧派生值（陈旧）。
+  效果：[近似] 稳态下差一帧的派生量；
+  风险：中——具体已暴露 bug = 回合刚开始第 0 帧 AnimTime 默认 0，招式态 `trigger1=AnimTime=0` 同帧自弹回站立
+    （人类操作不撞第 0 帧故实测无感，但是真实分歧）。忠实修法=ChangeAnim 即刻刷新派生量。已登记。
+
+[7.3] 表现层渲染  [装配] MugenLiveView/MugenSpriteLoader 读 AnimNo+当前帧 group/image 取精灵，
+  与逻辑层 anim 推进解耦；位置永不冻结(R-FIX-1)。非 Ikemen 渲染管线，属表现层装配。
+
+模块结论：anim 推进本身与 anim.go 逐位对齐；唯一实质分歧是"anim 派生量相对状态控制器晚一相"的时序，
+  已定位、已登记 R-FIX-ANIMTIME0，影响面窄（同帧 ChangeAnim 后读 anim 量 + 回合首帧）。
+
+================================================================================
+模块 8：Parse 解析层   ↔   compiler.go（Ikemen 把 CNS/CMD 编译成 bytecode）
+================================================================================
+
+[8.0] 结构差异  [装配·授权]
+  Ikemen：compiler.go 把整个 .cns/.cmd/.def 编译成 StateBytecode（状态→控制器 bytecode 序列），含类型检查/报错。
+  我方：MugenCnsParser 解析 [Statedef]/[State] → MStateDef + 实例化控制器对象；触发条件经 MugenExprCompiler 编 bytecode。
+  判定[装配]：产出等价（状态表+控制器+编译的触发器），差分校离散量。
+
+[8.1] MugenCnsParser  ↔  compiler.go stateCompile/scAdd
+  效果：[一致] [Statedef]头部+[State]→控制器实例化+编译 triggerall/triggerN(OR-of-ANDs)；字母枚举码(MugenCodes)。
+  [偏差·中] 未知控制器 type → NullController(降级)；Ikemen 编译期对未知控制器报错。
+    我方静默降级利于吃数据、弊在掩盖错误且该控制器无效果（与未覆盖 trigger 同哲学）。
+  [关键修复] .cmd 的 [Statedef -1] 命令解释器并入 States（MCharLoader）——此前漏解析致"完全不出招"，已修(commit 83fa880)。
+
+[8.2] MugenConstParser/MDefParser/MugenCmdParser  ↔  compiler.go const/def/cmd 解析
+  效果：[一致·子集] const 覆盖真实角色常用字段子集(MConstId)；.def [Files] 段取 sprite/anim/cmd/st/stcommon；
+    .cmd [Command] 定义。
+  [偏差·低] const 字段非全量(罕用字段缺)；localcoord/不常见 [Info] 字段未用。
+
+[8.3] MugenCodes  ↔  字母枚举码集中（StateType/MoveType/Physics/AttackType/hitflag/guardflag 解析）
+  效果：[一致] S/C/A/L、I/H/A、攻击类别 attr、hit/guard flag 解析与 Ikemen 编码对齐。
+
+模块结论：解析层产出与 Ikemen 编译结果在"状态/控制器/触发器"结构上等价；主要风险是"未知控制器/trigger 静默降级"
+  这一与 Ikemen 不同的容错哲学——需配合覆盖度差集清单(模块2/4)追踪缺口。
+
+================================================================================
+模块 9：Battle 引擎装配层   ↔   system.go fight()/action() + char.go actionPrepare/posUpdate
+================================================================================
+
+[9.0] MBattleEngine.Tick 总体  [装配]
+  Ikemen system.go action()/fight() 约 3000 行，耦合渲染/血条/网络/motif/SDL/Lua，非逐行可移植。
+  我方 MBattleEngine.Tick 是重写的 headless 装配，每相调用逐行移植的子系统。这是设计决定（CLAUDE/memory 记录）。
+  每帧相序：输入缓冲→actionPrepare→状态机→物理+LandCheck→动画→命中。子系统等价，编排为适配。
+
+[9.1] MActionSystem.Prepare/LandCheck  ↔  char.go:11435-11481 actionPrepare + 11717-11723 落地
+  效果：[一致] 跳40/空跳45/蹲10/起立12/走20/刹车，gate=keyctrl&&!nohardcodedkeys&&ctrl，else-if 顺序；
+    LandCheck physics=A&&vel.y>0&&pos.y>=0&&!105→52。带源码行号，Unity 实测(walk dx/apex/landed)对齐。
+  [偏差·低] 守招120(需 inguarddist，已部分接)、跑100/105、down/getup 部分硬编码转移未全做。
+
+[9.2] MPhysics.Step  ↔  char.go posUpdate/gravity
+  效果：[一致] 位置积分 + S/C 摩擦 + A 重力 + N 不施加；落地夹取交公共状态 trigger。
+  [偏差·低] canmove(acttmp) 门控、bind 位置覆盖、ScreenBound 夹取未接（见 9.4 暂停 + 模块4 Width/ScreenBound）。
+
+[9.3] MCharLoader/MCharData  [装配] 文本→MCharData→MChar 装配；接共享 Rng、AnimTable、common1。等价装配，无 Ikemen 对应单函数。
+
+[9.4] ★ Pause/SuperPause 暂停模型  [偏差·中·本审计重点]
+  —— 这是被指出"随意"的部分，下面如实列差异。
+  Ikemen 真实模型（system.go + char.go）：
+    - sys.pausetime / sys.supertime 是【全局】系统状态(system.go:49/55)，主循环开头递减(system.go:2562)。
+    - 每角色另有 c.pauseMovetime / c.superMovetime(char.go:3128) = 暂停期该角色还能动多久。
+    - actionPrepare(char.go:11421)算 pauseBool：supertime>0 时 = (superMovetime==0)；pausetime>0&&pauseMovetime==0 时 = true。
+    - c.acttmp(1 unpaused/0 default/-1 hitpause/-2 pause)贯穿全引擎门控：物理 canmove=acttmp>0(char.go:11944)、动画、镜头。
+    - 受击方 hitshake 期间被强制提升 movetime(char.go:11036 getter.superMovetime=Max(..,hitshaketime))。
+    - 专设 prevSuperMovetime/prevPauseMovetime 修 PauseTime 触发器 off-by-one(char.go:11431)。
+  我方现实现（MBattleEngine.Tick）：
+    - 暂停时长放在【per-char】SuperPauseTime/PauseTime，用 max 聚合成全局 → 与全局 sys.supertime 模型【结构不同】。
+    - 用临时 frozen[] 数组在引擎层跳过被冻结角色【整帧】(含输入/状态机/物理/动画)；无 acttmp 贯穿门控。
+    - 计时在 Tick 末尾递减；【无】prevMovetime off-by-one 修正；【无】受击 hitshake 提升 movetime。
+  效果一致性：[近似——仅 1v1 单施放者]
+    - 单角色发动 super、对方冻结、自己 movetime 窗口可动、计时到点恢复 → 离散结果与 Ikemen 大体一致。
+  潜在风险（不一致点）：
+    [中] 多施放者/受击叠加：Ikemen 全局 supertime + 各自 movetime + getter 提升那套，我方 max 聚合无法表达
+         "受击方在被超必杀打中时按 hitshaketime 提升 movetime" → 受击方冻结时长可能与 Ikemen 差，连段/受身时序分歧。
+    [中] PauseTime/SuperPauseTime 触发器：我方未暴露这两个 trigger，且无 off-by-one 修正 → 若角色用 pausetime 触发器
+         判断暂停剩余帧，结果会错。
+    [低] 暂停粒度：我方冻结整帧(连输入缓冲一起停)，Ikemen 暂停期仍处理 state-4/部分输入 → 边缘分歧。
+    [低] 暂停期命中：我方 anyPause 时整体跳过 TryHit；Ikemen globalCollision 也在暂停外，但 spr/帧时序细节不同。
+  结论：暂停是【已知的装配层近似】，不是 1:1 移植。当前 1v1 单施放可用；要对账 Ikemen 必须重构为
+    "引擎全局 super/pause time + 每角色 movetime + acttmp 门控 + getter 提升 + off-by-one 修正"。已列入待办。
+
+[9.5] MRoundSystem  ↔  system.go roundState()/stepRoundState()
+  效果：[近似] Intro→Fight→PreOver→Over→下一回合/结算 + KO/超时/双KO/三局两胜/满血复位 骨架对齐离散 RoundState 序列。
+  [偏差·中] 未驱动进 MBattleEngine.Tick 主路径(多数测试/Live 直接 Tick 不经回合机)；RoundState 字段默认 2，
+    回合机真正驱动时才写实际相位。intro/5900 入场演出、win pose 细节、超时镜头未做。
+  [偏差·低] 计时/胜负的连续量(over.waittime/slow motion)与 Ikemen 帧级未差分。
+
+================================================================================
+模块 10：Framework 地基   ↔   common.go / state_clone.go / rollback.go
+================================================================================
+
+[10.1] FFloat(Fix64 Q31.32)  ↔  Ikemen float32
+  [偏差·本质·设计] 定点 vs 浮点：连续量(pos/vel/三角/缩放)必有定点截断差，离散量要求等价。
+  这是移植根本前提，非缺陷；风险=连续量长期累积漂移需差分容差校验(R-ORACLE)，三角/pow/log 的定点实现误差需逐一对账。
+
+[10.2] Hash64(FNV-1a)/World/Snapshot  ↔  Ikemen state_clone.go(代码生成 clone) + rollback.go
+  效果：[一致·自洽] 确定性哈希 + 快照框架就绪、rollback-ready。
+  [偏差·缺失] R-ROLLBACK 未做：逐帧 desync 对账 + 输入预测/确认/重模拟未接(Ikemen rollback.go 1006 行)。
+  [偏差·缺失] R-DET：黄金哈希尚未从旧 ECS 迁到 MBattleEngine.ComputeHash；缺"全字段进 Hash"的自动反射守卫。
+
+[10.3] MRandom  ↔  common.go Random()/Rand()
+  效果：[一致] Park-Miller LCG(a=16807,m=2^31-1,Schrage q=127773 r=2836)逐位移植，纯整数确定性，MINSTD 序列对账通过。
+
+================================================================================
+全局风险汇总（按风险等级排序）
+================================================================================
+
+【高风险（影响真实角色对战正确性，需优先）】
+  - 无（当前已知项中无"高"；主干命中→受击→恢复链路离散结果在 1v1 已验证一致）。
+  说明：把若干"中"风险叠加在重度依赖 helper 的角色上，实际体验可能接近"高"，故 R-ENT 是最大功能坎。
+
+【中风险（特定招式/角色/多实体分歧）】
+  R1. R-ENT 缺失：helper/projectile/explod 及其全部 trigger(ishelper/numhelper/numproj...)与控制器无效。
+      影响：带 helper 超必杀/弹幕的角色招式逻辑错乱。最大功能缺口。
+  R2. Pause/SuperPause 装配近似(模块9.4)：多施放者/受击叠加/pausetime 触发器/off-by-one 与 Ikemen 分歧。
+  R3. 伤害两段式(R-DMG-PIPELINE)：同帧多次命中/同帧读 life 分歧；接 R-ENT 时须连 KO 排序改两段式。
+  R4. Tier B 写态控制器 no-op(模块4.4)：SuperPause 冻结对方/Width 推挤/ScreenBound/HitOverride/ReversalDef 当前无效果。
+  R5. juggle 未生效：理论可无限连(R-JUGGLE)。
+  R6. 未覆盖 trigger/控制器静默降级(模块1.4/8.1)：真实角色用到即门控误判，随覆盖度收敛。
+  R7. AnimTime 时序晚一相(R-FIX-ANIMTIME0)：同帧 ChangeAnim 后读 anim 量 + 回合首帧弹回。
+  R8. 状态机负状态 keyctrl 门控/persistent 负状态时序(模块3.1/3.2)：helper 与 persistent=N 边界分歧。
+
+【低风险（罕见/边缘/纯表现/连续量容差）】
+  L1. mod by 0、changeStateNest 上限、BodyDistX 前后宽/localscl、clsn 缩放角度、const 字段子集、sysvar 未隔离。
+  L2. 声音/特效/spark/envshake/palfx 纯表现 no-op（设计如此，不影响 sim）。
+  L3. 定点 vs float 连续量截断漂移（需差分容差校验）。
+  L4. 错误处理哲学：我方运行期宽容降级 vs Ikemen 编译期报错（掩盖角色脚本笔误）。
+
+================================================================================
+"最终能达到的效果是否一致"的总评
+================================================================================
+- 离散主干（命中→受击态 5000 系→恢复→扣血→KO、搓招→招式态、走跳蹲、伤害公式、随机、距离/名字/动画触发器）：
+  在【1v1、无 helper、无多段同帧、无超必杀冻结依赖】的范围内，离散可观测量与 Ikemen 一致，已大量 TDD + 真实角色验证。
+- 不一致集中在三类：①多实体(R-ENT) ②暂停/受击时序的装配近似(R2/R3/R7) ③未覆盖长尾(R6)+未驱动子系统(R4/R5)。
+- 连续量(位置/速度)为定点容差一致，需 R-ORACLE 真 trace 量化漂移。
+
+到达"与 Ikemen 离散全等"的必要工作（按依赖）：
+  R-ENT 实体系统 → 伤害两段式+KO 排序(R3) → Pause 重构为全局态+movetime+acttmp(R2) → juggle(R5) →
+  AnimTime 即刻刷新(R7) → trigger/控制器覆盖补全(R6) → R-ORACLE 差分 trace 量化连续量 + 兜底离散回归。
+
+（完）本审计基于 2026-06-05 HEAD f3bf6ba 逐文件比对；后续模块演进需同步更新本表。
