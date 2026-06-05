@@ -31,12 +31,76 @@ namespace Lockstep.Mugen.Battle
         // 全局暂停态（= Ikemen sys.pausetime/supertime + buffer/playerno）：全场角色共享，控制器经 SetPause 写。
         public readonly MPauseState PauseState = new MPauseState();
 
+        // R-ENT 实体世界（共享 spawn 通道 + id 分配 + helper 列表）。_helperData 与 World.Helpers 平行（引擎侧配置）。
+        public readonly MEntityWorld World = new MEntityWorld();
+        public List<MChar> Helpers => World.Helpers;
+        readonly List<MCharData> _helperData = new List<MCharData>();
+
         public void Add(MChar c, MCharData data)
         {
             c.Rng = Random;       // 接入共享随机源（对齐 Ikemen 全局种子）
             c.Pause = PauseState; // 接入共享暂停态（对齐 Ikemen 全局 sys.pause）
+            c.World = World;      // 接入实体世界（helper spawn 通道）
             Chars.Add(c);
             Data.Add(data);
+        }
+
+        // 找某实体对应的 MCharData（玩家在 Data、helper 在 _helperData）。helper 用 owner 的角色数据。
+        MCharData DataOf(MChar c)
+        {
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                if (ReferenceEquals(Chars[i], c)) { return Data[i]; }
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                if (ReferenceEquals(Helpers[i], c)) { return _helperData[i]; }
+            }
+            return null;
+        }
+
+        // 排空 spawn 队列：据请求造 helper 实体（移植 Helper 控制器 + char.go newHelper）。新 helper 下一帧起跑。
+        void DrainSpawns()
+        {
+            for (int q = 0; q < World.SpawnQueue.Count; q++)
+            {
+                MHelperRequest req = World.SpawnQueue[q];
+                MCharData ownerData = DataOf(req.Owner);
+                if (ownerData == null) { continue; }
+                MChar helper = MCharLoader.SpawnChar(ownerData, World.AllocId(),
+                    startStateNo: req.StateNo, startAnimNo: 0);
+                helper.IsHelper = true;
+                helper.HelperType = req.HelperType;
+                helper.Parent = req.Owner;
+                helper.Root = req.Owner.Root ?? req.Owner;
+                helper.P2 = req.Owner.P2;
+                helper.Rng = Random;
+                helper.Pause = PauseState;
+                helper.World = World;
+                helper.KeyCtrl = req.KeyCtrl;
+                // postype p1 相对：朝向继承 owner×req.Facing，位置 = owner.Pos + 朝向相对偏移（X 乘 owner 朝向）。
+                int facingSign = req.Owner.Facing.Raw >= 0 ? 1 : -1;
+                helper.Facing = FFloat.FromInt(facingSign * (req.Facing >= 0 ? 1 : -1));
+                helper.Pos = new FVector3(
+                    req.Owner.Pos.X + req.PosX * FFloat.FromInt(facingSign),
+                    req.Owner.Pos.Y + req.PosY, FFloat.Zero);
+                Helpers.Add(helper);
+                _helperData.Add(ownerData);
+            }
+            World.SpawnQueue.Clear();
+        }
+
+        // 移除 DestroySelf 标记的 helper（帧末）。
+        void RemoveDestroyed()
+        {
+            for (int i = Helpers.Count - 1; i >= 0; i--)
+            {
+                if (Helpers[i].Destroyed)
+                {
+                    Helpers.RemoveAt(i);
+                    _helperData.RemoveAt(i);
+                }
+            }
         }
 
         /// <summary>1v1：互设 P2/Root，便于 redirect(p2) 与命中。</summary>
@@ -72,76 +136,79 @@ namespace Lockstep.Mugen.Battle
             // 0) 全局暂停推进（移植 system.go:2562）：递减 super/pause 时长 + 应用 buffer（上一帧控制器设的暂停此刻生效）。
             //    再对每角色算 PauseBool/Acttmp（移植 char.go:11421 + 11524 movetime 递减）。无暂停时 PauseBool 全 false → 与原逐位一致。
             PauseState.Step();
-            for (int i = 0; i < Chars.Count; i++)
-            {
-                Chars[i].ComputePauseBool();
-            }
+            for (int i = 0; i < Chars.Count; i++) { Chars[i].ComputePauseBool(); }
+            for (int i = 0; i < Helpers.Count; i++) { Helpers[i].ComputePauseBool(); }
             bool anyPause = PauseState.AnyActive;
-            bool[] frozen = new bool[Chars.Count];
-            for (int i = 0; i < Chars.Count; i++)
-            {
-                frozen[i] = Chars[i].PauseBool;
-            }
 
-            // 1) 输入缓冲：命令匹配环形缓冲（搓招）+ 边沿计数缓冲（引擎硬编码键读 Fb/Bb/Ub/Db）。
+            // 1) 输入缓冲（仅玩家；helper 不读键）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (frozen[i]) { continue; }
+                if (Chars[i].PauseBool) { continue; }
                 MChar c = Chars[i];
                 MInput input = inputs != null && i < inputs.Count ? inputs[i] : MInput.None;
                 bool facingRight = c.Facing.Raw >= 0;
-                if (c.CommandList != null)
-                {
-                    c.CommandList.Update(input, facingRight);
-                }
-                if (c.Input != null)
-                {
-                    c.Input.Update(input, facingRight);
-                }
+                if (c.CommandList != null) { c.CommandList.Update(input, facingRight); }
+                if (c.Input != null) { c.Input.Update(input, facingRight); }
             }
 
-            // 2) actionPrepare：引擎硬编码基础动作（站/走/蹲/跳/刹车的状态转移，缓冲到 PendingStateNo）。
+            // 2) actionPrepare（硬编码基础动作；helper keyctrl=false 内部自然不动作，仍统一调用）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (frozen[i]) { continue; }
-                MActionSystem.Prepare(Chars[i]);
+                if (!Chars[i].PauseBool) { MActionSystem.Prepare(Chars[i]); }
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                if (!Helpers[i].PauseBool) { MActionSystem.Prepare(Helpers[i]); }
             }
 
-            // 3) 状态机（应用 Pending 切换、负状态/当前状态控制器、ChangeState 同帧重入）
+            // 3) 状态机（玩家 + helper）。helper 用 owner 角色数据。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (frozen[i]) { continue; }
-                _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates);
+                if (!Chars[i].PauseBool) { _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates); }
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                if (!Helpers[i].PauseBool) { _stateMachine.RunFrame(Helpers[i], _helperData[i].States, _helperData[i].CommonStates); }
             }
 
-            // 4) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate）+ 空中落地检测（硬编码 → 状态 52）。
-            //    PosFreeze（本帧由控制器断言）：跳过位置积分与落地检测，随后清零（每帧需重新断言）。
+            // 4) 物理 + 落地检测（玩家 + helper）。PosFreeze 跳积分后清零。
+            for (int i = 0; i < Chars.Count; i++) { StepPhysics(Chars[i]); }
+            for (int i = 0; i < Helpers.Count; i++) { StepPhysics(Helpers[i]); }
+
+            // 5) 动画推进（玩家 + helper）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (frozen[i]) { continue; }
-                MChar c = Chars[i];
-                if (!c.PosFreeze)
-                {
-                    MPhysics.Step(c);
-                    MActionSystem.LandCheck(c);
-                }
-                c.PosFreeze = false;
+                if (!Chars[i].PauseBool) { MAnimSystem.Action(Chars[i], Data[i].Anims); }
             }
-
-            // 5) 动画推进（M8）+ 派生 Clsn
-            for (int i = 0; i < Chars.Count; i++)
+            for (int i = 0; i < Helpers.Count; i++)
             {
-                if (frozen[i]) { continue; }
-                MAnimSystem.Action(Chars[i], Data[i].Anims);
+                if (!Helpers[i].PauseBool) { MAnimSystem.Action(Helpers[i], _helperData[i].Anims); }
             }
 
-            // 6) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）。暂停期间不结算命中。
-            //    （全局/movetime 计时递减已在步骤 0 的 PauseState.Step + ComputePauseBool 中完成，对齐 Ikemen 时序。）
+            // 5b) 排空 spawn 队列（本帧状态机里 Helper 控制器请求的实体，下帧起跑）。
+            DrainSpawns();
+
+            // 6) 命中（1v1 玩家双向；helper 命中归后续切片）。暂停期间不结算。
             if (Chars.Count == 2 && !anyPause)
             {
                 MHitSystem.TryHit(Chars[0], Chars[1]);
                 MHitSystem.TryHit(Chars[1], Chars[0]);
             }
+
+            // 7) 移除 DestroySelf 的 helper。
+            RemoveDestroyed();
+        }
+
+        // 单实体物理一相：PauseBool 冻结跳过；PosFreeze 跳积分；否则积分 + 落地检测。
+        void StepPhysics(MChar c)
+        {
+            if (c.PauseBool) { return; }
+            if (!c.PosFreeze)
+            {
+                MPhysics.Step(c);
+                MActionSystem.LandCheck(c);
+            }
+            c.PosFreeze = false;
         }
 
         /// <summary>全角色哈希（确定性对账/黄金哈希用）。</summary>
@@ -153,8 +220,14 @@ namespace Lockstep.Mugen.Battle
             {
                 Chars[i].WriteHash(ref hash);
             }
+            hash.AddInt32(Helpers.Count);   // helper 实体：数量 + 各自状态
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                Helpers[i].WriteHash(ref hash);
+            }
             hash.AddInt32(Random.Seed);   // 共享随机源种子：模拟状态，全场混入一次（不在 per-char 哈希以免重复计数）
             PauseState.WriteHash(ref hash);   // 共享全局暂停态：同理全场混入一次
+            World.WriteHash(ref hash);    // 实体世界（id 计数）
             return hash.Value;
         }
     }

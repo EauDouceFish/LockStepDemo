@@ -148,6 +148,23 @@ namespace Lockstep.Mugen.Char
         // 默认 2(Fight)：无回合系统驱动时多数 `roundstate=2` 门控即通过；MRoundSystem 驱动时每帧写入实际相位。
         public int RoundState = 2;
 
+        // ───────── R-ENT 实体系统（helper/projectile/explod）─────────
+        public MEntityWorld World;   // 共享实体世界引用（spawn 通道 + id 分配；同 Pause/Rng 浅拷+引擎重链）
+        public bool IsHelper;        // 本实体是否为 helper（ishelper trigger）
+        public int HelperType;       // helper id（= Helper 控制器 id 参数；ishelper(id)/numhelper(id) 匹配）
+        public bool Destroyed;       // DestroySelf 标记；引擎帧末移除（仅 helper 等实体，玩家不受影响）
+
+        /// <summary>请求创建一个 helper（移植 Helper 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
+        public void RequestHelper(int stateNo, int helperType, FFloat posX, FFloat posY, int facing, bool keyCtrl)
+        {
+            if (World == null) { return; }
+            World.RequestHelper(new MHelperRequest
+            {
+                Owner = this, StateNo = stateNo, HelperType = helperType,
+                PosX = posX, PosY = posY, Facing = facing, KeyCtrl = keyCtrl,
+            });
+        }
+
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
         public int PendingStateNo = -1;
         public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
@@ -407,6 +424,7 @@ namespace Lockstep.Mugen.Char
                 ScreenBoundEnabled = ScreenBoundEnabled, ScreenBoundMoveCameraX = ScreenBoundMoveCameraX,
                 ScreenBoundMoveCameraY = ScreenBoundMoveCameraY, ScreenBoundStageBound = ScreenBoundStageBound,
                 MoveContactTime = MoveContactTime, CounterHit = CounterHit, RoundState = RoundState,
+                World = World, IsHelper = IsHelper, HelperType = HelperType, Destroyed = Destroyed,
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
@@ -450,6 +468,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(ScreenBoundEnabled); hash.AddBool(ScreenBoundMoveCameraX);
             hash.AddBool(ScreenBoundMoveCameraY); hash.AddBool(ScreenBoundStageBound);
             hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit); hash.AddInt32(RoundState);
+            hash.AddBool(IsHelper); hash.AddInt32(HelperType); hash.AddBool(Destroyed);
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
@@ -584,6 +603,12 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(AnimElemNo == n && AnimElemTime == 0);
                 }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
+                case OpCode.OC_ishelper:
+                    // ishelper 无参=是否 helper；ishelper(id) 由编译器压参数后到此（弹参数比对 HelperType）。
+                    // 当前编译器把 ishelper 当无参 trigger（见编译器登记），无参形返回 IsHelper。
+                    return BytecodeValue.Bool(IsHelper);
+                case OpCode.OC_numhelper:
+                    return BytecodeValue.Int(World != null ? World.CountHelpers(-1) : 0);
                 case OpCode.OC_roundstate: return BytecodeValue.Int(RoundState);
                 case OpCode.OC_inguarddist:
                     // 简化：对手在攻击态(MoveType=A=4)且水平体距在守备范围内 → 可进入守招判定。
