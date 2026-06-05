@@ -80,7 +80,8 @@ namespace Lockstep.View
             Application.runInBackground = true;   // 失焦也 tick，否则 MCP 截图时动画冻结
             Debug.Log(string.Format(
                 "[MUGEN] Live: {0} 已接入引擎。状态 {1} 个、动画 {2} 个、命令 {3} 条。方向键走路，Z/X/C 出招。",
-                CharacterFolder, _data.States.Count, _data.Anims.Count, _data.Commands.Count));
+                CharacterFolder, _data.States.Count, _data.Anims.Count, _data.Commands.Count) +
+                "  拳 A/S/D  脚 Z/X/C");
             Render();
         }
 
@@ -105,6 +106,8 @@ namespace Lockstep.View
         }
 
         // 键盘 → MInput（方向存原始 L/R，B/F 由引擎按朝向转）。
+        // MUGEN 6 键布局：拳 x/y/z = A/S/D（家位行），脚 a/b/c = Z/X/C（底行）。
+        // KFM 用 x/y(拳) 与 a/b(脚)，三档 z/c 备用。缺拳键时所有拳招按不出（KFM 站立轻/强拳=command "x"/"y"）。
         static MInput SampleInput()
         {
             MInput input = MInput.None;
@@ -112,9 +115,12 @@ namespace Lockstep.View
             if (UnityEngine.Input.GetKey(KeyCode.DownArrow)) { input |= MInput.Down; }
             if (UnityEngine.Input.GetKey(KeyCode.LeftArrow)) { input |= MInput.Left; }
             if (UnityEngine.Input.GetKey(KeyCode.RightArrow)) { input |= MInput.Right; }
-            if (UnityEngine.Input.GetKey(KeyCode.Z)) { input |= MInput.A; }
-            if (UnityEngine.Input.GetKey(KeyCode.X)) { input |= MInput.B; }
-            if (UnityEngine.Input.GetKey(KeyCode.C)) { input |= MInput.C; }
+            if (UnityEngine.Input.GetKey(KeyCode.A)) { input |= MInput.X; }   // 轻拳
+            if (UnityEngine.Input.GetKey(KeyCode.S)) { input |= MInput.Y; }   // 强拳
+            if (UnityEngine.Input.GetKey(KeyCode.D)) { input |= MInput.Z; }   // 第三拳
+            if (UnityEngine.Input.GetKey(KeyCode.Z)) { input |= MInput.A; }   // 轻脚
+            if (UnityEngine.Input.GetKey(KeyCode.X)) { input |= MInput.B; }   // 强脚
+            if (UnityEngine.Input.GetKey(KeyCode.C)) { input |= MInput.C; }   // 第三脚
             return input;
         }
 
@@ -166,7 +172,7 @@ namespace Lockstep.View
             }
             MChar c = _engine.Chars[0];
             string text = string.Format(
-                "Live 帧 {0}\nStateNo {1}   AnimNo {2}   Elem {3}\nPhysics {4}  Type {5}  Ctrl {6}\nPos ({7:0.0},{8:0.0})  Vel ({9:0.00},{10:0.00})  Facing {11}\n方向键走路  Z/X/C 出招",
+                "Live 帧 {0}\nStateNo {1}   AnimNo {2}   Elem {3}\nPhysics {4}  Type {5}  Ctrl {6}\nPos ({7:0.0},{8:0.0})  Vel ({9:0.00},{10:0.00})  Facing {11}\n方向键移动  拳 A/S/D  脚 Z/X/C",
                 _frame, c.StateNo, c.AnimNo, c.AnimElem, c.Physics, c.StateType, c.Ctrl,
                 c.Pos.X.ToFloat(), c.Pos.Y.ToFloat(), c.Vel.X.ToFloat(), c.Vel.Y.ToFloat(),
                 c.Facing.Raw < 0 ? -1 : 1);

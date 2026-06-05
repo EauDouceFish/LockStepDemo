@@ -50,6 +50,10 @@ namespace Lockstep.Mugen.Battle
             if (cmdText != null)
             {
                 data.Commands = MugenCmdParser.Parse(cmdText);
+                // .cmd 不仅含 [Command] 定义，还含 [Statedef -1] 命令解释器（一堆 ChangeState 按
+                // command=... 触发出招）。它必须并入 States 才能每帧跑（对齐 MUGEN：.cmd 的状态块与
+                // .cns 状态同属角色状态表）。否则命令能匹配但无人消费 → 角色完全不出招。
+                MergeStates(data.States, MugenCnsParser.Parse(cmdText));
             }
             return data;
         }
