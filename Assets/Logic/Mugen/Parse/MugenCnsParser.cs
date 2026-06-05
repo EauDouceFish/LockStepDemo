@@ -565,6 +565,7 @@ namespace Lockstep.Mugen.Parse
             if (p.TryGetValue("fall", out string fl)) { hd.Fall = EvalI(comp, fl) != 0; }
             if (p.TryGetValue("p1stateno", out string p1s)) { hd.P1StateNo = EvalI(comp, p1s); }
             if (p.TryGetValue("p2stateno", out string p2s)) { hd.P2StateNo = EvalI(comp, p2s); }
+            if (p.TryGetValue("p2getp1state", out string g1s)) { hd.P2GetP1State = EvalI(comp, g1s) != 0; }
             if (p.TryGetValue("numhits", out string nh)) { hd.NumHits = EvalI(comp, nh); }
             if (p.TryGetValue("hitonce", out string ho)) { hd.HitOnce = EvalI(comp, ho); }
             // hitonce 默认：未显式给出（-1）时，投技(attr 含 throw 类)默认 1，否则 0（char.go:848）。

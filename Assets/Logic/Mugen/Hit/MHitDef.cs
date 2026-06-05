@@ -138,6 +138,7 @@ namespace Lockstep.Mugen.Hit
         public bool Fall;
         public int P1StateNo = -1;  // 攻方命中后切状态（-1 不切）
         public int P2StateNo = -1;  // 守方切状态（-1=默认 5000）
+        public bool P2GetP1State = true;  // 守方进 p2stateno 时是否用攻方状态表（投技自定义状态，默认 true）
         public int NumHits = 1;
         // hitonce：命中后是否立即停用本 HitDef（只命中一个目标）。-1=未设(解析时按投技→1/否则0 决议，char.go:848)。
         public int HitOnce = -1;
@@ -186,7 +187,7 @@ namespace Lockstep.Mugen.Hit
             hash.AddFixed(GroundVelX); hash.AddFixed(GroundVelY); hash.AddFixed(AirVelX); hash.AddFixed(AirVelY);
             hash.AddInt32((int)AnimType); hash.AddInt32((int)AirAnimType); hash.AddInt32((int)FallAnimType);
             hash.AddInt32((int)GroundType); hash.AddInt32((int)AirType);
-            hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
+            hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddBool(P2GetP1State); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
             hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage);
             hash.AddFixed(DownVelX); hash.AddFixed(DownVelY); hash.AddInt32(DownHitTime); hash.AddBool(DownBounce);

@@ -222,14 +222,16 @@ namespace Lockstep.Mugen.Battle
                 if (!Helpers[i].PauseBool) { MActionSystem.Prepare(Helpers[i]); }
             }
 
-            // 3) 状态机（玩家 + helper）。helper 用 owner 角色数据。
+            // 3) 状态机（玩家 + helper）。自定义状态(投技)：StateOwner 非 null → 跑该角色的状态表。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (!Chars[i].PauseBool) { _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates); }
+                MChar c = Chars[i];
+                if (!c.PauseBool) { MCharData sd = StateDataFor(c, Data[i]); _stateMachine.RunFrame(c, sd.States, sd.CommonStates); }
             }
             for (int i = 0; i < Helpers.Count; i++)
             {
-                if (!Helpers[i].PauseBool) { _stateMachine.RunFrame(Helpers[i], _helperData[i].States, _helperData[i].CommonStates); }
+                MChar c = Helpers[i];
+                if (!c.PauseBool) { MCharData sd = StateDataFor(c, _helperData[i]); _stateMachine.RunFrame(c, sd.States, sd.CommonStates); }
             }
 
             // 4) 物理 + 落地检测（玩家 + helper）。PosFreeze 跳积分后清零。
@@ -265,6 +267,17 @@ namespace Lockstep.Mugen.Battle
         static int TeamOf(MChar c)
         {
             return c.Root != null ? c.Root.Id : c.Id;
+        }
+
+        // 本角色本帧用哪张状态表：StateOwner 非 null(投技自定义状态)→其角色数据；否则自身数据(fallback)。
+        MCharData StateDataFor(MChar c, MCharData own)
+        {
+            if (c.StateOwner != null && !ReferenceEquals(c.StateOwner, c))
+            {
+                MCharData ownerData = DataOf(c.StateOwner);
+                if (ownerData != null) { return ownerData; }
+            }
+            return own;
         }
 
         // 全实体跨队命中：把玩家与 helper 合到一个列表，攻防两两尝试（TryHit 内部做 active/重叠/同招一次判定）。

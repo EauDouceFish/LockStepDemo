@@ -258,6 +258,8 @@ namespace Lockstep.Mugen.State
             IReadOnlyDictionary<int, MStateDef> commonStates)
         {
             int target = c.PendingStateNo;
+            // SelfState（PendingIsSelf）→ 退出自定义状态归属（回自身状态表）；ChangeState 保持归属（投技中切招仍跑攻方表）。
+            if (c.PendingIsSelf) { c.StateOwner = null; }
             c.PendingStateNo = -1;
             c.PendingIsSelf = false;
             c.PrevStateNo = c.StateNo;

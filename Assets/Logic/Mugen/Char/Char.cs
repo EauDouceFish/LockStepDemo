@@ -198,6 +198,7 @@ namespace Lockstep.Mugen.Char
         public int Id;                       // 本角色实例 id（playerid / target 匹配用）
         public MChar P2;                     // 对手（1v1 中即对方）
         public MChar Root;                   // 根角色（非 helper 时通常 = 自身）
+        public MChar StateOwner;             // 自定义状态归属（投技 p2getp1state）：非 null 时本角色跑该角色的状态表；SelfState 复位
         public MChar Parent;                 // 父角色（helper 的创建者；root 为 null）
         public List<MChar> Targets = new List<MChar>();   // 本角色 HitDef 命中的目标
 
@@ -444,7 +445,7 @@ namespace Lockstep.Mugen.Char
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
                 // redirect 链接是结构性引用：浅拷引用本身（指向旧图），由 World 在快照后统一重链到克隆图，
                 // 避免在此深拷造成无限递归。Targets 列表新建容器但元素仍为旧引用，同样待重链。
-                P2 = P2, Root = Root, Parent = Parent,
+                P2 = P2, Root = Root, Parent = Parent, StateOwner = StateOwner,
                 Targets = new List<MChar>(Targets),
             };
             return c;
@@ -487,7 +488,8 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);
             HashFloatVars(ref hash, FloatVars);
-            // redirect 链接不递归哈希（被引 Char 各自 WriteHash）；只混入 target id 反映命中关系
+            // redirect 链接不递归哈希（被引 Char 各自 WriteHash）；混入 target id + 自定义状态归属 id（影响跑哪张状态表）
+            hash.AddInt32(StateOwner != null ? StateOwner.Id : -1);
             hash.AddInt32(Targets.Count);
             for (int t = 0; t < Targets.Count; t++)
             {

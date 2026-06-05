@@ -255,7 +255,17 @@ namespace Lockstep.Mugen.Hit
 
             // 守方进入受击状态 + movetype H + 失控
             defender.PendingStateNo = ResolveGetHitState(defender, hd, ghv);
-            defender.PendingIsSelf = true;
+            // 自定义状态（投技）：p2stateno 且 p2getp1state → 守方跑攻方状态表（StateOwner=attacker）；否则用自身状态表。
+            if (hd.P2StateNo >= 0 && hd.P2GetP1State)
+            {
+                defender.StateOwner = attacker;
+                defender.PendingIsSelf = false;
+            }
+            else
+            {
+                defender.StateOwner = null;
+                defender.PendingIsSelf = true;
+            }
             defender.Ctrl = false;        // MoveType=2(H) 已在伤害计算前设置
 
             // 连段计数（受击方）：numhits 计入 receivedHits（combocount 源，char.go:11170）
