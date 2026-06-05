@@ -1,7 +1,8 @@
 ================================================================================
 LockstepActDemo Mugen 引擎  ——  逐模块逐函数对照 Ikemen GO 实现的差异审计
 ================================================================================
-生成：2026-06-05   基线提交：f3bf6ba（dotnet test 444/444）
+生成：2026-06-05   已提交绿基线：7da5e26（dotnet test 444/444）；最新审计文档提交：afddefe
+当前工作区注意：存在未提交 Pause 字段重构，dotnet test 编译失败（旧 PauseTime/SuperPauseTime 引用尚未统一到 MPauseState）。
 Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 被审计代码：Assets/Logic/Mugen/（约 6400 行 C#）+ Assets/Logic/Framework/
 
@@ -181,15 +182,18 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 
 [4.4] Tier B 非实体控制器（TierBNonEntityControllers.cs，Codex 落地）
   真实执行子集：[一致] VarRandom(用共享 Rng)/VarRangeSet/MoveHitReset(清 movecontact 等)/SuperPause.poweradd。
-  [偏差·缺失·中] 大量控制器为 ParameterOnlyController（参数保留 no-op），运行期不写 MChar：
+  [偏差·缺失·中] master 当前仍有大量控制器为 ParameterOnlyController（参数保留 no-op），运行期不写 MChar：
     Pause/SuperPause(冻结)/PosFreeze/Width/PlayerPush/ScreenBound/HitOverride/ReversalDef/AttackDist。
-    现状：Pause/SuperPause/PosFreeze 的 MChar 字段+引擎消费 Claude 已落地，待 Codex 把控制器接线到字段；
-    其余(Width/PlayerPush/ScreenBound/HitOverride/ReversalDef)字段已铺、消费未做。
+    现状：Char/引擎侧 Pause/PosFreeze/Width/PlayerPush/ScreenBound/HitOverride 字段批正在主工作区半落地；
+    当前测试红，需先把字段模型收口。控制器接线到字段尚未完成。
     风险：中——这些控制器目前对 sim 无效果，依赖它们的招式行为缺失（如超必杀不冻结对方、投技反击 ReversalDef 不生效）。
   [偏差·缺失·低] 纯表现控制器(PlaySnd/Explod/PalFX/AfterImage/Trans/Angle/EnvShake/MakeDust...)逻辑层 no-op，
     对确定性 sim 无影响（设计如此），渲染待表现层。
-  [偏差·缺失·中] 实体类控制器(Helper/Projectile/Target*/BindTo*/ParentVar*/DestroySelf)未做——R-ENT 范畴。
-    Target* 本可不依赖 R-ENT（作用 MChar.Targets），已派给 Codex 第二轮。
+  [偏差·缺失·中] 实体类控制器(Helper/Projectile/BindTo*/ParentVar*/DestroySelf)未做——R-ENT 范畴。
+    TargetState/TargetLifeAdd/TargetPowerAdd/TargetVelSet/TargetVelAdd/TargetFacing/TargetDrop 已在 Codex 独立分支
+    `codex-tierb-nonentity` commit 1e4845e 完成并测试，尚未合入 master；TargetBind 仍依赖 bind 状态字段。
+  [覆盖提升·待合入] Codex 1e4845e 同时补了 Explod/PalFX/AfterImage/Text/声音/冷门控制器的大量强类型参数捕获；
+    master 当前仍停在 8ae6874 的较小 parse-only 子集。
 
 [4.5] HitDefController + HitDef 字段（见模块 6）
 
@@ -381,8 +385,10 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 
 【中风险（特定招式/角色/多实体分歧）】
   R2. Pause/SuperPause 装配近似(模块9.4)：多施放者/受击叠加/pausetime 触发器/off-by-one 与 Ikemen 分歧。
+      当前主工作区还处于字段模型重构半落地状态，测试未绿；先恢复编译绿再谈语义验收。
   R3. 伤害两段式(R-DMG-PIPELINE)：同帧多次命中/同帧读 life 分歧；接 R-ENT 时须连 KO 排序改两段式。
   R4. Tier B 写态控制器 no-op(模块4.4)：SuperPause 冻结对方/Width 推挤/ScreenBound/HitOverride/ReversalDef 当前无效果。
+      Target* 在 Codex 分支已完成但未合入，不再算 R-ENT 必然缺口；合入后剩 TargetBind 归 bind/custom state。
   R5. juggle 未生效：理论可无限连(R-JUGGLE)。
   R6. 未覆盖 trigger/控制器静默降级(模块1.4/8.1)：真实角色用到即门控误判，随覆盖度收敛（范围B 下偏高）。
   R7. AnimTime 时序晚一相(R-FIX-ANIMTIME0)：同帧 ChangeAnim 后读 anim 量 + 回合首帧弹回。
@@ -397,8 +403,9 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
 ================================================================================
 验证矩阵（"已验证"具体指什么——证据边界，避免过度声称）
 ================================================================================
-口径声明：以下"通过"= 本地 dotnet test 单元/集成测试 + 个别 Unity MCP 手动样例；
+口径声明：以下"通过"= 对应提交时的本地 dotnet test 单元/集成测试 + 个别 Unity MCP 手动样例；
   【尚未】通过 Ikemen 逐帧差分 trace（R-ORACLE 未做）证明与 Ikemen 位级/帧级一致。Ikemen 版本/commit 未锚定。
+  当前主工作区因未提交 Pause 字段重构处于编译失败状态；下列证据以最近绿基线 7da5e26 及各功能提交当时测试为准。
 
   验证项                     | 证据形式                                   | 断言的离散量            | 范围/局限
   --------------------------|-------------------------------------------|-----------------------|------------------------------------
@@ -410,7 +417,8 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
   触发器(random/animelem/距离/| 各 *TriggerTests(5-8例)                     | 与手算/MINSTD oracle    | 单元级；oracle=手算或经典序列，非 Ikemen
    name/roundstate/animelemtime)|                                          | 值逐位等价              |   运行期 trace
   确定性                     | 各 *IsDeterministic 测试                    | 同输入同 ComputeHash    | 仅"自洽确定性"，非与 Ikemen 跨实现一致
-  暂停冻结                   | PauseFreezeTests(5例)                      | 冻结方Time不变/计时递减  | 直接置字段隔离测引擎；非经控制器端到端
+  暂停冻结                   | PauseFreezeTests(5例，字段重构前/过程中)    | 冻结方Time不变/计时递减  | 当前主工作区未绿；需 MPauseState 收口后重跑
+  Target 控制器               | Codex 分支 TargetControllersTests(7例)      | target life/power/vel/state/drop | commit 1e4845e，尚未合入 master
 
   尚【未】有的证据：Ikemen headless 帧 trace 对账(R-ORACLE)、真实角色"完整招式集"端到端、长序列回放、
     连续量(pos/vel)对 Ikemen 的容差量化、跨实现确定性(双端同 hash)。

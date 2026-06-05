@@ -36,4 +36,9 @@ Codex 再 rebase 使用。字段命名以 Ikemen `char.go` 原义为准。
 
 ## 已完成登记（Codex 更新）
 <!-- - ✅ R-CTRL-snd PlaySnd/StopSnd/SndPan（commit xxx, dotnet test N/N） -->
-（暂空）
+- ✅ Tier B 非实体控制器可解析子集（master commit `8ae6874`，dotnet test 409/409）：PlaySnd/StopSnd/SndPan、
+  Explod/ModifyExplod/RemoveExplod、MakeDust/GameMakeAnim、EnvShake/FallEnvShake、ForceFeedback、
+  DisplayToClipboard/VictoryQuote、VarRandom/VarRangeSet/MoveHitReset 等。
+- 🔧 待合入 master：Codex 分支 `codex-tierb-nonentity` commit `1e4845e` 已完成 TargetState/TargetLifeAdd/
+  TargetPowerAdd/TargetVelSet/TargetVelAdd/TargetFacing/TargetDrop，以及 Explod/PalFX/AfterImage/Text/声音等
+  更完整参数捕获（dotnet test 439/439）。`TargetBind` 因 bind 运行态字段未落地仍未做。

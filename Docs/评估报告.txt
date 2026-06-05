@@ -1,0 +1,151 @@
+
+• 结论
+  当前已经从“Ikemen/MUGEN 战斗内核的早期骨架”推进到“1v1 根角色战斗主干可验证”的阶段，但还不是可兼容任意 MUGEN
+  角色的完整引擎。按“能导入真实角色并可靠战斗”的目标，整体进度约 30-35%；按“两个 KFM 能在 Unity 里站、走、跳、
+  出招、发生命中、进入受击与回合结算”的最小 playable 目标，大概 55-60%。真正卡点已经从受击状态机转移到
+  Pause 字段重构收口、Target/控制器接线、R-ENT 实体系统、表现事件与回滚确定性。
+
+  最近已提交绿基线：7da5e26，dotnet test 444/444。
+  当前主工作区不是绿的：存在未提交 Pause 字段重构，dotnet test 编译失败；旧代码仍引用 MChar.PauseTime/SuperPauseTime，
+  但 Char.cs 正在改为 MPauseState Pause 聚合模型。先恢复编译绿是下一步第一优先级。
+
+  离目标还差多远
+  最大缺口不是架构壳，而是 MUGEN 战斗语义密度：
+
+   模块                                                   当前状态    距 Ikemen/MUGEN 兼容还差
+  ━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Char 运行态    有核心字段、Clone/Hash、P2/Target/Root、Ghv、Round    helper/projectile/explod、bind/custom state、
+                  State、Tier B 字段批一部分；Pause 正在重构             camera、team/localcoord、表现态仍缺；当前 Pause
+                                                                      字段模型半落地导致测试红
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   状态机           可跑 -3/-2/-1、当前状态、triggerall/triggerN、    没有 Ikemen 嵌套 StateBlock 树、if/else/loop/
+                       persistent、ignorehitpause、common fallback    for；custom state ownership/target state 语义不完
+                                                                      整
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   控制器          基础/生命能量/HitDef/受击 hit 控制器可运行；Tier B  Ikemen bytecode.go 里上百个；helper/projectile/
+                  非实体 parse-only 子集已入 master；Codex 分支已补     bind/ParentVar/TargetBind 仍缺，Pause/Width/
+                  Target* 与大量参数捕获，待合入                       ScreenBound/HitOverride 等还要接线到运行态
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   HitDef/命中    有 Clsn1×Clsn2、hitflag/guardflag、伤害公式、       投技 p2getp1state/custom state、juggle、两段式
+                  攻防倍率、numhits/hitonce、fall.damage/down.*、      伤害管线、spark/sound/envshake/cornerpush 等仍缺
+                  守招与 Target 记录
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   受击机          5000-5160 主干已完成：命中进入受击、hitshake/slide/  仍需更多 gethitvar 字段、juggle、防御边角、投技
+                  recover、倒地/起身、10 角色站立受击 TDD 通过         与真实角色完整招式集差分
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   命令系统        CMD parser、输入缓冲、方向相对、蓄力/释放等已较    复杂角色 command 边角仍需真实角色差分验证
+                                                              扎实
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   动画/AIR        AIR 到 MAnim，动画推进、Clsn 派生可用；animelem、   animelemno(time)、blend/interpolate、角度/缩放
+                  animelemtime 高频触发器已补                         表现语义仍缺
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   素材/SFF                   SFF v1/v2 读取已有，Unity 可渲染 KFM    .act 调色板、PalFX、localcoord、声音 SND、stage/
+                                                                      HUD 未系统化
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   回合/系统       MRoundSystem 已有 intro/fight/preover/over、KO、     lifebar、win pose、round intro 细节、camera/
+                  time over、计分；roundstate trigger 已接             screenbound/stage 仍未系统化
+  ─────────────  ──────────────────────────────────────────────────  ───────────────────────────────────────────────────
+   确定性/回滚                 MChar Hash 已接一部分，测试工程可跑    黄金哈希迁移、RollbackPredictor、KCP 重模拟还没真
+                                                                      正落到新 Mugen 引擎
+
+  状态机对比
+  当前状态机结构是“行为近似、结构不等同”。
+
+   点                 Ikemen                           当前 C#                           风险
+  ━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   主入口             Char.actionPrepare() +           LockstepActDemo/Assets/Logic/     顺序目前合理，但 round/pause/
+                      Char.actionRun() +               Mugen/Battle/MBattleEngine.cs     superpause/helper 后会更复杂
+                      posUpdate() 等集中在 char.go     串 pipeline
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   State 表示         StateBytecode / StateBlock，     LockstepActDemo/Assets/Logic/     结构差异最大：复杂 if/else/
+                      支持嵌套块                       Mugen/State/MStateDef.cs 扁平     loop 状态会不兼容
+                                                       Controllers 列表
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   Trigger 组织       bytecode block 执行              MTriggerSet: triggerall AND，     常规 CNS 足够，复杂 block 语义
+                                                       triggerN 组内 AND、组间 OR        不足
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   -3/-2/-1           actionRun 每帧按 Ikemen 顺序     LockstepActDemo/Assets/Logic/     基本对齐；负状态切换后的重入细
+                      跑                               Mugen/State/MStateMachine.cs      节还需差分
+                                                       跑 -3/-2/-1，再当前状态
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   ChangeState        立即变更并重入相关状态块         C# 用 PendingStateNo 缓冲，当     当前状态基本可用；负状态和
+                                                       前状态中切换后同帧重入            custom state 细节可能偏
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   persistent         Ikemen 每 StateBlock 有          C# 用 PersistCounters 字典按      行为近似；嵌套块不存在导致复杂
+                      ctrlsps                          stateNo/index                     persistent 可能偏
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   hitpause           Ikemen hitpause gate 细节多      C# Hitstop>0 时 Time 冻结，只     hitstop 基础对；pause/superpause
+                                                       跑 ignorehitpause；Pause 正重构   字段模型当前未收口
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   statedef header    Ikemen 进入状态时求值 header     C# RunInit() 已做 anim/ctrl/      这是已修对的部分
+                      表达式                           velset/facep2 等表达式求值
+  ─────────────────  ───────────────────────────────  ────────────────────────────────  ────────────────────────────────
+   common states      Ikemen 标准 common1/数据体系     C# 支持 common fallback，受击     标准 common1 仍应替换/校准，真实
+                                                       5000 系主干可跑                   角色自带 common1 需差分
+
+  结构层面差异清单
+  需要重点盯这几项，不是简单补几个 controller 能解决：
+
+  1. StateBlock 树没有移植
+     当前扁平化设计可读性好，但 Ikemen 的状态执行模型支持嵌套块、条件块、循环和块级 persistent。只跑 KFM 或简单 CNS 可以
+     顶住，兼容复杂角色时会遇到结构性缺口。
+
+  2. Char 运行态不是 Ikemen 完整 Char
+     当前 MChar 已不只是核心子集，受击、倍率、roundstate、Tier B 字段批已有一部分。但 helper、projectile、explod、
+     target bind、custom state、camera/team/localcoord/表现态仍要进入运行态并纳入 Clone/Hash。当前 Pause 字段重构要先收口。
+
+  3. HitDef/GetHitVar 字段不完整
+     当前命中已覆盖伤害公式、攻防倍率、numhits/hitonce、fall.damage/down.* 等主干，但 MUGEN 角色大量依赖 p2getp1state、
+     spark/sound/envshake、cornerpush、完整 gethitvar()。这会直接卡投技、打击感和复杂连段。
+
+  4. 实体系统缺失
+     Ikemen 的 helper/projectile/explod 是大量角色的基础。当前只有两个 root char。没有实体生命周期、owner/root/parent/
+     target 体系，很多控制器无法真实实现。
+
+  5. 回合/系统层缺失
+     RoundState 主干已进来，但 lifebar、win pose、round intro 细节、camera、screenbound/stage 边界仍没系统化。
+
+  6. 表现和逻辑事件还未分层完整
+     Explod、PalFX、AfterImage、EnvShake、PlaySnd 等现在还没有统一事件/实体输出。后面要避免把表现层 Unity 对象直接塞进逻
+     辑层。
+
+  模块实现对比
+
+   模块          Ikemen 源                          当前实现                           评价
+  ━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   表达式 VM     bytecode.go opcode +               Expr/Bytecode* +                   算术/逻辑/常用 trigger 已有，方
+                 compiler.go                        MugenExprCompiler                  向正确
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   状态机        char.go actionRun + bytecode.go    State/MStateMachine.cs +           行为骨架可用，结构未 1:1
+                 StateBlock                         MStateDef.cs
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   控制器        bytecode.go 上百个 controller      StateCtrl/*.cs 基础+Hit+Tier B      覆盖度提升，但实体/表现/写态仍未
+                                                    子集，Codex 分支有待合入扩展       到真实角色泛用
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   角色运行态    char.go Char 巨大状态体            Char/Char.cs 子集                  需要继续扩字段，但要守 Clone/
+                                                                                       Hash
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   命令输入      input.go                           Command/* + MInputBuffer           当前相对成熟
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   动画          anim.go                            Anim/MAnimSystem.cs                基础动作可跑
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   命中          char.go hit/gethit                 Hit/MHitSystem.cs + MHitDef.cs     1v1 主干可用，不到投技/多实体兼容
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   角色加载      DEF/CNS/CMD/AIR/SFF load           Battle/MCharLoader.cs + Parse/     可加载 KFM 级别，完整角色不足
+                                                    Import
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   物理          char.go posUpdate/gravity          Battle/MPhysics.cs                 基础站/蹲/空物理有，边界/camera/
+                                                                                       localcoord 不足
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   回合系统      system.go round flow               MRoundSystem + StartRound shim     主干有，表现和细节未全
+  ────────────  ─────────────────────────────────  ─────────────────────────────────  ──────────────────────────────────
+   回滚确定性    Ikemen 原生不是此项目目标          ComputeHash() 部分接入             新引擎回滚还没完成
+
+  我的判断
+  架构方向没有明显“推倒重来”的问题：模块拆分、纯 C# 定点、MChar 承载运行态、controller 类化、parser 接线都能继续推进。真
+  正的结构风险是 状态块扁平化。如果目标是“兼容大量 MUGEN 角色”，以后大概率要补一个能表达 Ikemen StateBlock 嵌套语义的中
+  间层；如果目标先是“KFM/常规角色能打”，当前扁平模型可以继续顶一段。
+
+  下一步优先级已经变化：先把当前 Pause 字段重构收口，让主工作区恢复 dotnet test 全绿；然后合入 Codex 分支的
+  Target* 与 Tier B 参数捕获；随后把 Pause/Width/ScreenBound/HitOverride/ReversalDef 等控制器接到 MChar 字段。
+  这些完成后再开 R-ENT，因为 helper/projectile/explod/custom state 是“真实角色泛用兼容”的最大地基。

@@ -4,6 +4,18 @@
 
 以下字段应声明在 `MChar`，并全部纳入 `Clone()` 与 `WriteHash()`，除非用途明确写为纯表现但仍会影响回放一致性。连续量用 `FFloat`。
 
+## 2026-06-05 状态更新
+
+- 已在主工作区可见：`PosFreeze`、`WidthPlayerFront/Back`、`WidthEdgeFront/Back`、`PlayerPushEnabled`、`PushPriority`、
+  `PushAffectTeam`、`ScreenBoundEnabled`、`ScreenBoundMoveCameraX/Y`、`ScreenBoundStageBound`、`HitOverrides`、
+  `MoveContactTime`、`CounterHit`、`RoundState` 等字段或容器，并已开始进入 `Clone()`/`WriteHash()`。
+- Pause/SuperPause 正在从下列分散字段迁移到 `MPauseState Pause` 聚合模型；当前主工作区仍有旧字段引用，`dotnet test`
+  编译失败。下一步应先统一 `MBattleEngine/PauseFreezeTests/Char.Clone/Hash` 到同一模型，恢复测试全绿。
+- Codex 第二轮 `codex-tierb-nonentity` commit `1e4845e` 已完成 Target* 与 Tier B 大量参数捕获，但尚未合入 `master`；
+  合入后才按这些字段接线控制器运行态。
+
+## 原始字段请求
+
 - `PauseTime`，`int`，Pause/SuperPause 冻结剩余时间，对应 `setPauseTime/setSuperPauseTime`。
 - `PauseMoveTime`，`int`，Pause 期间本角色可行动帧数。
 - `SuperPauseTime`，`int`，SuperPause 剩余时间。
