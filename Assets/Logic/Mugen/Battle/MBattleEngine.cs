@@ -23,8 +23,14 @@ namespace Lockstep.Mugen.Battle
 
         readonly MStateMachine _stateMachine = new MStateMachine();
 
+        // 确定性随机源（= Ikemen 单一全局 sys.randseed）：全场角色共享，random trigger 推进它。
+        // 固定默认种子保证回放/双端逐位一致；联机时由对局配置同步初始种子。模拟状态 → 纳入 ComputeHash。
+        public readonly MRandom Random = new MRandom(DefaultRandomSeed);
+        const int DefaultRandomSeed = 1;
+
         public void Add(MChar c, MCharData data)
         {
+            c.Rng = Random;   // 接入共享随机源（对齐 Ikemen 全局种子）
             Chars.Add(c);
             Data.Add(data);
         }
@@ -115,6 +121,7 @@ namespace Lockstep.Mugen.Battle
             {
                 Chars[i].WriteHash(ref hash);
             }
+            hash.AddInt32(Random.Seed);   // 共享随机源种子：模拟状态，全场混入一次（不在 per-char 哈希以免重复计数）
             return hash.Value;
         }
     }

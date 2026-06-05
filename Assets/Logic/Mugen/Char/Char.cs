@@ -81,6 +81,10 @@ namespace Lockstep.Mugen.Char
         // 浮空已持续帧数（= Ikemen fallTime）：fallflag 期间每帧 ++，进受击/落地清零。canRecover 判定用。
         public int FallTime;
 
+        // 确定性随机源（= Ikemen 全局 sys.randseed）：`random` trigger 查此。引擎装配时所有角色共享同一实例
+        // （对齐 Ikemen 单一全局种子）。Clone 浅拷引用（共享可变态，引擎级快照统一重链 + 入哈希）。可为 null（退化返 0）。
+        public MRandom Rng;
+
         // 命令系统（M6）：输入缓冲 + 命令激活状态。command="name" trigger 查此。可为 null（无输入源时）。
         public Command.MCommandList CommandList;
 
@@ -242,6 +246,8 @@ namespace Lockstep.Mugen.Char
                 KeyCtrl = KeyCtrl, AirJumpCount = AirJumpCount,
                 Constants = Constants,   // 不可变配置，浅拷引用
                 AnimTable = AnimTable,   // 不可变配置，浅拷引用（同 Constants，不进哈希）
+                Rng = Rng,   // 共享可变随机源：浅拷引用，引擎级快照统一重链（同 redirect 链接）；哈希在引擎层混入一次
+
                 HitDef = HitDef.Clone(),
                 Clsn1 = Clsn1, Clsn2 = Clsn2,   // 帧派生数据，浅引用（由 Anim 系统每帧重填）
                 Guarding = Guarding, HitByAttr = HitByAttr, HitByTime = HitByTime, HitByIsNot = HitByIsNot,
@@ -349,6 +355,11 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_power: return BytecodeValue.Int(Power);
                 case OpCode.OC_powermax: return BytecodeValue.Int(PowerMax);
                 case OpCode.OC_alive: return BytecodeValue.Bool(Alive);
+
+                // random：返回 [0,999]（移植 bytecode.go:2308 OC_random → Rand(0,999)）。
+                // 推进共享种子；无随机源时退化返 0（不崩）。
+                case OpCode.OC_random:
+                    return BytecodeValue.Int(Rng != null ? Rng.Rand(0, 999) : 0);
 
                 case OpCode.OC_command:
                 {
