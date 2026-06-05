@@ -397,7 +397,7 @@ namespace Lockstep.Mugen.StateCtrl
     /// <summary>SndPan: logic-layer no-op until R-SND connects audio events.</summary>
     public sealed class SndPanController : ParameterOnlyController { public BytecodeExp Channel; public BytecodeExp Pan; public BytecodeExp AbsPan; }
 
-    /// <summary>Explod: logic-layer no-op until R-ENT introduces explod entities.</summary>
+    /// <summary>Explod: creates a deterministic logic-layer explod record; rendering is handled later.</summary>
     public class ExplodController : ParameterOnlyController
     {
         public BytecodeExp[] Anim;
@@ -450,10 +450,102 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] ShaderParam;
         public AfterImageParamSet AfterImage = new AfterImageParamSet();
         public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            if (character.World == null)
+            {
+                return false;
+            }
+            MExplod explod = new MExplod
+            {
+                Id = character.World.AllocId(),
+                OwnerId = character.Id,
+            };
+            ApplyToExplod(character, explod);
+            character.World.AddExplod(explod);
+            return false;
+        }
+
+        protected void ApplyToExplod(MChar character, MExplod explod)
+        {
+            if (Id != null) { explod.ExplodId = Id.Run(character).ToI(); }
+            if (Anim != null && Anim.Length > 0) { explod.AnimNo = Anim[Anim.Length - 1].Run(character).ToI(); }
+            if (Position != null && Position.Length > 0)
+            {
+                FFloat x = Position[0].Run(character).ToF();
+                FFloat y = Position.Length > 1 ? Position[1].Run(character).ToF() : explod.Pos.Y;
+                FFloat z = Position.Length > 2 ? Position[2].Run(character).ToF() : explod.Pos.Z;
+                explod.Pos = new FVector3(x, y, z);
+            }
+            if (Velocity != null && Velocity.Length > 0)
+            {
+                FFloat x = Velocity[0].Run(character).ToF();
+                FFloat y = Velocity.Length > 1 ? Velocity[1].Run(character).ToF() : explod.Vel.Y;
+                FFloat z = Velocity.Length > 2 ? Velocity[2].Run(character).ToF() : explod.Vel.Z;
+                explod.Vel = new FVector3(x, y, z);
+            }
+            if (Accel != null && Accel.Length > 0)
+            {
+                FFloat x = Accel[0].Run(character).ToF();
+                FFloat y = Accel.Length > 1 ? Accel[1].Run(character).ToF() : explod.Accel.Y;
+                FFloat z = Accel.Length > 2 ? Accel[2].Run(character).ToF() : explod.Accel.Z;
+                explod.Accel = new FVector3(x, y, z);
+            }
+            if (Scale != null && Scale.Length > 0)
+            {
+                explod.ScaleX = Scale[0].Run(character).ToF();
+                explod.ScaleY = Scale.Length > 1 ? Scale[1].Run(character).ToF() : explod.ScaleX;
+            }
+            if (Facing != null) { explod.Facing = Facing.Run(character).ToI() < 0 ? -1 : 1; }
+            if (VFacing != null) { explod.VFacing = VFacing.Run(character).ToI() < 0 ? -1 : 1; }
+            if (BindTime != null) { explod.BindTime = BindTime.Run(character).ToI(); }
+            if (RemoveTime != null) { explod.RemoveTime = RemoveTime.Run(character).ToI(); }
+            if (SprPriority != null) { explod.SprPriority = SprPriority.Run(character).ToI(); }
+            if (OwnPal != null) { explod.OwnPal = OwnPal.Run(character).ToB(); }
+            if (RemoveOnGetHit != null) { explod.RemoveOnGetHit = RemoveOnGetHit.Run(character).ToB(); }
+            if (RemoveOnChangeState != null) { explod.RemoveOnChangeState = RemoveOnChangeState.Run(character).ToB(); }
+        }
     }
 
-    public sealed class ModifyExplodController : ExplodController { public BytecodeExp Index; }
-    public sealed class RemoveExplodController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; }
+    public sealed class ModifyExplodController : ExplodController
+    {
+        public BytecodeExp Index;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World == null)
+            {
+                return false;
+            }
+            int explodId = Id != null ? Id.Run(character).ToI() : -1;
+            int matchIndex = Index != null ? Index.Run(character).ToI() : -1;
+            List<MExplod> explods = character.World.FindExplods(explodId, character.Id, matchIndex);
+            for (int index = 0; index < explods.Count; index++)
+            {
+                ApplyToExplod(character, explods[index]);
+            }
+            return false;
+        }
+    }
+
+    public sealed class RemoveExplodController : ParameterOnlyController
+    {
+        public BytecodeExp Id;
+        public BytecodeExp Index;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World == null)
+            {
+                return false;
+            }
+            int explodId = Id != null ? Id.Run(character).ToI() : -1;
+            int matchIndex = Index != null ? Index.Run(character).ToI() : -1;
+            character.World.RemoveExplods(explodId, character.Id, matchIndex);
+            return false;
+        }
+    }
     public sealed class MakeDustController : ParameterOnlyController { public BytecodeExp Spacing; public BytecodeExp[] Position; public BytecodeExp[] Position2; }
     public sealed class GameMakeAnimController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp[] Position; public BytecodeExp Under; }
     public sealed class EnvShakeController : ParameterOnlyController

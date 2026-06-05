@@ -303,7 +303,7 @@ namespace Lockstep.Mugen.Expr
 
             // R-ENT entity count predicates must run before function parsing,
             // otherwise numhelper(5) is consumed as an unknown function.
-            if (name == "numhelper" || name == "numproj" || name == "ishelper")
+            if (name == "numhelper" || name == "numproj" || name == "numexplod" || name == "ishelper")
             {
                 if (IsOp("("))
                 {
@@ -316,7 +316,8 @@ namespace Lockstep.Mugen.Expr
                     EmitInt(-1);
                 }
                 Emit(name == "numhelper" ? OpCode.OC_numhelper
-                    : name == "numproj" ? OpCode.OC_numproj : OpCode.OC_ishelper);
+                    : name == "numproj" ? OpCode.OC_numproj
+                    : name == "numexplod" ? OpCode.OC_numexplod : OpCode.OC_ishelper);
                 return;
             }
 
@@ -787,7 +788,7 @@ namespace Lockstep.Mugen.Expr
             ["moveguarded"] = OpCode.OC_moveguarded, ["movereversed"] = OpCode.OC_movereversed,
             ["numtarget"] = OpCode.OC_numtarget, ["roundstate"] = OpCode.OC_roundstate,
             ["inguarddist"] = OpCode.OC_inguarddist,
-            // 注：ishelper/numhelper/numproj 在 ParseIdent 特判（统一弹 id 参数，无参压 -1=全部），不在此表。
+            // 注：ishelper/numhelper/numproj/numexplod 在 ParseIdent 特判（统一弹 id 参数，无参压 -1=全部），不在此表。
             // 受击触发器（common1 5000-5160 用）
             ["hitshakeover"] = OpCode.OC_hitshakeover, ["hitover"] = OpCode.OC_hitover,
             ["hitfall"] = OpCode.OC_hitfall, ["canrecover"] = OpCode.OC_canrecover,

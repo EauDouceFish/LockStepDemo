@@ -1,6 +1,5 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/char.go Helper/DestroySelf + system.go charList（实体注册/生命周期）。
-// 去全局单例：把"谁能 spawn 实体"做成引擎持有、角色共享引用的注册表。控制器请求 spawn，引擎每帧 drain。
+// Source: src/char.go helper/projectile/explod helpers + system.go entity lists.
 // Adapted to fixed-point lockstep. See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
 using Lockstep.Core;
@@ -8,46 +7,117 @@ using Lockstep.Math;
 
 namespace Lockstep.Mugen.Char
 {
-    /// <summary>helper spawn 请求（控制器入队，引擎 DrainSpawns 时据此造 helper 实体）。</summary>
+    /// <summary>Helper spawn request queued by Helper controller and drained by the battle engine.</summary>
     public struct MHelperRequest
     {
-        public MChar Owner;     // 创建者（helper 的 parent）
-        public int StateNo;     // helper 初始状态号
-        public int HelperType;  // helper id（= Helper 控制器 id 参数；ishelper(id)/numhelper(id) 用）
-        public int PosType;     // postype（0=p1 相对，1=p2，2=front，3=back，4=left，5=right；v1 仅 p1 相对）
-        public FFloat PosX;     // 相对偏移
+        public MChar Owner;
+        public int StateNo;
+        public int HelperType;
+        public int PosType;
+        public FFloat PosX;
         public FFloat PosY;
-        public int Facing;      // 1/-1（相对 owner 朝向）
-        public bool KeyCtrl;    // 是否受键控（多数 helper 否）
+        public int Facing;
+        public bool KeyCtrl;
     }
 
-    /// <summary>projectile spawn 请求（Projectile 控制器入队，引擎 DrainSpawns 时造弹幕实体）。</summary>
+    /// <summary>Projectile spawn request queued by Projectile controller and drained by the battle engine.</summary>
     public struct MProjectileRequest
     {
         public MChar Owner;
         public int ProjId;
-        public FFloat VelX, VelY, AccelX, AccelY, PosX, PosY;
+        public FFloat VelX;
+        public FFloat VelY;
+        public FFloat AccelX;
+        public FFloat AccelY;
+        public FFloat PosX;
+        public FFloat PosY;
         public int RemoveTime;
         public int AnimNo;
-        public Hit.MHitDef HitDef;   // 弹幕自带 HitDef（控制器从同段 hitdef 参数 BuildHitDef）
+        public Hit.MHitDef HitDef;
     }
 
     /// <summary>
-    /// 实体世界（共享）：helper/projectile/explod 的 spawn 队列 + 确定性实体 id 计数。引擎持单例、各角色共享引用。
-    /// 实体列表本身存在引擎（MBattleEngine.Helpers）；本对象只承载"跨控制器→引擎"的请求通道 + id 分配。
+    /// Minimal deterministic Explod runtime state. It backs numexplod, ModifyExplod and RemoveExplod.
+    /// Rendering fields are intentionally deferred to the view layer.
+    /// </summary>
+    public sealed class MExplod
+    {
+        public int Id;
+        public int OwnerId;
+        public int ExplodId;
+        public int AnimNo;
+        public FVector3 Pos;
+        public FVector3 Vel;
+        public FVector3 Accel;
+        public FFloat ScaleX = FFloat.One;
+        public FFloat ScaleY = FFloat.One;
+        public int Facing = 1;
+        public int VFacing = 1;
+        public int BindTime;
+        public int RemoveTime = -2;
+        public int SprPriority;
+        public bool OwnPal;
+        public bool RemoveOnGetHit;
+        public bool RemoveOnChangeState;
+
+        public MExplod Clone()
+        {
+            return new MExplod
+            {
+                Id = Id,
+                OwnerId = OwnerId,
+                ExplodId = ExplodId,
+                AnimNo = AnimNo,
+                Pos = Pos,
+                Vel = Vel,
+                Accel = Accel,
+                ScaleX = ScaleX,
+                ScaleY = ScaleY,
+                Facing = Facing,
+                VFacing = VFacing,
+                BindTime = BindTime,
+                RemoveTime = RemoveTime,
+                SprPriority = SprPriority,
+                OwnPal = OwnPal,
+                RemoveOnGetHit = RemoveOnGetHit,
+                RemoveOnChangeState = RemoveOnChangeState,
+            };
+        }
+
+        public void WriteHash(ref Hash64 hash)
+        {
+            hash.AddInt32(Id);
+            hash.AddInt32(OwnerId);
+            hash.AddInt32(ExplodId);
+            hash.AddInt32(AnimNo);
+            hash.AddFixed(Pos);
+            hash.AddFixed(Vel);
+            hash.AddFixed(Accel);
+            hash.AddFixed(ScaleX);
+            hash.AddFixed(ScaleY);
+            hash.AddInt32(Facing);
+            hash.AddInt32(VFacing);
+            hash.AddInt32(BindTime);
+            hash.AddInt32(RemoveTime);
+            hash.AddInt32(SprPriority);
+            hash.AddBool(OwnPal);
+            hash.AddBool(RemoveOnGetHit);
+            hash.AddBool(RemoveOnChangeState);
+        }
+    }
+
+    /// <summary>
+    /// Shared entity world for helper, projectile and explod state. Controllers write requests or records here;
+    /// the engine owns frame stepping and lifecycle pruning.
     /// </summary>
     public sealed class MEntityWorld
     {
         public readonly List<MHelperRequest> SpawnQueue = new List<MHelperRequest>();
         public readonly List<MProjectileRequest> ProjSpawnQueue = new List<MProjectileRequest>();
-
-        // 当前存活 helper 实体（引擎维护；char 经共享 World 数 numhelper/ishelper）。与引擎 _helperData 平行。
         public readonly List<MChar> Helpers = new List<MChar>();
-
-        // 当前存活弹幕实体（char 经共享 World 数 numproj/projcontact/projhit）。
         public readonly List<MProjectile> Projectiles = new List<MProjectile>();
+        public readonly List<MExplod> Explods = new List<MExplod>();
 
-        // 实体 id 分配（确定性递增，模拟状态 → 入哈希）。玩家用 0/1，helper/proj/explod 从此起。
         public int NextEntityId = 1000;
 
         public int AllocId()
@@ -65,35 +135,113 @@ namespace Lockstep.Mugen.Char
             ProjSpawnQueue.Add(request);
         }
 
-        /// <summary>helper 计数（numhelper trigger）。helperType&lt;0 表全部，否则按 type 计。</summary>
         public int CountHelpers(int helperType)
         {
             if (helperType < 0) { return Helpers.Count; }
-            int n = 0;
-            for (int i = 0; i < Helpers.Count; i++)
+            int count = 0;
+            for (int index = 0; index < Helpers.Count; index++)
             {
-                if (Helpers[i].HelperType == helperType) { n++; }
+                if (Helpers[index].HelperType == helperType) { count++; }
             }
-            return n;
+            return count;
         }
 
-        /// <summary>弹幕计数（numproj trigger）。projId&lt;0 表全部，否则按 ProjId 计。</summary>
         public int CountProjectiles(int projId)
         {
             if (projId < 0) { return Projectiles.Count; }
-            int n = 0;
-            for (int i = 0; i < Projectiles.Count; i++)
+            int count = 0;
+            for (int index = 0; index < Projectiles.Count; index++)
             {
-                if (Projectiles[i].ProjId == projId) { n++; }
+                if (Projectiles[index].ProjId == projId) { count++; }
             }
-            return n;
+            return count;
+        }
+
+        public void AddExplod(MExplod explod)
+        {
+            Explods.Add(explod);
+        }
+
+        public int CountExplods(int explodId, int ownerId)
+        {
+            int count = 0;
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                MExplod explod = Explods[index];
+                if (explod.OwnerId == ownerId && (explodId < 0 || explod.ExplodId == explodId))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        public List<MExplod> FindExplods(int explodId, int ownerId, int matchIndex)
+        {
+            List<MExplod> matches = new List<MExplod>();
+            int seen = 0;
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                MExplod explod = Explods[index];
+                if (explod.OwnerId != ownerId || (explodId >= 0 && explod.ExplodId != explodId))
+                {
+                    continue;
+                }
+                if (matchIndex >= 0)
+                {
+                    if (seen == matchIndex)
+                    {
+                        matches.Add(explod);
+                        return matches;
+                    }
+                    seen++;
+                }
+                else
+                {
+                    matches.Add(explod);
+                }
+            }
+            return matches;
+        }
+
+        public void RemoveExplods(int explodId, int ownerId, int matchIndex)
+        {
+            int seen = 0;
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                MExplod explod = Explods[index];
+                if (explod.OwnerId != ownerId || (explodId >= 0 && explod.ExplodId != explodId))
+                {
+                    continue;
+                }
+                bool remove = matchIndex < 0 || seen == matchIndex;
+                seen++;
+                if (remove)
+                {
+                    Explods.RemoveAt(index);
+                    if (matchIndex >= 0)
+                    {
+                        return;
+                    }
+                    index--;
+                }
+            }
         }
 
         public MEntityWorld Clone()
         {
             MEntityWorld world = new MEntityWorld { NextEntityId = NextEntityId };
-            // SpawnQueue 在每帧 DrainSpawns 后清空，帧边界通常为空；为安全仍浅拷请求（Owner 引用待引擎级重链）。
             world.SpawnQueue.AddRange(SpawnQueue);
+            world.ProjSpawnQueue.AddRange(ProjSpawnQueue);
+            world.Helpers.AddRange(Helpers);
+            for (int index = 0; index < Projectiles.Count; index++)
+            {
+                world.Projectiles.Add(Projectiles[index].Clone());
+            }
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                world.Explods.Add(Explods[index].Clone());
+            }
             return world;
         }
 
@@ -101,6 +249,12 @@ namespace Lockstep.Mugen.Char
         {
             hash.AddInt32(NextEntityId);
             hash.AddInt32(SpawnQueue.Count);
+            hash.AddInt32(ProjSpawnQueue.Count);
+            hash.AddInt32(Explods.Count);
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                Explods[index].WriteHash(ref hash);
+            }
         }
     }
 }

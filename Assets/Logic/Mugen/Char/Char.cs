@@ -664,6 +664,11 @@ namespace Lockstep.Mugen.Char
                     int id = Pop(stack).ToI();
                     return BytecodeValue.Int(World != null ? World.CountProjectiles(id) : 0);
                 }
+                case OpCode.OC_numexplod:
+                {
+                    int id = Pop(stack).ToI();
+                    return BytecodeValue.Int(World != null ? World.CountExplods(id, Id) : 0);
+                }
                 case OpCode.OC_projcontacttime:
                 {
                     int id = Pop(stack).ToI();
