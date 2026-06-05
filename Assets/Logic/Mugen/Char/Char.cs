@@ -202,6 +202,33 @@ namespace Lockstep.Mugen.Char
             return AnimTable != null && AnimTable.ContainsKey(animNo);
         }
 
+        /// <summary>animelemtime(n)：自元素 n（1-based）起已播 tick。当前元素精确；其余按累积起始时间推算。</summary>
+        int ComputeAnimElemTime(int elemNo1Based)
+        {
+            if (elemNo1Based == AnimElemNo)
+            {
+                return AnimElemTime;   // 当前元素：精确（与 animelem= 首帧语义一致）
+            }
+            if (AnimTable == null || !AnimTable.TryGetValue(AnimRunningNo, out Anim.MAnimData anim)
+                || anim.Frames == null)
+            {
+                return 0;
+            }
+            int index = elemNo1Based - 1;
+            if (index < 0 || index >= anim.Frames.Length)
+            {
+                return 0;
+            }
+            int startTime = 0;
+            for (int e = 0; e < index; e++)
+            {
+                int t = anim.Frames[e].Time;
+                if (t < 0) { break; }   // 永久帧前缀：无法累加，止于此
+                startTime += t;
+            }
+            return AnimCurTime - startTime;
+        }
+
         // ───────── 距离（p2dist/p2bodydist；移植 char.go:8743 distX / 8787 bodyDistX 简化形）─────────
 
         /// <summary>到对手的朝向相对水平距离（前为正）= facing*(opp.x - self.x)。
@@ -483,6 +510,13 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_movereversed: return BytecodeValue.Int(MoveReversed);
                 case OpCode.OC_animtime: return BytecodeValue.Int(AnimTime);
                 case OpCode.OC_animelemno: return BytecodeValue.Int(AnimElemNo);
+                case OpCode.OC_animelemtime:
+                {
+                    // animelemtime(n)：自元素 n（1-based）起已播 tick。当前元素精确返 AnimElemTime；
+                    // 其他元素按累积起始时间推算（移植 anim.go AnimElemTime）。
+                    int n = Pop(stack).ToI();
+                    return BytecodeValue.Int(ComputeAnimElemTime(n));
+                }
                 case OpCode.OC_animelem:
                 {
                     // animelem = n：到达元素 n 的首帧（当前元素号 == n 且本元素已播 0 tick）。

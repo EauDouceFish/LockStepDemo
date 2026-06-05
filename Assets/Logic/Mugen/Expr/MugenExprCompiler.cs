@@ -798,6 +798,8 @@ namespace Lockstep.Mugen.Expr
             // animexist(n)/selfanimexist(n)：求值参数 n 后发 trigger opcode，运行期由 MChar 查动画表。
             // 对齐 Ikemen compiler.go:1824/3588（参数压栈 + OC_animexist/OC_selfanimexist）。
             ["animexist"] = OpCode.OC_animexist, ["selfanimexist"] = OpCode.OC_selfanimexist,
+            // animelemtime(n)：求值元素号 n 后发 opcode，运行期 MChar 算「自元素 n 起已播 tick」。
+            ["animelemtime"] = OpCode.OC_animelemtime,
         };
 
         // ───────── 字节码发射（编码与 BytecodeExp.Run 一致）─────────
