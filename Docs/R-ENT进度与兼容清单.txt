@@ -1,0 +1,57 @@
+================================================================================
+R-ENT 实体系统进度 + 到「兼容所有 MUGEN 角色导入 → 状态机可跑」的清单
+================================================================================
+基线：2026-06-05 commit 987bb1a，dotnet test 470/470。
+
+--------------------------------------------------------------------------------
+A. R-ENT 已完成（切片 1-2）
+--------------------------------------------------------------------------------
+[✅] 实体世界 MEntityWorld：共享 spawn 队列 + helper 列表 + 确定性 id 分配，入 ComputeHash。
+[✅] helper 实体生命周期：RequestHelper 入队 → DrainSpawns 造实体(用 owner 角色数据，接 Parent/Root/P2/Rng/Pause/World)
+     → 引擎 Tick 跑 helper 的 prepare/状态机/物理/动画(用 owner 数据) → RemoveDestroyed 帧末移除。
+[✅] 触发器 ishelper(无参)/numhelper。
+[✅] 控制器 Helper(stateno/id/pos/postype/facing/keyctrl) / DestroySelf，接 MugenCnsParser，端到端 CNS 测试绿。
+[✅] 确定性：helper 生命周期逐帧 ComputeHash 一致。
+
+--------------------------------------------------------------------------------
+B. R-ENT 余下切片（按依赖/价值排序）
+--------------------------------------------------------------------------------
+[⬜] 切片3 Projectile：弹幕实体（pos/vel/accel + 自带 HitDef + 命中/超时/越界移除 + projcontact/projhit/numproj 触发器）。
+     —— 建议模型：projectile 作为轻量实体纳入实体世界，命中复用 MHitSystem 对敌方判定。弹幕角色必需。
+[⬜] 切片4 Explod：表现实体（逻辑层仅追踪 numexplod；渲染归表现层）。RemoveExplod/ModifyExplod 关联。
+[⬜] 切片5 custom state（p2getp1state / TargetState 完整）：一个角色运行另一个角色的状态(状态归属 ownership)。
+     —— 投技(throw)必需；HitDef 的 p1stateno/p2stateno/p2getp1state 字段驱动。
+[⬜] 切片6 helper 关联控制器：ParentVarSet/Add、RootVarSet、BindToParent/Root/Target、ChangeAnim2、TargetBind。
+     —— helper 实体已就绪，这些作用于 parent/root/target 的变量与绑定。
+[⬜] 切片7 helper/proj 参与命中：当前命中仅玩家 1v1 双向；需扩展到「全实体 vs 全实体」(helper 打人、被打)。
+[⬜] 切片8 numhelper(id)/ishelper(id)/helper(id) redirect/parent·root(helper 语义)/partner：参数形与 helper redirect。
+
+--------------------------------------------------------------------------------
+C. R-ENT 之外、到「兼容所有角色」仍需的（审计风险表对应项）
+--------------------------------------------------------------------------------
+[⬜] R-DMG-PIPELINE(R3)：伤害两段式(ghv.damage 累加→防守方 tick 应用 + KO 排序)。同帧多段/多实体命中必需，依赖切片7。
+[⬜] juggle(R5)：juggle 点扣减/检查真正生效，防无限连。
+[⬜] AnimTime 即刻刷新(R7)：ChangeAnim 后同帧读 AnimTime/AnimElem 反映新动画(消除晚一相)。
+[⬜] ReversalDef：反击定义容器 + 命中检测(打断对方攻击)。
+[⬜] 触发器长尾覆盖补全：const/sysvar 全字段、gethitvar 余字段、projXXX、stagevar 等(随真实角色用量驱动)。
+[⬜] R-LOCALCOORD：localcoord 缩放(不同坐标系角色 clsn/pos/vel 缩放)。
+[⬜] R-PAL：.act 调色板 + PalFX 着色(表现，影响 Janos 等)。
+[⬜] R-SND：声音事件(PlaySnd 真播；逻辑层已 no-op)。
+[⬜] R-ORACLE：Ikemen headless 帧 trace 对账(锚定 commit)，量化连续量漂移 + 离散全等回归。
+
+--------------------------------------------------------------------------------
+D. 「状态机可兼容所有角色导入」的判据与现状
+--------------------------------------------------------------------------------
+判据 = 任意 MUGEN 角色 .def/.cns/.cmd/.air/.sff 导入后，其状态机(含负状态/招式/受击/helper/proj)在引擎里
+       不崩、不哑火、离散行为与 Ikemen 一致(连续量容差)。
+
+现状（范围分级，对齐审计 Ikemen对照审计.txt）：
+- 范围A(1v1、无 helper/proj、无超必杀冻结依赖)：离散主干已在本地测试 + KFM 类样例范围内通过。
+- 范围B(真实角色泛用)：helper 已通(切片1-2)；projectile/custom state(投技)/全实体命中/两段式伤害/juggle 仍缺，
+  这些是「能真正吃任意角色」的剩余硬门。完成 B 节的切片3-8 + C 节的 R3/R5/R7 + R-ORACLE 兜底后，
+  方可声称「状态机兼容所有角色导入」。
+
+下一步执行顺序：切片3 Projectile → 切片7 全实体命中 → 切片5 custom state(投技) → R3 两段式 → 切片4 Explod →
+  切片6 helper 关联控制器 → juggle/AnimTime → 触发器长尾 → R-ORACLE 差分兜底 → 全角色导入冒烟测试矩阵。
+
+（本清单随 R-ENT 切片推进持续更新。）
