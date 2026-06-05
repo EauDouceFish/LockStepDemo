@@ -321,6 +321,7 @@ namespace Lockstep.Mugen.Battle
                 MPhysics.Step(c);
                 MActionSystem.LandCheck(c);
             }
+            c.ApplyBind();
             c.PosFreeze = false;
         }
 

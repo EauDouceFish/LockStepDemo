@@ -231,6 +231,8 @@ namespace Lockstep.Mugen.Parse
                 case "posset": return new PosSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "posadd": return new PosAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "changeanim": return new ChangeAnimController { Value = Expr(comp, p, "value") };
+                case "changeanim2":
+                    return new ChangeAnim2Controller { Value = Expr(comp, p, "value"), Elem = Expr(comp, p, "elem"), ElemTime = Expr(comp, p, "elemtime") };
                 case "ctrlset": return new CtrlSetController { Value = Expr(comp, p, "value") };
                 case "varset": return BuildVarSet(comp, p, false);
                 case "varadd": return BuildVarSet(comp, p, true);
@@ -422,6 +424,8 @@ namespace Lockstep.Mugen.Parse
                 case "victoryquote": return WithParams(new VictoryQuoteController { Value = Expr(comp, p, "value") }, p);
                 case "targetstate":
                     return new TargetStateController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Value = Expr(comp, p, "value") };
+                case "targetbind":
+                    return new TargetBindController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Time = Expr(comp, p, "time"), Position = ExprList(comp, p, "pos") };
                 case "targetlifeadd":
                     return new TargetLifeAddController
                     {
@@ -443,6 +447,12 @@ namespace Lockstep.Mugen.Parse
                     return new TargetFacingController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Value = Expr(comp, p, "value") };
                 case "targetdrop":
                     return new TargetDropController { ExcludeId = Expr(comp, p, "excludeid"), KeepOne = Expr(comp, p, "keepone") };
+                case "bindtoparent":
+                    return new BindToParentController { Time = Expr(comp, p, "time"), Facing = Expr(comp, p, "facing"), Position = ExprList(comp, p, "pos") };
+                case "bindtoroot":
+                    return new BindToRootController { Time = Expr(comp, p, "time"), Facing = Expr(comp, p, "facing"), Position = ExprList(comp, p, "pos") };
+                case "bindtotarget":
+                    return new BindToTargetController { Id = Expr(comp, p, "id"), Index = Expr(comp, p, "index"), Time = Expr(comp, p, "time"), Position = ExprList(comp, p, "pos"), PosZ = Expr(comp, p, "posz") };
                 case "text": return WithParams(FillText(new TextController(), comp, p), p);
                 case "modifytext": return WithParams(FillText(new ModifyTextController { Index = Expr(comp, p, "index") }, comp, p), p);
                 case "removetext":

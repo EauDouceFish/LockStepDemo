@@ -211,6 +211,12 @@ namespace Lockstep.Mugen.Char
         // persistent 计数：当前状态内各控制器(按 index)已触发帧数，进入新状态时清空（仅作用当前状态）
         public Dictionary<int, int> PersistCounters = new Dictionary<int, int>();
 
+        // BindTo*/TargetBind runtime. BindTarget is a structural reference; offset is stored in target-facing space.
+        public MChar BindTarget;
+        public int BindTime;
+        public FVector3 BindPos;
+        public int BindFacing;
+
         // 物理
         public FVector3 Pos;
         public FVector3 OldPos;
@@ -425,6 +431,36 @@ namespace Lockstep.Mugen.Char
             return AnimTable == null || AnimTable.ContainsKey(animNo);
         }
 
+        public void BindTo(MChar target, int time, FVector3 offset, int bindFacing)
+        {
+            BindTarget = target;
+            BindTime = time;
+            BindPos = offset;
+            BindFacing = bindFacing;
+        }
+
+        public void ApplyBind()
+        {
+            if (BindTarget == null || BindTime <= 0)
+            {
+                return;
+            }
+            FFloat targetFacing = BindTarget.Facing.Raw >= 0 ? FFloat.One : -FFloat.One;
+            Pos = new FVector3(
+                BindTarget.Pos.X + BindPos.X * targetFacing,
+                BindTarget.Pos.Y + BindPos.Y,
+                BindTarget.Pos.Z + BindPos.Z);
+            if (BindFacing != 0)
+            {
+                Facing = targetFacing * FFloat.FromInt(BindFacing);
+            }
+            BindTime--;
+            if (BindTime <= 0)
+            {
+                BindTarget = null;
+            }
+        }
+
         // ───────── 回滚支持 ─────────
 
         public MChar Clone()
@@ -440,6 +476,7 @@ namespace Lockstep.Mugen.Char
                 FallDefenseMul = FallDefenseMul, DefenseMulDelay = DefenseMulDelay,
                 Hitstop = Hitstop, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
+                BindTarget = BindTarget, BindTime = BindTime, BindPos = BindPos, BindFacing = BindFacing,
                 HitCount = HitCount, UniqHitCount = UniqHitCount, GuardCount = GuardCount, ReceivedHits = ReceivedHits,
                 MoveContact = MoveContact, MoveHit = MoveHit, MoveGuarded = MoveGuarded, MoveReversed = MoveReversed,
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
@@ -492,6 +529,7 @@ namespace Lockstep.Mugen.Char
             hash.AddFixed(FallDefenseMul); hash.AddBool(DefenseMulDelay);
             hash.AddInt32(Hitstop); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
             HashVars(ref hash, PersistCounters);
+            hash.AddInt32(BindTarget != null ? BindTarget.Id : -1); hash.AddInt32(BindTime); hash.AddFixed(BindPos); hash.AddInt32(BindFacing);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount); hash.AddInt32(GuardCount); hash.AddInt32(ReceivedHits);
             hash.AddInt32(MoveContact); hash.AddInt32(MoveHit); hash.AddInt32(MoveGuarded); hash.AddInt32(MoveReversed);
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
