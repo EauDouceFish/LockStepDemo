@@ -198,6 +198,10 @@ namespace Lockstep.Mugen.Parse
                     };
                 }
                 case "destroyself": return new DestroySelfController();
+                case "parentvarset": return BuildRelayVar(comp, p, MVarTarget.Parent, false);
+                case "parentvaradd": return BuildRelayVar(comp, p, MVarTarget.Parent, true);
+                case "rootvarset": return BuildRelayVar(comp, p, MVarTarget.Root, false);
+                case "rootvaradd": return BuildRelayVar(comp, p, MVarTarget.Root, true);
                 case "projectile":
                 {
                     BytecodeExp[] vel = ExprList(comp, p, "velocity");
@@ -469,6 +473,22 @@ namespace Lockstep.Mugen.Parse
         }
 
         // VarSet/VarAdd：支持 v=N value=expr(int) / fv=N value=expr(float) / var(N)=expr / fvar(N)=expr
+        // ParentVarSet/RootVarSet 等：复用 BuildVarSet 的 index/isFloat/value 提取，改写到 parent/root。
+        static MStateController BuildRelayVar(MugenExprCompiler comp, Dictionary<string, string> p,
+            MVarTarget target, bool isAdd)
+        {
+            MStateController built = BuildVarSet(comp, p, isAdd);
+            if (built is VarSetController vs)
+            {
+                return new RelayVarSetController { Target = target, Index = vs.Index, IsFloat = vs.IsFloat, IsAdd = false, Value = vs.Value };
+            }
+            if (built is VarAddController va)
+            {
+                return new RelayVarSetController { Target = target, Index = va.Index, IsFloat = va.IsFloat, IsAdd = true, Value = va.Value };
+            }
+            return new NullController();
+        }
+
         static MStateController BuildVarSet(MugenExprCompiler comp, Dictionary<string, string> p, bool isAdd)
         {
             int index = 0;

@@ -36,6 +36,42 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
+    /// <summary>变量写入目标（ParentVarSet→Parent，RootVarSet→Root）。</summary>
+    public enum MVarTarget { Parent, Root }
+
+    /// <summary>
+    /// ParentVarSet/ParentVarAdd/RootVarSet/RootVarAdd：把值写到 parent/root 的变量。
+    /// 值表达式在本实体(helper)上下文求值，结果写到目标角色（对齐 MUGEN parentvarset 语义）。
+    /// </summary>
+    public sealed class RelayVarSetController : MStateController
+    {
+        public MVarTarget Target;
+        public int Index;
+        public bool IsFloat;
+        public bool IsAdd;
+        public BytecodeExp Value;
+
+        public override bool Run(MChar character)
+        {
+            if (Value == null) { return false; }
+            MChar target = Target == MVarTarget.Parent ? character.Parent : character.Root;
+            if (target == null) { return false; }
+            if (IsFloat)
+            {
+                FFloat v = Value.Run(character).ToF();
+                if (IsAdd) { target.FloatVars.TryGetValue(Index, out FFloat cur); v = cur + v; }
+                target.FloatVars[Index] = v;
+            }
+            else
+            {
+                int v = Value.Run(character).ToI();
+                if (IsAdd) { target.IntVars.TryGetValue(Index, out int cur); v = cur + v; }
+                target.IntVars[Index] = v;
+            }
+            return false;
+        }
+    }
+
     /// <summary>DestroySelf：标记本实体移除（移植 char.go destroySelf）。仅对 helper 等实体生效，玩家忽略。</summary>
     public sealed class DestroySelfController : MStateController
     {
