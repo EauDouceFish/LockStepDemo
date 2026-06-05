@@ -262,7 +262,7 @@ Ikemen Oracle：../MugenSource/_reference/Ikemen-GO/src/（只读）
     AnimTime/AnimElem 仍是上一帧派生值（陈旧）。
   效果：[近似] 稳态下差一帧的派生量；
   风险：中——具体已暴露 bug = 回合刚开始第 0 帧 AnimTime 默认 0，招式态 `trigger1=AnimTime=0` 同帧自弹回站立
-    （人类操作不撞第 0 帧故实测无感，但是真实分歧）。忠实修法=ChangeAnim 即刻刷新派生量。已登记。
+    （人类操作不撞第 0 帧故实测无感，但是真实分歧）。对齐修法=ChangeAnim 即刻刷新派生量。已登记。
 
 [7.3] 表现层渲染  [装配] MugenLiveView/MugenSpriteLoader 读 AnimNo+当前帧 group/image 取精灵，
   与逻辑层 anim 推进解耦；位置永不冻结(R-FIX-1)。非 Ikemen 渲染管线，属表现层装配。
