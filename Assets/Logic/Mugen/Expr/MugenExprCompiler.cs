@@ -329,6 +329,19 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            // name/p1name = "x"（自身）、p2name/enemyname = "x"（对手 P2）：角色名字符串比较。
+            // 用量大（name 897/p2name 275）。p1name 等同 name；1v1 中 p2name/enemyname 走 P2 redirect。
+            if (name == "name" || name == "p1name")
+            {
+                EmitNameCompare();
+                return;
+            }
+            if (name == "p2name" || name == "enemyname")
+            {
+                EmitRedirectedNameCompare();
+                return;
+            }
+
             // animelem = n：动画到达元素 n 的「首帧」触发（AnimElemNo==n && AnimElemTime==0），
             // 是 expValue 级原子布尔（自行消费 = / != 与操作数），对齐 MUGEN animelem 触发器语义。
             // 大量 HitDef/取消用 `trigger1 = animelem = N` 计时——此前 animelem 未特判落到压 0 → 恒假 → 招式哑火。
@@ -533,6 +546,41 @@ namespace Lockstep.Mugen.Expr
                 _out.Add(nameBytes[k]);
             }
             if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        // name = "x" / != "x"：发 OC_name + [1字节名长][ASCII 名字]，运行期与角色 Name 精确比较。无比较则压 0。
+        void EmitNameCompare()
+        {
+            bool negate = IsOp("!=");
+            if (negate || IsOp("=")) { Next(); }
+            else { EmitInt(0); return; }
+            string wanted = Cur.Kind == TokKind.Str ? Cur.Text : "";
+            if (Cur.Kind == TokKind.Str) { Next(); }
+            Emit(OpCode.OC_name);
+            byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(wanted);
+            _out.Add((byte)(nameBytes.Length > 255 ? 255 : nameBytes.Length));
+            for (int k = 0; k < nameBytes.Length && k < 255; k++)
+            {
+                _out.Add(nameBytes[k]);
+            }
+            if (negate) { Emit(OpCode.OC_blnot); }
+        }
+
+        // p2name/enemyname = "x"：把名字比较编入子缓冲，用 OC_p2 redirect + OC_run 包裹（对齐 p2statetype 套路）。
+        void EmitRedirectedNameCompare()
+        {
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            EmitNameCompare();
+            List<byte> sub = _out;
+            _out = outer;
+
+            int runBlockLen = 1 + 4 + sub.Count;
+            _out.Add((byte)OpCode.OC_p2);
+            AppendI32(runBlockLen);
+            _out.Add((byte)OpCode.OC_run);
+            AppendI32(sub.Count);
+            _out.AddRange(sub);
         }
 
         void EmitTypeCheck(OpCode op, bool isMove)

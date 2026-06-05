@@ -399,6 +399,15 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(CommandList != null && CommandList.IsActive(cmdName));
                 }
 
+                case OpCode.OC_name:
+                {
+                    // name = "x"：与角色 Name 精确比较（编码同 OC_command：[1字节名长]+ASCII）。
+                    int len = code[i]; i++;
+                    string wanted = System.Text.Encoding.ASCII.GetString(code, i, len);
+                    i += len;
+                    return BytecodeValue.Bool(Name == wanted);
+                }
+
                 // CharSystemVar 常用 trigger
                 case OpCode.OC_id: return BytecodeValue.Int(Id);
                 case OpCode.OC_palno: return BytecodeValue.Int(PalNo);
