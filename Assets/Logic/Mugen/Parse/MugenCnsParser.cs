@@ -183,6 +183,21 @@ namespace Lockstep.Mugen.Parse
             switch (type)
             {
                 case "null": return new NullController();
+                case "helper":
+                {
+                    BytecodeExp[] helperPos = ExprList(comp, p, "pos");
+                    return new HelperController
+                    {
+                        StateNo = Expr(comp, p, "stateno"),
+                        Id = Expr(comp, p, "id"),
+                        PosX = helperPos != null && helperPos.Length > 0 ? helperPos[0] : null,
+                        PosY = helperPos != null && helperPos.Length > 1 ? helperPos[1] : null,
+                        PosType = Expr(comp, p, "postype"),
+                        Facing = Expr(comp, p, "facing"),
+                        KeyCtrl = Expr(comp, p, "keyctrl"),
+                    };
+                }
+                case "destroyself": return new DestroySelfController();
                 case "changestate":
                     return new ChangeStateController { Value = Expr(comp, p, "value"), Ctrl = IntP(p, "ctrl", -1), Anim = IntP(p, "anim", -1) };
                 case "selfstate":
