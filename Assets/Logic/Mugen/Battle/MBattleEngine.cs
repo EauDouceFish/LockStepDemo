@@ -60,12 +60,34 @@ namespace Lockstep.Mugen.Battle
         }
 
         /// <summary>推进一帧。inputs[i] 对应 Chars[i] 本帧输入。
-        /// 顺序对齐 Ikemen 每帧：输入缓冲 → actionPrepare(硬编码基础动作) → actionRun(状态机) → update(物理/动画) → 命中。</summary>
+        /// 顺序对齐 Ikemen 每帧：输入缓冲 → actionPrepare(硬编码基础动作) → actionRun(状态机) → update(物理/动画) → 命中。
+        /// Pause/SuperPause（移植 system.go super/pause 全局冻结）：暂停期间被冻结角色跳过本帧全部处理，
+        /// 仅施暂停方在其 movetime 窗口内可动；SuperPause 优先于 Pause。命中在暂停期间不结算。</summary>
         public void Tick(IReadOnlyList<MInput> inputs)
         {
+            // 0) 计算本帧全局暂停态 + 每角色是否被冻结。无暂停时所有 frozen=false → 行为与原先逐位一致。
+            int globalSuperPause = 0;
+            int globalPause = 0;
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                if (Chars[i].SuperPauseTime > globalSuperPause) { globalSuperPause = Chars[i].SuperPauseTime; }
+                if (Chars[i].PauseTime > globalPause) { globalPause = Chars[i].PauseTime; }
+            }
+            bool superActive = globalSuperPause > 0;
+            bool pauseActive = !superActive && globalPause > 0;
+            bool anyPause = superActive || pauseActive;
+
+            bool[] frozen = new bool[Chars.Count];
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                if (superActive) { frozen[i] = Chars[i].SuperPauseMoveTime <= 0; }
+                else if (pauseActive) { frozen[i] = Chars[i].PauseMoveTime <= 0; }
+            }
+
             // 1) 输入缓冲：命令匹配环形缓冲（搓招）+ 边沿计数缓冲（引擎硬编码键读 Fb/Bb/Ub/Db）。
             for (int i = 0; i < Chars.Count; i++)
             {
+                if (frozen[i]) { continue; }
                 MChar c = Chars[i];
                 MInput input = inputs != null && i < inputs.Count ? inputs[i] : MInput.None;
                 bool facingRight = c.Facing.Raw >= 0;
@@ -82,33 +104,53 @@ namespace Lockstep.Mugen.Battle
             // 2) actionPrepare：引擎硬编码基础动作（站/走/蹲/跳/刹车的状态转移，缓冲到 PendingStateNo）。
             for (int i = 0; i < Chars.Count; i++)
             {
+                if (frozen[i]) { continue; }
                 MActionSystem.Prepare(Chars[i]);
             }
 
             // 3) 状态机（应用 Pending 切换、负状态/当前状态控制器、ChangeState 同帧重入）
             for (int i = 0; i < Chars.Count; i++)
             {
+                if (frozen[i]) { continue; }
                 _stateMachine.RunFrame(Chars[i], Data[i].States, Data[i].CommonStates);
             }
 
-            // 4) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate）+ 空中落地检测（硬编码 → 状态 52）
+            // 4) 物理（位置积分 + 摩擦/重力，移植 Ikemen posUpdate）+ 空中落地检测（硬编码 → 状态 52）。
+            //    PosFreeze（本帧由控制器断言）：跳过位置积分与落地检测，随后清零（每帧需重新断言）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                MPhysics.Step(Chars[i]);
-                MActionSystem.LandCheck(Chars[i]);
+                if (frozen[i]) { continue; }
+                MChar c = Chars[i];
+                if (!c.PosFreeze)
+                {
+                    MPhysics.Step(c);
+                    MActionSystem.LandCheck(c);
+                }
+                c.PosFreeze = false;
             }
 
             // 5) 动画推进（M8）+ 派生 Clsn
             for (int i = 0; i < Chars.Count; i++)
             {
+                if (frozen[i]) { continue; }
                 MAnimSystem.Action(Chars[i], Data[i].Anims);
             }
 
-            // 6) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）
-            if (Chars.Count == 2)
+            // 6) 命中（1v1：双向尝试，TryHit 内部做 hitflag/重叠/同招一次判定）。暂停期间不结算命中。
+            if (Chars.Count == 2 && !anyPause)
             {
                 MHitSystem.TryHit(Chars[0], Chars[1]);
                 MHitSystem.TryHit(Chars[1], Chars[0]);
+            }
+
+            // 7) 暂停计时递减（每角色持有自己的 super/pause 时长与 movetime；min 0）。
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                MChar c = Chars[i];
+                if (c.SuperPauseTime > 0) { c.SuperPauseTime--; }
+                if (c.SuperPauseMoveTime > 0) { c.SuperPauseMoveTime--; }
+                if (c.PauseTime > 0) { c.PauseTime--; }
+                if (c.PauseMoveTime > 0) { c.PauseMoveTime--; }
             }
         }
 
