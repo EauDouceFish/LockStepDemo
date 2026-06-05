@@ -83,13 +83,21 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp PalFXHue;
     }
 
-    /// <summary>Pause: parser-ready placeholder until PauseTime/PauseMoveTime fields land on MChar.</summary>
+    /// <summary>Pause: 写共享暂停态 buffer（移植 bytecode.go pause.Run，默认 t=0/mt=0）。</summary>
     public sealed class PauseController : ParameterOnlyController
     {
         public BytecodeExp Time;
         public BytecodeExp MoveTime;
         public BytecodeExp PauseBg;
         public BytecodeExp EndCmdBufTime;
+
+        public override bool Run(MChar character)
+        {
+            int t = Time != null ? Time.Run(character).ToI() : 0;
+            int mt = MoveTime != null ? MoveTime.Run(character).ToI() : 0;
+            character.SetPause(t, mt);
+            return false;
+        }
     }
 
     /// <summary>SuperPause: applies poweradd now; pause timers/p2defmul need MChar fields from Claude batch.</summary>
@@ -110,6 +118,11 @@ namespace Lockstep.Mugen.StateCtrl
 
         public override bool Run(MChar character)
         {
+            // 写共享暂停态（移植 bytecode.go superPause.Run，默认 t=30/mt=0/unhittable=true）。
+            int t = Time != null ? Time.Run(character).ToI() : 30;
+            int mt = MoveTime != null ? MoveTime.Run(character).ToI() : 0;
+            bool uh = Unhittable == null || Unhittable.Run(character).ToB();
+            character.SetSuperPause(t, mt, uh);
             if (PowerAdd != null)
             {
                 character.Power = Clamp(character.Power + PowerAdd.Run(character).ToI(), 0, character.PowerMax);
@@ -123,34 +136,84 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
-    /// <summary>PosFreeze: requires MChar PosFreeze flag to affect physics; placeholder parses params only.</summary>
+    /// <summary>PosFreeze: 冻结本帧位置（无参 value 默认 true）。引擎物理相据 MChar.PosFreeze 跳过积分。</summary>
     public sealed class PosFreezeController : ParameterOnlyController
     {
         public BytecodeExp Value;
+
+        public override bool Run(MChar character)
+        {
+            character.PosFreeze = Value == null || Value.Run(character).ToB();
+            return false;
+        }
     }
 
-    /// <summary>Width: requires MChar width/edge width fields; placeholder parses params only.</summary>
+    /// <summary>Width: 设角色推挤宽度(player)与边界宽度(edge)，前/后。value 同时设两者。每帧重新断言。</summary>
     public sealed class WidthController : ParameterOnlyController
     {
         public BytecodeExp[] Value;
         public BytecodeExp[] Player;
         public BytecodeExp[] Edge;
+
+        public override bool Run(MChar character)
+        {
+            if (Value != null && Value.Length >= 1)
+            {
+                FFloat front = Value[0].Run(character).ToF();
+                FFloat back = Value.Length > 1 ? Value[1].Run(character).ToF() : front;
+                character.WidthPlayerFront = front;
+                character.WidthPlayerBack = back;
+                character.WidthEdgeFront = front;
+                character.WidthEdgeBack = back;
+            }
+            if (Player != null && Player.Length >= 1)
+            {
+                character.WidthPlayerFront = Player[0].Run(character).ToF();
+                character.WidthPlayerBack = Player.Length > 1 ? Player[1].Run(character).ToF() : character.WidthPlayerFront;
+            }
+            if (Edge != null && Edge.Length >= 1)
+            {
+                character.WidthEdgeFront = Edge[0].Run(character).ToF();
+                character.WidthEdgeBack = Edge.Length > 1 ? Edge[1].Run(character).ToF() : character.WidthEdgeFront;
+            }
+            return false;
+        }
     }
 
-    /// <summary>PlayerPush: requires MChar push flags/priority; placeholder parses params only.</summary>
+    /// <summary>PlayerPush: 设是否参与角色推挤 + 优先级 + 影响队伍。每帧重新断言。</summary>
     public sealed class PlayerPushController : ParameterOnlyController
     {
         public BytecodeExp Value;
         public BytecodeExp Priority;
         public BytecodeExp AffectTeam;
+
+        public override bool Run(MChar character)
+        {
+            if (Value != null) { character.PlayerPushEnabled = Value.Run(character).ToB(); }
+            if (Priority != null) { character.PushPriority = Priority.Run(character).ToI(); }
+            if (AffectTeam != null) { character.PushAffectTeam = AffectTeam.Run(character).ToI(); }
+            return false;
+        }
     }
 
-    /// <summary>ScreenBound: requires MChar screen/stage/move-camera flags; placeholder parses params only.</summary>
+    /// <summary>ScreenBound: 设屏幕/舞台边界约束 + 相机跟随。每帧重新断言。</summary>
     public sealed class ScreenBoundController : ParameterOnlyController
     {
         public BytecodeExp Value;
         public BytecodeExp[] MoveCamera;
         public BytecodeExp StageBound;
+
+        public override bool Run(MChar character)
+        {
+            if (Value != null) { character.ScreenBoundEnabled = Value.Run(character).ToB(); }
+            if (MoveCamera != null && MoveCamera.Length >= 1)
+            {
+                character.ScreenBoundMoveCameraX = MoveCamera[0].Run(character).ToB();
+                character.ScreenBoundMoveCameraY = MoveCamera.Length > 1 && MoveCamera[1].Run(character).ToB();
+            }
+            if (StageBound != null) { character.ScreenBoundStageBound = StageBound.Run(character).ToB(); }
+            return false;
+        }
     }
 
     /// <summary>AttackDist: Ikemen writes HitDef guard distance arrays; MHitDef lacks them in this worktree.</summary>
@@ -161,7 +224,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] ZValues;
     }
 
-    /// <summary>HitOverride: requires an eight-slot MChar HitOverride container.</summary>
+    /// <summary>HitOverride: 写 MChar.HitOverrides[slot]（移植 char.go HitOverride，默认 time=1）。命中系统据此改受击态。</summary>
     public sealed class HitOverrideController : ParameterOnlyController
     {
         public int Attr;
@@ -173,6 +236,24 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp ForceAir;
         public BytecodeExp ForceGuard;
         public BytecodeExp KeepState;
+
+        public override bool Run(MChar character)
+        {
+            int slot = Slot != null ? Slot.Run(character).ToI() : 0;
+            if (slot < 0 || slot >= character.HitOverrides.Length)
+            {
+                return false;
+            }
+            character.HitOverrides[slot] = new MHitOverride
+            {
+                Attr = Attr,
+                StateNo = StateNo != null ? StateNo.Run(character).ToI() : -1,
+                Time = Time != null ? Time.Run(character).ToI() : 1,
+                ForceAir = ForceAir != null && ForceAir.Run(character).ToB(),
+                KeepState = KeepState != null && KeepState.Run(character).ToB(),
+            };
+            return false;
+        }
     }
 
     /// <summary>
