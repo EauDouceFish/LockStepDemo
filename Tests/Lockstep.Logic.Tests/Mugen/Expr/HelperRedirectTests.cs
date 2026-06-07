@@ -2,6 +2,7 @@
 // Source: src/compiler.go redirect parsing + src/bytecode.go OC_helper/OC_partner + src/char.go helperTrigger/partner.
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
+using Lockstep.Math;
 using NUnit.Framework;
 
 namespace Lockstep.Logic.Tests.Mugen.Expr
@@ -48,6 +49,45 @@ namespace Lockstep.Logic.Tests.Mugen.Expr
             Assert.That(Eval("helper(5), var(3)", owner), Is.EqualTo(11));
             Assert.That(Eval("helper(5, 1), var(3)", owner), Is.EqualTo(22));
             Assert.That(new MugenExprCompiler().Compile("helper(7), var(3)").Run(owner).IsUndefined(), Is.True);
+        }
+
+        [Test]
+        public void TargetRedirect_FiltersByIdAndMatchIndexOnRealChar()
+        {
+            MChar owner = new MChar();
+            MChar first = new MChar { Id = 7, Life = 111 };
+            MChar second = new MChar { Id = 7, Life = 222 };
+            MChar other = new MChar { Id = 9, Life = 999 };
+            owner.Targets.Add(first);
+            owner.Targets.Add(second);
+            owner.Targets.Add(other);
+
+            Assert.That(Eval("target(7, 0), life", owner), Is.EqualTo(111));
+            Assert.That(Eval("target(7, 1), life", owner), Is.EqualTo(222));
+            Assert.That(Eval("target(9), life", owner), Is.EqualTo(999));
+            Assert.That(new MugenExprCompiler().Compile("target(7, 2), life").Run(owner).IsUndefined(), Is.True);
+        }
+
+        [Test]
+        public void SysVarNamespaces_AreIndependentOnRealChar()
+        {
+            MChar owner = new MChar();
+            owner.IntVars[1] = 10;
+            owner.SysIntVars[1] = 20;
+            owner.FloatVars[1] = FFloat.FromInt(30);
+            owner.SysFloatVars[1] = FFloat.FromInt(40);
+
+            Assert.That(Eval("var(1) + sysvar(1) + fvar(1) + sysfvar(1)", owner), Is.EqualTo(100));
+        }
+
+        [Test]
+        public void StateOwnerRedirect_UsesCustomStateOwner()
+        {
+            MChar owner = new MChar { Life = 777 };
+            MChar controlled = new MChar { Life = 100, StateOwner = owner };
+
+            Assert.That(Eval("stateowner, life", controlled), Is.EqualTo(777));
+            Assert.That(new MugenExprCompiler().Compile("stateowner, life").Run(new MChar()).IsUndefined(), Is.True);
         }
 
         [Test]

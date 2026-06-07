@@ -157,11 +157,11 @@ namespace Lockstep.Tests.Mugen
         [Test]
         public void RedirectTarget_FirstTarget()
         {
-            // target, life：OC_target 弹 id(-1=任意→第一个)；命中目标 Life=222
+            // target, life：OC_target 弹 id(-1=任意→第一个) 和 index(0)；命中目标 Life=222
             MChar tgt = new MChar { Id = 7, Life = 222 };
             MChar c = new MChar();
             c.Targets.Add(tgt);
-            int r = new Emit().Int(-1).Rd(OpCode.OC_target, 1).Op(OpCode.OC_life).Run(c).ToI();
+            int r = new Emit().Int(-1).Int(0).Rd(OpCode.OC_target, 1).Op(OpCode.OC_life).Run(c).ToI();
             Assert.That(r, Is.EqualTo(222));
         }
 
@@ -174,6 +174,36 @@ namespace Lockstep.Tests.Mugen
 
             b.Time = 4;
             Assert.That(HashOf(a), Is.Not.EqualTo(HashOf(b)), "状态变化哈希应变");
+        }
+
+        [Test]
+        public void WriteHash_IncludesSystemVariablesAndStructuralLinks()
+        {
+            MChar baseChar = new MChar { Id = 1 };
+            MChar changed = baseChar.Clone();
+
+            changed.SysIntVars[2] = 20;
+            Assert.That(HashOf(changed), Is.Not.EqualTo(HashOf(baseChar)), "sysvar 应影响哈希");
+
+            baseChar.SysIntVars[2] = 20;
+            changed = baseChar.Clone();
+            changed.SysFloatVars[3] = FFloat.FromInt(30);
+            Assert.That(HashOf(changed), Is.Not.EqualTo(HashOf(baseChar)), "sysfvar 应影响哈希");
+
+            baseChar.SysFloatVars[3] = FFloat.FromInt(30);
+            changed = baseChar.Clone();
+            changed.P2 = new MChar { Id = 200 };
+            Assert.That(HashOf(changed), Is.Not.EqualTo(HashOf(baseChar)), "P2 链接身份应影响哈希");
+
+            baseChar.P2 = new MChar { Id = 200 };
+            changed = baseChar.Clone();
+            changed.Root = new MChar { Id = 300 };
+            Assert.That(HashOf(changed), Is.Not.EqualTo(HashOf(baseChar)), "Root 链接身份应影响哈希");
+
+            baseChar.Root = new MChar { Id = 300 };
+            changed = baseChar.Clone();
+            changed.Parent = new MChar { Id = 400 };
+            Assert.That(HashOf(changed), Is.Not.EqualTo(HashOf(baseChar)), "Parent 链接身份应影响哈希");
         }
     }
 }
