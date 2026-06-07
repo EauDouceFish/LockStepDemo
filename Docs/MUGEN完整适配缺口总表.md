@@ -57,7 +57,9 @@
 - [ ] comparer 比较所有已记录字段；实体按稳定 key，不按列表下标；字段级容差。
 - [x] native hash 使用规范 FNV 初值（`Hash64.Create()`），并有回归测试防止退回零初值。
 - [ ] native hash 覆盖所有影响未来模拟的状态，加入 frame/resource manifest，并建立字段级 mutation guard。
-- [ ] `MBattleEngineSnapshot` 整体克隆对象图并两阶段重链；恢复后重建派生状态。
+- [x] native hash 已加入 `FrameNo`、projectile `HitDef/Owner/Clsn1` 与 helper/projectile spawn queue 内容。
+- [x] `MBattleEngineSnapshot` 整体克隆对象图并两阶段重链，覆盖玩家、helper、projectile、explod、spawn queues 与核心引用边。
+- [ ] snapshot 恢复后重建派生状态，并建立字段级 mutation guard。
 - [ ] 输入历史、快照环、重演、confirmed frame、表现事件提交/去重。
 - [ ] Ikemen 固定提交插桩：固定输入注入，post-combat-tick 输出 JSONL semantic trace。
 - [ ] C# 与 Ikemen scenario runner、差异分类和 CI golden 流程。

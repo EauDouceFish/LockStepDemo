@@ -250,11 +250,50 @@ namespace Lockstep.Mugen.Char
         {
             hash.AddInt32(NextEntityId);
             hash.AddInt32(SpawnQueue.Count);
+            for (int index = 0; index < SpawnQueue.Count; index++)
+            {
+                WriteHash(ref hash, SpawnQueue[index]);
+            }
             hash.AddInt32(ProjSpawnQueue.Count);
+            for (int index = 0; index < ProjSpawnQueue.Count; index++)
+            {
+                WriteHash(ref hash, ProjSpawnQueue[index]);
+            }
             hash.AddInt32(Explods.Count);
             for (int index = 0; index < Explods.Count; index++)
             {
                 Explods[index].WriteHash(ref hash);
+            }
+        }
+
+        static void WriteHash(ref Hash64 hash, MHelperRequest request)
+        {
+            hash.AddInt32(request.Owner != null ? request.Owner.Id : -1);
+            hash.AddInt32(request.StateNo);
+            hash.AddInt32(request.HelperType);
+            hash.AddInt32(request.PosType);
+            hash.AddFixed(request.PosX);
+            hash.AddFixed(request.PosY);
+            hash.AddInt32(request.Facing);
+            hash.AddBool(request.KeyCtrl);
+        }
+
+        static void WriteHash(ref Hash64 hash, MProjectileRequest request)
+        {
+            hash.AddInt32(request.Owner != null ? request.Owner.Id : -1);
+            hash.AddInt32(request.ProjId);
+            hash.AddFixed(request.VelX);
+            hash.AddFixed(request.VelY);
+            hash.AddFixed(request.AccelX);
+            hash.AddFixed(request.AccelY);
+            hash.AddFixed(request.PosX);
+            hash.AddFixed(request.PosY);
+            hash.AddInt32(request.RemoveTime);
+            hash.AddInt32(request.AnimNo);
+            hash.AddBool(request.HitDef != null);
+            if (request.HitDef != null)
+            {
+                request.HitDef.WriteHash(ref hash);
             }
         }
     }

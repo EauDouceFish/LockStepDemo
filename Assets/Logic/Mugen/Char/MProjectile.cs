@@ -63,10 +63,30 @@ namespace Lockstep.Mugen.Char
         public void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(Id); hash.AddInt32(OwnerId); hash.AddInt32(ProjId);
+            hash.AddInt32(Owner != null ? Owner.Id : -1);
             hash.AddFixed(Pos); hash.AddFixed(Vel); hash.AddFixed(Accel); hash.AddFixed(Facing);
             hash.AddInt32(AnimNo); hash.AddInt32(RemoveTime); hash.AddInt32(Time);
             hash.AddBool(Removed); hash.AddInt32(HitCount); hash.AddInt32(ContactCount);
-            hash.AddBool(HitDone);   // HitDef/Clsn1/Owner 不递归哈希（模板/帧派生/结构引用）
+            hash.AddBool(HitDone);
+            hash.AddBool(HitDef != null);
+            if (HitDef != null)
+            {
+                HitDef.WriteHash(ref hash);
+            }
+            WriteClsn(ref hash, Clsn1);
+        }
+
+        static void WriteClsn(ref Hash64 hash, Hit.MClsnBox[] boxes)
+        {
+            hash.AddInt32(boxes != null ? boxes.Length : -1);
+            if (boxes == null) { return; }
+            for (int index = 0; index < boxes.Length; index++)
+            {
+                hash.AddFixed(boxes[index].X1);
+                hash.AddFixed(boxes[index].Y1);
+                hash.AddFixed(boxes[index].X2);
+                hash.AddFixed(boxes[index].Y2);
+            }
         }
     }
 }

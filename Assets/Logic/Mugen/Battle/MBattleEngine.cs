@@ -203,6 +203,111 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        public MBattleEngineSnapshot Snapshot()
+        {
+            MBattleEngineSnapshot snapshot = new MBattleEngineSnapshot
+            {
+                FrameNo = FrameNo,
+                RandomSeed = Random.Seed,
+                Pause = PauseState.Clone(),
+                NextEntityId = World.NextEntityId,
+            };
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                snapshot.Chars.Add(Chars[i].Clone());
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                snapshot.Helpers.Add(Helpers[i].Clone());
+            }
+            for (int i = 0; i < World.Projectiles.Count; i++)
+            {
+                snapshot.Projectiles.Add(World.Projectiles[i].Clone());
+            }
+            for (int i = 0; i < World.Explods.Count; i++)
+            {
+                snapshot.Explods.Add(World.Explods[i].Clone());
+            }
+            for (int i = 0; i < World.SpawnQueue.Count; i++)
+            {
+                snapshot.SpawnQueue.Add(CloneRequest(World.SpawnQueue[i]));
+            }
+            for (int i = 0; i < World.ProjSpawnQueue.Count; i++)
+            {
+                snapshot.ProjectileSpawnQueue.Add(CloneRequest(World.ProjSpawnQueue[i]));
+            }
+            return snapshot;
+        }
+
+        public void Restore(MBattleEngineSnapshot snapshot)
+        {
+            Chars.Clear();
+            Helpers.Clear();
+            _helperData.Clear();
+            World.Projectiles.Clear();
+            World.Explods.Clear();
+            World.SpawnQueue.Clear();
+            World.ProjSpawnQueue.Clear();
+
+            FrameNo = snapshot.FrameNo;
+            Random.Seed = snapshot.RandomSeed;
+            CopyPause(snapshot.Pause, PauseState);
+            World.NextEntityId = snapshot.NextEntityId;
+
+            Dictionary<int, MChar> map = new Dictionary<int, MChar>();
+            for (int i = 0; i < snapshot.Chars.Count; i++)
+            {
+                MChar clone = snapshot.Chars[i].Clone();
+                AttachSharedState(clone, ResourceForPlayer(clone.PlayerNo));
+                Chars.Add(clone);
+                map[clone.Id] = clone;
+            }
+            for (int i = 0; i < snapshot.Helpers.Count; i++)
+            {
+                MChar clone = snapshot.Helpers[i].Clone();
+                MCharData data = ResourceForPlayer(clone.PlayerNo) ?? clone.OwnData;
+                AttachSharedState(clone, data);
+                Helpers.Add(clone);
+                _helperData.Add(data);
+                map[clone.Id] = clone;
+            }
+
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                RelinkChar(Chars[i], snapshot.Chars[i], map);
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                RelinkChar(Helpers[i], snapshot.Helpers[i], map);
+            }
+
+            for (int i = 0; i < snapshot.Projectiles.Count; i++)
+            {
+                MProjectile projectile = snapshot.Projectiles[i].Clone();
+                if (map.TryGetValue(projectile.OwnerId, out MChar owner))
+                {
+                    projectile.Owner = owner;
+                }
+                World.Projectiles.Add(projectile);
+            }
+            for (int i = 0; i < snapshot.Explods.Count; i++)
+            {
+                World.Explods.Add(snapshot.Explods[i].Clone());
+            }
+            for (int i = 0; i < snapshot.SpawnQueue.Count; i++)
+            {
+                MHelperRequest request = CloneRequest(snapshot.SpawnQueue[i]);
+                request.Owner = Remap(request.Owner, map);
+                World.SpawnQueue.Add(request);
+            }
+            for (int i = 0; i < snapshot.ProjectileSpawnQueue.Count; i++)
+            {
+                MProjectileRequest request = CloneRequest(snapshot.ProjectileSpawnQueue[i]);
+                request.Owner = Remap(request.Owner, map);
+                World.ProjSpawnQueue.Add(request);
+            }
+        }
+
         /// <summary>推进一帧。inputs[i] 对应 Chars[i] 本帧输入。
         /// 顺序对齐 Ikemen 每帧：输入缓冲 → actionPrepare(硬编码基础动作) → actionRun(状态机) → update(物理/动画) → 命中。
         /// Pause/SuperPause（移植 system.go super/pause 全局冻结）：暂停期间被冻结角色跳过本帧全部处理，
@@ -361,6 +466,7 @@ namespace Lockstep.Mugen.Battle
         public ulong ComputeHash()
         {
             Hash64 hash = Hash64.Create();
+            hash.AddInt32(FrameNo);
             hash.AddInt32(Chars.Count);
             for (int i = 0; i < Chars.Count; i++)
             {
@@ -380,6 +486,64 @@ namespace Lockstep.Mugen.Battle
             PauseState.WriteHash(ref hash);   // 共享全局暂停态：同理全场混入一次
             World.WriteHash(ref hash);    // 实体世界（id 计数）
             return hash.Value;
+        }
+
+        MCharData ResourceForPlayer(int playerNo)
+        {
+            MCharData data = Resources.Get(playerNo);
+            if (data != null) { return data; }
+            return playerNo >= 0 && playerNo < Data.Count ? Data[playerNo] : null;
+        }
+
+        void AttachSharedState(MChar character, MCharData data)
+        {
+            character.Resources = Resources;
+            character.OwnData = data;
+            character.Rng = Random;
+            character.Pause = PauseState;
+            character.World = World;
+        }
+
+        static void CopyPause(MPauseState source, MPauseState target)
+        {
+            target.PauseTime = source.PauseTime;
+            target.SuperTime = source.SuperTime;
+            target.PauseTimeBuffer = source.PauseTimeBuffer;
+            target.SuperTimeBuffer = source.SuperTimeBuffer;
+            target.PausePlayerNo = source.PausePlayerNo;
+            target.SuperPlayerNo = source.SuperPlayerNo;
+        }
+
+        static void RelinkChar(MChar target, MChar source, Dictionary<int, MChar> map)
+        {
+            target.P2 = Remap(source.P2, map);
+            target.Root = Remap(source.Root, map);
+            target.Parent = Remap(source.Parent, map);
+            target.Partner = Remap(source.Partner, map);
+            target.StateOwner = Remap(source.StateOwner, map);
+            target.BindTarget = Remap(source.BindTarget, map);
+            target.Targets.Clear();
+            for (int i = 0; i < source.Targets.Count; i++)
+            {
+                target.Targets.Add(Remap(source.Targets[i], map));
+            }
+        }
+
+        static MChar Remap(MChar character, Dictionary<int, MChar> map)
+        {
+            if (character == null) { return null; }
+            return map.TryGetValue(character.Id, out MChar remapped) ? remapped : null;
+        }
+
+        static MHelperRequest CloneRequest(MHelperRequest request)
+        {
+            return request;
+        }
+
+        static MProjectileRequest CloneRequest(MProjectileRequest request)
+        {
+            request.HitDef = request.HitDef != null ? request.HitDef.Clone() : null;
+            return request;
         }
     }
 }

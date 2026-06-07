@@ -97,6 +97,7 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             expected.AddInt32(0);
             expected.AddInt32(0);
             expected.AddInt32(0);
+            expected.AddInt32(0);
             expected.AddInt32(engine.Random.Seed);
             engine.PauseState.WriteHash(ref expected);
             engine.World.WriteHash(ref expected);
