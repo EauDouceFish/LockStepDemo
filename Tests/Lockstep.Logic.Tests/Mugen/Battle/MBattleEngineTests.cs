@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Lockstep.Core;
 using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
@@ -86,6 +87,21 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
                 return e.ComputeHash();
             }
             Assert.That(RunOnce(), Is.EqualTo(RunOnce()), "相同输入逐帧确定性一致");
+        }
+
+        [Test]
+        public void ComputeHash_UsesCanonicalHashSeed()
+        {
+            MBattleEngine engine = new MBattleEngine();
+            Hash64 expected = Hash64.Create();
+            expected.AddInt32(0);
+            expected.AddInt32(0);
+            expected.AddInt32(0);
+            expected.AddInt32(engine.Random.Seed);
+            engine.PauseState.WriteHash(ref expected);
+            engine.World.WriteHash(ref expected);
+
+            Assert.That(engine.ComputeHash(), Is.EqualTo(expected.Value));
         }
 
         // ───────── 真实 KFM：加载 + 连跑不崩 ─────────

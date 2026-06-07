@@ -1,94 +1,144 @@
-// MUGEN .def [Files] 段解析（移植 Ikemen char.go loadName/[Files] 读取的文件名约定）。
-// 只取文件名（逻辑层不做 IO）；由表现层/测试读文件内容后交给 MCharLoader。See Docs/移植方案_Ikemen.md.
+using System;
 using System.Collections.Generic;
 
 namespace Lockstep.Mugen.Parse
 {
-    /// <summary>.def [Files] 段里各资源的文件名。st 可有多个(st/st1/st2…)，合并为状态文件列表。</summary>
+    /// <summary>Files referenced by a character DEF. Paths are kept unresolved so the logic layer performs no IO.</summary>
     public sealed class MDefFiles
     {
-        public string Cmd;          // 命令集 .cmd
-        public string Cns;          // 常量 .cns（const 取值来源）
-        public List<string> St = new List<string>();   // 角色状态 .cns（st, st1, st2…）
-        public string StCommon;     // 公共状态 common1.cns
-        public string Sprite;       // .sff（表现层）
-        public string Anim;         // .air
+        public string Cmd;
+        public string Cns;
+        public readonly List<string> St = new List<string>();
+        public string StCommon;
+        public string Sprite;
+        public string Anim;
+        public string Sound;
+        public readonly Dictionary<int, string> Palettes = new Dictionary<int, string>();
     }
 
-    /// <summary>解析 .def 文本，提取 [Files] 段文件名。容错：缺段返回空字段。</summary>
+    /// <summary>Character metadata that affects import and runtime interpretation.</summary>
+    public sealed class MCharacterDefinition
+    {
+        public string Name = "";
+        public string DisplayName = "";
+        public int LocalCoordWidth = 320;
+        public int LocalCoordHeight = 240;
+        public readonly List<int> PaletteDefaults = new List<int>();
+        public MDefFiles Files = new MDefFiles();
+
+        public bool UsesDefaultLocalCoord => LocalCoordWidth == 320 && LocalCoordHeight == 240;
+    }
+
+    /// <summary>Pure parser for the [Info] and [Files] portions of a character DEF.</summary>
     public static class MDefParser
     {
         public static MDefFiles ParseFiles(string text)
         {
-            MDefFiles files = new MDefFiles();
-            bool inFiles = false;
+            return Parse(text).Files;
+        }
 
-            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        public static MCharacterDefinition Parse(string text)
+        {
+            MCharacterDefinition definition = new MCharacterDefinition();
+            string section = "";
+            string[] lines = (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             foreach (string raw in lines)
             {
                 string line = StripComment(raw).Trim();
-                if (line.Length == 0)
-                {
-                    continue;
-                }
+                if (line.Length == 0) { continue; }
                 if (line[0] == '[')
                 {
                     int rb = line.IndexOf(']');
-                    string header = (rb > 0 ? line.Substring(1, rb - 1) : line.Substring(1)).Trim().ToLowerInvariant();
-                    inFiles = header == "files";
+                    section = (rb > 0 ? line.Substring(1, rb - 1) : line.Substring(1)).Trim().ToLowerInvariant();
                     continue;
                 }
-                if (!inFiles)
-                {
-                    continue;
-                }
+
                 int eq = line.IndexOf('=');
-                if (eq < 0)
-                {
-                    continue;
-                }
+                if (eq < 0) { continue; }
                 string key = line.Substring(0, eq).Trim().ToLowerInvariant();
-                string val = line.Substring(eq + 1).Trim();
-                AssignFile(files, key, val);
+                string value = Unquote(line.Substring(eq + 1).Trim());
+                if (section == "files") { AssignFile(definition.Files, key, value); }
+                else if (section == "info") { AssignInfo(definition, key, value); }
             }
-            return files;
+            return definition;
         }
 
-        static void AssignFile(MDefFiles files, string key, string val)
+        static void AssignInfo(MCharacterDefinition definition, string key, string value)
         {
             switch (key)
             {
-                case "cmd": files.Cmd = val; break;
-                case "cns": files.Cns = val; break;
-                case "stcommon": files.StCommon = val; break;
-                case "sprite": files.Sprite = val; break;
-                case "anim": files.Anim = val; break;
+                case "name": definition.Name = value; break;
+                case "displayname": definition.DisplayName = value; break;
+                case "localcoord":
+                    int[] coord = ParseInts(value);
+                    if (coord.Length > 0 && coord[0] > 0) { definition.LocalCoordWidth = coord[0]; }
+                    if (coord.Length > 1 && coord[1] > 0) { definition.LocalCoordHeight = coord[1]; }
+                    break;
+                case "pal.defaults":
+                    definition.PaletteDefaults.Clear();
+                    definition.PaletteDefaults.AddRange(ParseInts(value));
+                    break;
+            }
+        }
+
+        static void AssignFile(MDefFiles files, string key, string value)
+        {
+            switch (key)
+            {
+                case "cmd": files.Cmd = value; break;
+                case "cns": files.Cns = value; break;
+                case "stcommon": files.StCommon = value; break;
+                case "sprite": files.Sprite = value; break;
+                case "anim": files.Anim = value; break;
+                case "sound": files.Sound = value; break;
                 default:
-                    // st / st1 / st2 … → 状态文件列表（按出现顺序）。
-                    if (key == "st" || (key.StartsWith("st") && key.Length > 2 && IsDigits(key.Substring(2))))
+                    if (key == "st" || (key.StartsWith("st", StringComparison.Ordinal) && IsDigits(key.Substring(2))))
                     {
-                        files.St.Add(val);
+                        files.St.Add(value);
+                    }
+                    else if (key.StartsWith("pal", StringComparison.Ordinal) &&
+                             int.TryParse(key.Substring(3), out int paletteNo) && paletteNo > 0)
+                    {
+                        files.Palettes[paletteNo] = value;
                     }
                     break;
             }
         }
 
-        static bool IsDigits(string s)
+        static int[] ParseInts(string value)
         {
-            for (int i = 0; i < s.Length; i++)
+            string[] parts = value.Split(',');
+            List<int> values = new List<int>();
+            for (int i = 0; i < parts.Length; i++)
             {
-                if (s[i] < '0' || s[i] > '9')
-                {
-                    return false;
-                }
+                if (int.TryParse(parts[i].Trim(), out int parsed)) { values.Add(parsed); }
             }
-            return s.Length > 0;
+            return values.ToArray();
+        }
+
+        static bool IsDigits(string value)
+        {
+            if (value.Length == 0) { return false; }
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (value[i] < '0' || value[i] > '9') { return false; }
+            }
+            return true;
         }
 
         static string StripComment(string line)
         {
             int semi = line.IndexOf(';');
             return semi >= 0 ? line.Substring(0, semi) : line;
+        }
+
+        static string Unquote(string value)
+        {
+            if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+            {
+                return value.Substring(1, value.Length - 2);
+            }
+            return value;
         }
     }
 }

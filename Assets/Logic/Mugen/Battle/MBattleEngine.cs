@@ -20,6 +20,7 @@ namespace Lockstep.Mugen.Battle
     {
         public readonly List<MChar> Chars = new List<MChar>();
         public readonly List<MCharData> Data = new List<MCharData>();
+        public readonly MPlayerResourceRegistry Resources = new MPlayerResourceRegistry();
 
         readonly MStateMachine _stateMachine = new MStateMachine();
 
@@ -35,9 +36,17 @@ namespace Lockstep.Mugen.Battle
         public readonly MEntityWorld World = new MEntityWorld();
         public List<MChar> Helpers => World.Helpers;
         readonly List<MCharData> _helperData = new List<MCharData>();
+        public int FrameNo { get; private set; }
 
         public void Add(MChar c, MCharData data)
         {
+            int playerNo = Resources.Register(data);
+            c.Resources = Resources;
+            c.OwnData = data;
+            c.PlayerNo = playerNo;
+            c.StatePlayerNo = playerNo;
+            c.AnimPlayerNo = playerNo;
+            c.SpritePlayerNo = playerNo;
             c.Rng = Random;       // 接入共享随机源（对齐 Ikemen 全局种子）
             c.Pause = PauseState; // 接入共享暂停态（对齐 Ikemen 全局 sys.pause）
             c.World = World;      // 接入实体世界（helper spawn 通道）
@@ -74,6 +83,12 @@ namespace Lockstep.Mugen.Battle
                 helper.Parent = req.Owner;
                 helper.Root = req.Owner.Root ?? req.Owner;
                 helper.P2 = req.Owner.P2;
+                helper.Resources = Resources;
+                helper.OwnData = ownerData;
+                helper.PlayerNo = req.Owner.PlayerNo;
+                helper.StatePlayerNo = req.Owner.PlayerNo;
+                helper.AnimPlayerNo = req.Owner.PlayerNo;
+                helper.SpritePlayerNo = req.Owner.PlayerNo;
                 helper.Rng = Random;
                 helper.Pause = PauseState;
                 helper.World = World;
@@ -194,6 +209,7 @@ namespace Lockstep.Mugen.Battle
         /// 仅施暂停方在其 movetime 窗口内可动；SuperPause 优先于 Pause。命中在暂停期间不结算。</summary>
         public void Tick(IReadOnlyList<MInput> inputs)
         {
+            World.Events.BeginFrame(FrameNo);
             // 0) 全局暂停推进（移植 system.go:2562）：递减 super/pause 时长 + 应用 buffer（上一帧控制器设的暂停此刻生效）。
             //    再对每角色算 PauseBool/Acttmp（移植 char.go:11421 + 11524 movetime 递减）。无暂停时 PauseBool 全 false → 与原逐位一致。
             PauseState.Step();
@@ -243,11 +259,11 @@ namespace Lockstep.Mugen.Battle
             // 5) 动画推进（玩家 + helper）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (!Chars[i].PauseBool) { MAnimSystem.Action(Chars[i], Data[i].Anims); }
+                if (!Chars[i].PauseBool) { MAnimSystem.Action(Chars[i], Chars[i].CurrentAnimTable()); }
             }
             for (int i = 0; i < Helpers.Count; i++)
             {
-                if (!Helpers[i].PauseBool) { MAnimSystem.Action(Helpers[i], _helperData[i].Anims); }
+                if (!Helpers[i].PauseBool) { MAnimSystem.Action(Helpers[i], Helpers[i].CurrentAnimTable()); }
             }
 
             // 5b) 排空 spawn 队列（本帧状态机里 Helper/Projectile 控制器请求的实体，下帧起跑）+ 推进现有弹幕。
@@ -264,6 +280,7 @@ namespace Lockstep.Mugen.Battle
 
             // 7) 移除 DestroySelf 的 helper。
             RemoveDestroyed();
+            FrameNo++;
         }
 
         static void StepProjectileContactTime(MChar character)
@@ -283,6 +300,8 @@ namespace Lockstep.Mugen.Battle
         // 本角色本帧用哪张状态表：StateOwner 非 null(投技自定义状态)→其角色数据；否则自身数据(fallback)。
         MCharData StateDataFor(MChar c, MCharData own)
         {
+            MCharData byOwnerId = Resources.Get(c.StatePlayerNo);
+            if (byOwnerId != null) { return byOwnerId; }
             if (c.StateOwner != null && !ReferenceEquals(c.StateOwner, c))
             {
                 MCharData ownerData = DataOf(c.StateOwner);
@@ -341,7 +360,7 @@ namespace Lockstep.Mugen.Battle
         /// <summary>全角色哈希（确定性对账/黄金哈希用）。</summary>
         public ulong ComputeHash()
         {
-            Hash64 hash = new Hash64();
+            Hash64 hash = Hash64.Create();
             hash.AddInt32(Chars.Count);
             for (int i = 0; i < Chars.Count; i++)
             {

@@ -3,6 +3,7 @@
 // 编译器是编译期变换：兼容性取决于(1)运算符语义[已在 BytecodeOps 忠实移植] 与(2)优先级+trigger 映射[此处照搬]。
 // 故采用按 Ikemen 优先级链重写的递归下降，产出与 M1 执行器约定一致的字节码，差分测试兜底。
 // See Docs/移植方案_Ikemen.md.
+using System;
 using System.Collections.Generic;
 using Lockstep.Math;
 
@@ -19,23 +20,51 @@ namespace Lockstep.Mugen.Expr
             public string Text;
             public int IntValue;
             public FFloat FloatValue;
+            public int Position;
+            public int Length;
         }
 
         List<Tok> _toks;
         int _pos;
         List<byte> _out = new List<byte>();   // 非 readonly：redirect 子表达式编译时临时切换缓冲
+        List<MugenExprDiagnostic> _diagnostics;
 
         public BytecodeExp Compile(string expr)
         {
-            _toks = Tokenize(expr);
+            return CompileCore(expr).Expression;
+        }
+
+        /// <summary>
+        /// Compiles with strict, structured diagnostics. Existing <see cref="Compile"/> callers keep
+        /// their recovery behavior; import/audit code should require <see cref="MugenExprCompileResult.Success"/>.
+        /// </summary>
+        public MugenExprCompileResult CompileStrict(string expr)
+        {
+            return CompileCore(expr);
+        }
+
+        MugenExprCompileResult CompileCore(string expr)
+        {
+            expr = expr ?? string.Empty;
+            _diagnostics = new List<MugenExprDiagnostic>();
+            _toks = Tokenize(expr, _diagnostics);
             _pos = 0;
             _out.Clear();
+            if (Cur.Kind == TokKind.End)
+            {
+                Error(MugenExprDiagnosticCode.EmptyExpression, Cur, "Expression is empty.");
+            }
             ParseBoolOr();
-            return new BytecodeExp(_out.ToArray());
+            if (Cur.Kind != TokKind.End)
+            {
+                Error(MugenExprDiagnosticCode.TrailingToken, Cur,
+                    "Unexpected trailing token '" + Cur.Text + "'.");
+            }
+            return new MugenExprCompileResult(new BytecodeExp(_out.ToArray()), _diagnostics);
         }
 
         // ───────── 词法 ─────────
-        static List<Tok> Tokenize(string s)
+        static List<Tok> Tokenize(string s, List<MugenExprDiagnostic> diagnostics)
         {
             List<Tok> toks = new List<Tok>();
             int i = 0;
@@ -55,8 +84,26 @@ namespace Lockstep.Mugen.Expr
                     {
                         i++;
                     }
-                    toks.Add(new Tok { Kind = TokKind.Str, Text = s.Substring(start, i - start) });
-                    if (i < s.Length) { i++; }   // 跳过收尾引号
+                    bool terminated = i < s.Length;
+                    toks.Add(new Tok
+                    {
+                        Kind = TokKind.Str,
+                        Text = s.Substring(start, i - start),
+                        Position = start - 1,
+                        Length = i - start + (terminated ? 2 : 1),
+                    });
+                    if (terminated)
+                    {
+                        i++;
+                    }
+                    else
+                    {
+                        diagnostics.Add(new MugenExprDiagnostic(
+                            MugenExprDiagnosticCode.UnterminatedString,
+                            start - 1,
+                            s.Length - start + 1,
+                            "String literal is not terminated."));
+                    }
                     continue;
                 }
                 if (char.IsDigit(ch) || (ch == '.' && i + 1 < s.Length && char.IsDigit(s[i + 1])))
@@ -79,12 +126,46 @@ namespace Lockstep.Mugen.Expr
                     string num = s.Substring(start, i - start);
                     if (isFloat)
                     {
-                        toks.Add(new Tok { Kind = TokKind.FloatNumber, Text = num, FloatValue = ParseFixed(num) });
+                        FFloat floatValue = FFloat.Zero;
+                        try
+                        {
+                            floatValue = ParseFixed(num);
+                        }
+                        catch (OverflowException)
+                        {
+                            diagnostics.Add(new MugenExprDiagnostic(
+                                MugenExprDiagnosticCode.InvalidNumber,
+                                start,
+                                i - start,
+                                "Fixed-point literal is outside the supported range."));
+                        }
+                        toks.Add(new Tok
+                        {
+                            Kind = TokKind.FloatNumber,
+                            Text = num,
+                            FloatValue = floatValue,
+                            Position = start,
+                            Length = i - start,
+                        });
                     }
                     else
                     {
-                        int.TryParse(num, out int iv);
-                        toks.Add(new Tok { Kind = TokKind.Number, Text = num, IntValue = iv });
+                        if (!int.TryParse(num, out int iv))
+                        {
+                            diagnostics.Add(new MugenExprDiagnostic(
+                                MugenExprDiagnosticCode.InvalidNumber,
+                                start,
+                                i - start,
+                                "Integer literal is outside the supported Int32 range."));
+                        }
+                        toks.Add(new Tok
+                        {
+                            Kind = TokKind.Number,
+                            Text = num,
+                            IntValue = iv,
+                            Position = start,
+                            Length = i - start,
+                        });
                     }
                     continue;
                 }
@@ -95,21 +176,27 @@ namespace Lockstep.Mugen.Expr
                     {
                         i++;
                     }
-                    toks.Add(new Tok { Kind = TokKind.Ident, Text = s.Substring(start, i - start).ToLowerInvariant() });
+                    toks.Add(new Tok
+                    {
+                        Kind = TokKind.Ident,
+                        Text = s.Substring(start, i - start).ToLowerInvariant(),
+                        Position = start,
+                        Length = i - start,
+                    });
                     continue;
                 }
                 // 多字符运算符优先
                 string two = i + 1 < s.Length ? s.Substring(i, 2) : "";
                 if (two == "**" || two == "!=" || two == ">=" || two == "<=" || two == "&&" || two == "||" || two == "^^" || two == ":=")
                 {
-                    toks.Add(new Tok { Kind = TokKind.Op, Text = two });
+                    toks.Add(new Tok { Kind = TokKind.Op, Text = two, Position = i, Length = 2 });
                     i += 2;
                     continue;
                 }
-                toks.Add(new Tok { Kind = TokKind.Op, Text = ch.ToString() });
+                toks.Add(new Tok { Kind = TokKind.Op, Text = ch.ToString(), Position = i, Length = 1 });
                 i++;
             }
-            toks.Add(new Tok { Kind = TokKind.End, Text = "" });
+            toks.Add(new Tok { Kind = TokKind.End, Text = "", Position = s.Length, Length = 0 });
             return toks;
         }
 
@@ -141,11 +228,25 @@ namespace Lockstep.Mugen.Expr
         bool IsOp(string op) => Cur.Kind == TokKind.Op && Cur.Text == op;
         void Next() => _pos++;
 
+        void Error(MugenExprDiagnosticCode code, Tok token, string message)
+        {
+            _diagnostics.Add(new MugenExprDiagnostic(
+                code,
+                token.Position,
+                token.Length,
+                message));
+        }
+
         // ───────── 优先级链（低→高，照搬 Ikemen）─────────
         void ParseBoolOr()
         {
             ParseBoolXor();
-            while (IsOp("||")) { Next(); ParseBoolXor(); Emit(OpCode.OC_blor); }
+            while (IsOp("||"))
+            {
+                Next();
+                List<byte> right = Capture(ParseBoolXor);
+                EmitShortCircuit(OpCode.OC_jnz8, OpCode.OC_jnz, right);
+            }
         }
         void ParseBoolXor()
         {
@@ -155,7 +256,12 @@ namespace Lockstep.Mugen.Expr
         void ParseBoolAnd()
         {
             ParseOr();
-            while (IsOp("&&")) { Next(); ParseOr(); Emit(OpCode.OC_bland); }
+            while (IsOp("&&"))
+            {
+                Next();
+                List<byte> right = Capture(ParseOr);
+                EmitShortCircuit(OpCode.OC_jz8, OpCode.OC_jz, right);
+            }
         }
         void ParseOr()
         {
@@ -275,7 +381,7 @@ namespace Lockstep.Mugen.Expr
             {
                 Next();
                 ParseBoolOr();
-                if (IsOp(")")) { Next(); }
+                Expect(")");
                 return;
             }
             if (Cur.Kind == TokKind.Ident)
@@ -283,13 +389,20 @@ namespace Lockstep.Mugen.Expr
                 ParseIdent();
                 return;
             }
-            // 无法识别 → 压 0（容错，详见诚实边界）
+            Error(Cur.Kind == TokKind.End
+                    ? MugenExprDiagnosticCode.UnexpectedEnd
+                    : MugenExprDiagnosticCode.UnexpectedToken,
+                Cur,
+                Cur.Kind == TokKind.End
+                    ? "Expected an expression value."
+                    : "Unexpected token '" + Cur.Text + "'.");
             EmitInt(0);
             if (Cur.Kind != TokKind.End) { Next(); }
         }
 
         void ParseIdent()
         {
+            Tok identifier = Cur;
             string name = Cur.Text;
             Next();
 
@@ -344,7 +457,7 @@ namespace Lockstep.Mugen.Expr
             // 函数调用：name(...)
             if (IsOp("("))
             {
-                ParseFunction(name);
+                ParseFunction(name, identifier);
                 return;
             }
 
@@ -402,8 +515,14 @@ namespace Lockstep.Mugen.Expr
             if ((name == "pos" || name == "vel" || name == "screenpos" || name == "hitvel"
                  || name == "p2dist" || name == "p2bodydist") && Cur.Kind == TokKind.Ident)
             {
+                Tok axisToken = Cur;
                 string axis = Cur.Text;
                 Next();
+                if (!IsValidAxis(name, axis))
+                {
+                    Error(MugenExprDiagnosticCode.InvalidAxis, axisToken,
+                        "Axis '" + axis + "' is not valid for " + name + ".");
+                }
                 Emit(AxisOpcode(name, axis));
                 return;
             }
@@ -415,29 +534,44 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
-            // 未知标识符 → 压 0（容错；statetype 字母枚举/redirect/command 待补）
+            Error(MugenExprDiagnosticCode.UnknownIdentifier, identifier,
+                "Unknown identifier '" + name + "'.");
             EmitInt(0);
         }
 
-        void ParseFunction(string name)
+        void ParseFunction(string name, Tok identifier)
         {
             Next(); // 吃掉 '('
             // const(field)：参数是点分字段名(如 data.life / velocity.walk.fwd.x)，发 OC_const_ + 字段id 字节。
             if (name == "const")
             {
+                Tok fieldToken = Cur;
                 string field = ReadDottedName();
                 Expect(")");
                 Emit(OpCode.OC_const_);
-                _out.Add((byte)ConstFieldId(field));
+                MConstId fieldId = ConstFieldId(field);
+                if (fieldId == MConstId.Unknown)
+                {
+                    Error(MugenExprDiagnosticCode.UnknownField, fieldToken,
+                        "Unknown const field '" + field + "'.");
+                }
+                _out.Add((byte)fieldId);
                 return;
             }
             // gethitvar(field)：参数是点分字段名(如 fall.yvel)，发 OC_ex_ + 字段id 字节，运行期从 Ghv 读
             if (name == "gethitvar")
             {
+                Tok fieldToken = Cur;
                 string field = ReadDottedName();
                 Expect(")");
                 Emit(OpCode.OC_ex_);
-                _out.Add((byte)GetHitVarFieldId(field));
+                int fieldId = GetHitVarFieldId(field);
+                if (fieldId == 255)
+                {
+                    Error(MugenExprDiagnosticCode.UnknownField, fieldToken,
+                        "Unknown gethitvar field '" + field + "'.");
+                }
+                _out.Add((byte)fieldId);
                 return;
             }
             if (name == "jugglepoints")
@@ -452,15 +586,29 @@ namespace Lockstep.Mugen.Expr
             {
                 ParseBoolOr();
                 Expect(")");
-                Emit(name == "fvar" || name == "sysfvar" ? OpCode.OC_fvar : OpCode.OC_var);
+                Emit(name == "var" ? OpCode.OC_var
+                    : name == "fvar" ? OpCode.OC_fvar
+                    : name == "sysvar" ? OpCode.OC_sysvar
+                    : OpCode.OC_sysfvar);
                 return;
             }
-            if (name == "ifelse" || name == "cond")
+            if (name == "ifelse")
             {
                 ParseBoolOr(); Expect(",");   // cond
                 ParseBoolOr(); Expect(",");   // trueVal
                 ParseBoolOr(); Expect(")");   // falseVal
                 Emit(OpCode.OC_ifelse);
+                return;
+            }
+            if (name == "cond")
+            {
+                ParseBoolOr();
+                Expect(",");
+                List<byte> trueValue = Capture(ParseBoolOr);
+                Expect(",");
+                List<byte> falseValue = Capture(ParseBoolOr);
+                Expect(")");
+                EmitConditional(trueValue, falseValue);
                 return;
             }
             if (name == "log")
@@ -476,8 +624,10 @@ namespace Lockstep.Mugen.Expr
             if (UnaryFuncs.TryGetValue(name, out OpCode op))
             {
                 Emit(op);
+                return;
             }
-            // 未知单参函数：保留参数值（不发 opcode）
+            Error(MugenExprDiagnosticCode.UnknownFunction, identifier,
+                "Unknown function '" + name + "'.");
         }
 
         void EmitProjectileContactAlias(string name)
@@ -501,7 +651,72 @@ namespace Lockstep.Mugen.Expr
 
         void Expect(string op)
         {
-            if (IsOp(op)) { Next(); }
+            if (IsOp(op))
+            {
+                Next();
+                return;
+            }
+            Error(MugenExprDiagnosticCode.MissingToken, Cur,
+                "Expected '" + op + "' before "
+                + (Cur.Kind == TokKind.End ? "the end of the expression." : "'" + Cur.Text + "'."));
+        }
+
+        List<byte> Capture(Action parser)
+        {
+            List<byte> outer = _out;
+            _out = new List<byte>();
+            parser();
+            List<byte> captured = _out;
+            _out = outer;
+            return captured;
+        }
+
+        void EmitShortCircuit(OpCode shortJump, OpCode longJump, List<byte> right)
+        {
+            AppendJump(shortJump, longJump, right.Count + 1);
+            Emit(OpCode.OC_pop);
+            _out.AddRange(right);
+        }
+
+        void EmitConditional(List<byte> trueValue, List<byte> falseValue)
+        {
+            List<byte> falsePath = new List<byte>(falseValue.Count + 1);
+            falsePath.Add((byte)OpCode.OC_pop);
+            falsePath.AddRange(falseValue);
+
+            List<byte> truePath = new List<byte>(trueValue.Count + 6);
+            truePath.Add((byte)OpCode.OC_pop);
+            truePath.AddRange(trueValue);
+            AppendJump(truePath, OpCode.OC_jmp8, OpCode.OC_jmp, falsePath.Count);
+
+            AppendJump(OpCode.OC_jz8, OpCode.OC_jz, truePath.Count);
+            _out.AddRange(truePath);
+            _out.AddRange(falsePath);
+        }
+
+        void AppendJump(OpCode shortJump, OpCode longJump, int skippedByteCount)
+        {
+            AppendJump(_out, shortJump, longJump, skippedByteCount);
+        }
+
+        static void AppendJump(
+            List<byte> output,
+            OpCode shortJump,
+            OpCode longJump,
+            int skippedByteCount)
+        {
+            if (skippedByteCount <= byte.MaxValue)
+            {
+                output.Add((byte)shortJump);
+                output.Add((byte)skippedByteCount);
+                return;
+            }
+
+            output.Add((byte)longJump);
+            for (int k = 0; k < 4; k++)
+            {
+                output.Add((byte)(skippedByteCount >> (8 * k)));
+            }
         }
 
         // 读点分字段名：ident(.ident)*（标识符已小写）。用于 const(data.fall.defence_up) 等。
@@ -855,6 +1070,15 @@ namespace Lockstep.Mugen.Expr
                 case "p2bodydist": return axis == "y" ? OpCode.OC_p2bodydist_y : OpCode.OC_p2bodydist_x;
                 default: return OpCode.OC_pos_x;
             }
+        }
+
+        static bool IsValidAxis(string name, string axis)
+        {
+            if (axis == "x" || axis == "y")
+            {
+                return true;
+            }
+            return axis == "z" && (name == "vel" || name == "hitvel");
         }
 
         // 注：statetype/movetype 不在此表——它们是 expValue 级原子比较(自行消费 = / 字母)，见 ParseIdent。

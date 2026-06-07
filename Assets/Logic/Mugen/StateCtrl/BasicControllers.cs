@@ -91,10 +91,7 @@ namespace Lockstep.Mugen.StateCtrl
             {
                 int animNo = Value.Run(c).ToI();
                 // 目标动画不存在则不切（对齐 Ikemen changeAnimEx：a==nil → 保留当前动画，避免冻结）。
-                if (c.CanChangeAnimTo(animNo))
-                {
-                    MAnimSystem.Play(c, animNo, c.AnimTable);
-                }
+                c.PlayAnimation(animNo, c.PlayerNo, c.PlayerNo);
             }
             return false;
         }

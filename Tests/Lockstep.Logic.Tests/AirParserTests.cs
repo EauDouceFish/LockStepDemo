@@ -80,5 +80,80 @@ namespace Lockstep.Tests
             // 每帧都有受击框
             Assert.That(anims[20].Frames[0].Clsn2.Length, Is.GreaterThan(0));
         }
+
+        [Test]
+        public void CopyAction_ResolvesMultiLevelChainAndPreservesDestinationId()
+        {
+            const string air =
+                "[Begin Action 10]\nCopy Action 20\n" +
+                "[Begin Action 20]\nCopy Action 30\n" +
+                "[Begin Action 30]\n30,4, 5,6, 7,H\n";
+
+            Dictionary<int, AnimData> anims = AirParser.ToDictionary(AirParser.Parse(air));
+
+            Assert.That(anims[10].Id, Is.EqualTo(10));
+            Assert.That(anims[10].Frames.Length, Is.EqualTo(1));
+            Assert.That(anims[10].Frames[0].SpriteGroup, Is.EqualTo(30));
+            Assert.That(anims[10].Frames[0].SpriteImage, Is.EqualTo(4));
+            Assert.That(anims[10].Frames[0].Duration, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void CopyAction_MissingTargetAndCycleAreRemoved()
+        {
+            const string air =
+                "[Begin Action 1]\nCopy Action 99\n" +
+                "[Begin Action 2]\nCopy Action 3\n" +
+                "[Begin Action 3]\nCopy Action 2\n" +
+                "[Begin Action 4]\n4,0,0,0,1\n";
+
+            Dictionary<int, AnimData> anims = AirParser.ToDictionary(AirParser.Parse(air));
+
+            Assert.That(anims.ContainsKey(1), Is.False);
+            Assert.That(anims.ContainsKey(2), Is.False);
+            Assert.That(anims.ContainsKey(3), Is.False);
+            Assert.That(anims.ContainsKey(4), Is.True);
+        }
+
+        [Test]
+        public void DuplicateAction_FirstDefinitionWinsEvenWhenFirstIsCopy()
+        {
+            const string air =
+                "[Begin Action 5]\nCopy Action 6\n" +
+                "[Begin Action 5]\n5,9,0,0,1\n" +
+                "[Begin Action 6]\n6,1,0,0,2\n";
+
+            List<AnimData> parsed = AirParser.Parse(air);
+            Dictionary<int, AnimData> anims = AirParser.ToDictionary(parsed);
+
+            Assert.That(parsed.Count, Is.EqualTo(2));
+            Assert.That(anims[5].Frames[0].SpriteGroup, Is.EqualTo(6));
+            Assert.That(anims[5].Frames[0].SpriteImage, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void EmptyAction_CopiesNextActionLikeIkemenReadAction()
+        {
+            const string air =
+                "[Begin Action 7]\n" +
+                "[Begin Action 8]\n8,2,0,0,3\n";
+
+            Dictionary<int, AnimData> anims = AirParser.ToDictionary(AirParser.Parse(air));
+
+            Assert.That(anims[7].Frames.Length, Is.EqualTo(1));
+            Assert.That(anims[7].Frames[0].SpriteGroup, Is.EqualTo(8));
+            Assert.That(anims[8].Frames.Length, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NonActionSection_DoesNotCreateActionZero()
+        {
+            const string air = "[Info]\nfoo = bar\n[Begin Action 9]\n9,0,0,0,1\n";
+
+            Dictionary<int, AnimData> anims = AirParser.ToDictionary(AirParser.Parse(air));
+
+            Assert.That(anims.ContainsKey(0), Is.False);
+            Assert.That(anims.ContainsKey(9), Is.True);
+        }
     }
 }

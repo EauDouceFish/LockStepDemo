@@ -295,17 +295,17 @@ namespace Lockstep.Mugen.Hit
             ghv.AnimType = defender.GetHitAnimType();
 
             // 守方进入受击状态 + movetype H + 失控
-            defender.PendingStateNo = ResolveGetHitState(defender, hd, ghv);
+            int getHitState = ResolveGetHitState(defender, hd, ghv);
             // 自定义状态（投技）：p2stateno 且 p2getp1state → 守方跑攻方状态表（StateOwner=attacker）；否则用自身状态表。
             if (hd.P2StateNo >= 0 && hd.P2GetP1State)
             {
                 defender.StateOwner = attacker;
-                defender.PendingIsSelf = false;
+                defender.QueueTransition(getHitState, attacker.StatePlayerNo);
             }
             else
             {
                 defender.StateOwner = null;
-                defender.PendingIsSelf = true;
+                defender.QueueTransition(getHitState, defender.PlayerNo);
             }
             defender.Ctrl = false;        // MoveType=2(H) 已在伤害计算前设置
 
@@ -324,7 +324,7 @@ namespace Lockstep.Mugen.Hit
             }
             if (hd.P1StateNo >= 0)
             {
-                attacker.PendingStateNo = hd.P1StateNo;
+                attacker.QueueTransition(hd.P1StateNo, attacker.StatePlayerNo);
             }
         }
 

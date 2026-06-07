@@ -117,6 +117,7 @@ namespace Lockstep.Mugen.Char
         public readonly List<MChar> Helpers = new List<MChar>();
         public readonly List<MProjectile> Projectiles = new List<MProjectile>();
         public readonly List<MExplod> Explods = new List<MExplod>();
+        public readonly MFrameEvents Events = new MFrameEvents();
 
         public int NextEntityId = 1000;
 

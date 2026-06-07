@@ -1,61 +1,195 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/input.go (Command.Step 匹配语义)。
-// 匹配模型：末步由当前帧边沿触发，其余步在 Time 帧窗内按序贪心匹配(允许夹无关帧)；
-// '>' 步要求与上一步严格相邻；'~' 释放边沿；蓄力=连续按住 N 帧；'$' 4way 子集；'/' 按住不要求边沿。
-// 方向 B/F 按朝向解析(facing>0 面右：F=Right,B=Left)。See Docs/移植方案_Ikemen.md.
+// Source: src/input.go Command.ReadCommandSymbols/Command.Step.
+using System;
+using System.Collections.Generic;
+using Lockstep.Core;
+
 namespace Lockstep.Mugen.Command
 {
+    /// <summary>
+    /// Compatibility entry point for callers that still provide an input history. The production path uses
+    /// <see cref="MCommandRuntime"/> incrementally through <see cref="MCommandList.Update"/>.
+    /// </summary>
     public static class MCommandMatcher
     {
-        /// <summary>命令是否在当前帧(缓冲最新帧)达成。facingRight=角色是否面向右(+X)。</summary>
         public static bool Matches(MCommandDef cmd, MCommandBuffer buf, bool facingRight)
         {
-            int n = cmd.Steps.Count;
-            if (n == 0 || buf.Count == 0)
+            if (cmd == null || cmd.Steps.Count == 0 || buf == null || buf.Count == 0)
             {
                 return false;
             }
 
-            int window = buf.Capacity < buf.Count ? buf.Capacity : buf.Count;
-            if (cmd.Time > 0 && cmd.Time < window)
+            MInputBuffer input = new MInputBuffer();
+            MCommandRuntime runtime = new MCommandRuntime(cmd);
+            int count = System.Math.Min(buf.Count, buf.Capacity);
+            bool completed = false;
+            for (int age = count - 1; age >= 0; age--)
             {
-                window = cmd.Time;
+                input.Update(buf.Ago(age), facingRight);
+                completed = runtime.Step(input);
             }
+            return completed;
+        }
+    }
 
-            // age：0=最新帧。末步须在 age 0 达成(边沿触发)。向更早(age 增大)依次匹配更早的步。
-            int prevAge = -1;
-            for (int i = n - 1; i >= 0; i--)
-            {
-                MCommandStep step = cmd.Steps[i];
-                bool isLast = i == n - 1;
-                int found = -1;
+    /// <summary>一条命令的逐帧状态。定义共享，完成位、计时器和缓冲均属于角色运行时。</summary>
+    internal sealed class MCommandRuntime
+    {
+        static readonly MCommandKey[] RelativeDirections =
+        {
+            Dir(MInput.Up), Dir(MInput.Down), Back(), Forward(),
+            Diagonal(MInput.Up, back: true), Diagonal(MInput.Up, back: false),
+            Diagonal(MInput.Down, back: true), Diagonal(MInput.Down, back: false),
+        };
 
-                // 搜索范围：末步固定 age 0；其余从 prevAge+1 起到窗口末
-                int startAge = isLast ? 0 : prevAge + 1;
-                int endAge = isLast ? 0 : window - 1;
-                for (int age = startAge; age <= endAge; age++)
-                {
-                    if (StepSatisfied(step, buf, age, facingRight))
-                    {
-                        // '>' 严格相邻：本步(更早)须正好在上一步(更晚)的下一帧，即 age == prevAge+1
-                        if (step.Greater && !isLast && age != prevAge + 1)
-                        {
-                            continue;
-                        }
-                        found = age;
-                        break;
-                    }
-                }
-                if (found < 0)
-                {
-                    return false;
-                }
-                prevAge = found;
-            }
-            return true;
+        static readonly MCommandKey[] PhysicalDirections =
+        {
+            Dir(MInput.Up), Dir(MInput.Down), Dir(MInput.Left), Dir(MInput.Right),
+            Dir(MInput.Up | MInput.Left), Dir(MInput.Up | MInput.Right),
+            Dir(MInput.Down | MInput.Left), Dir(MInput.Down | MInput.Right),
+        };
+
+        static readonly MCommandKey[] Buttons =
+        {
+            Button(MInput.A), Button(MInput.B), Button(MInput.C), Button(MInput.X),
+            Button(MInput.Y), Button(MInput.Z), Button(MInput.S),
+        };
+
+        readonly MCommandDef _definition;
+        readonly bool[] _completed;
+        readonly int[] _stepTimers;
+        readonly int[] _loopOrder;
+        int _currentTime;
+        int _bufferTime;
+
+        internal MCommandRuntime(MCommandDef definition)
+        {
+            _definition = definition;
+            _completed = new bool[definition.Steps.Count];
+            _stepTimers = new int[definition.Steps.Count];
+            _loopOrder = BuildLoopOrder(definition.Steps);
         }
 
-        static bool StepSatisfied(MCommandStep step, MCommandBuffer buf, int age, bool facingRight)
+        MCommandRuntime(MCommandRuntime source)
+        {
+            _definition = source._definition;
+            _completed = (bool[])source._completed.Clone();
+            _stepTimers = (int[])source._stepTimers.Clone();
+            _loopOrder = (int[])source._loopOrder.Clone();
+            _currentTime = source._currentTime;
+            _bufferTime = source._bufferTime;
+        }
+
+        internal MCommandDef Definition => _definition;
+        internal bool Active => _bufferTime > 0;
+        internal MCommandRuntime Clone() => new MCommandRuntime(this);
+
+        internal bool Step(MInputBuffer input)
+        {
+            if (_bufferTime > 0)
+            {
+                _bufferTime--;
+            }
+            if (_definition.Steps.Count == 0)
+            {
+                return false;
+            }
+
+            bool anyDone = false;
+            int maxStepTime = _definition.StepTime > 0 ? _definition.StepTime : _definition.Time;
+            for (int i = 0; i < _completed.Length; i++)
+            {
+                if (!_completed[i])
+                {
+                    continue;
+                }
+                _stepTimers[i]++;
+                if (maxStepTime > 0 && _stepTimers[i] > maxStepTime)
+                {
+                    _completed[i] = false;
+                    _stepTimers[i] = 0;
+                    continue;
+                }
+                anyDone = true;
+            }
+
+            if (anyDone)
+            {
+                _currentTime++;
+            }
+            else if (_currentTime > 0)
+            {
+                ClearProgress();
+            }
+
+            for (int order = 0; order < _loopOrder.Length; order++)
+            {
+                int i = _loopOrder[order];
+                if (i > 0 && !_completed[i - 1])
+                {
+                    continue;
+                }
+
+                MCommandStep step = _definition.Steps[i];
+                bool matched = StepMatches(step, input);
+                if (step.Greater && i > 0 && _completed[i - 1] && !_completed[i] && GreaterCheckFail(step, input))
+                {
+                    matched = false;
+                    _completed[i - 1] = false;
+                    _stepTimers[i - 1] = 0;
+                }
+                if (!matched)
+                {
+                    continue;
+                }
+
+                _completed[i] = true;
+                _stepTimers[i] = 0;
+                if (i > 0)
+                {
+                    _completed[i - 1] = false;
+                    _stepTimers[i - 1] = 0;
+                }
+                if (i == 0)
+                {
+                    _currentTime = 0;
+                }
+            }
+
+            bool complete = _completed[_completed.Length - 1];
+            if (!complete && _currentTime < _definition.Time)
+            {
+                return false;
+            }
+
+            ClearProgress();
+            if (complete)
+            {
+                _bufferTime = System.Math.Max(_bufferTime, System.Math.Max(1, _definition.BufferTime));
+            }
+            return complete;
+        }
+
+        internal void ClearProgress()
+        {
+            _currentTime = 0;
+            Array.Clear(_completed, 0, _completed.Length);
+            Array.Clear(_stepTimers, 0, _stepTimers.Length);
+        }
+
+        internal void WriteHash(ref Hash64 hash)
+        {
+            hash.AddInt32(_currentTime);
+            hash.AddInt32(_bufferTime);
+            hash.AddInt32(_completed.Length);
+            for (int i = 0; i < _completed.Length; i++)
+            {
+                hash.AddInt32(_completed[i] ? 1 : 0);
+                hash.AddInt32(_stepTimers[i]);
+            }
+        }
+
+        static bool StepMatches(MCommandStep step, MInputBuffer input)
         {
             if (step.Keys.Count == 0)
             {
@@ -63,95 +197,140 @@ namespace Lockstep.Mugen.Command
             }
             if (step.OrLogic)
             {
-                // 任一键满足即可
-                for (int k = 0; k < step.Keys.Count; k++)
+                for (int i = 0; i < step.Keys.Count; i++)
                 {
-                    if (KeySatisfied(step.Keys[k], buf, age, facingRight))
-                    {
-                        return true;
-                    }
+                    if (KeyMatches(step.Keys[i], input)) return true;
                 }
                 return false;
             }
-            // 全部键满足（'+' AND）
-            for (int k = 0; k < step.Keys.Count; k++)
+            for (int i = 0; i < step.Keys.Count; i++)
             {
-                if (!KeySatisfied(step.Keys[k], buf, age, facingRight))
-                {
-                    return false;
-                }
+                if (!KeyMatches(step.Keys[i], input)) return false;
             }
             return true;
         }
 
-        static bool KeySatisfied(MCommandKey key, MCommandBuffer buf, int age, bool facingRight)
+        static bool KeyMatches(MCommandKey key, MInputBuffer input)
         {
-            if (key.IsButton)
+            int state = input.State(key);
+            bool matched = key.Hold ? state > 0 : state == 1;
+            return matched && (key.ChargeTime <= 1 || input.StateCharge(key) >= key.ChargeTime);
+        }
+
+        static bool GreaterCheckFail(MCommandStep step, MInputBuffer input)
+        {
+            bool usePhysical = false;
+            for (int i = 0; i < step.Keys.Count; i++)
             {
-                bool downNow = (buf.Ago(age) & key.Bits) != 0;
-                if (key.Release)
+                if (!step.Keys[i].IsButton &&
+                    (step.Keys[i].Bits & (MInput.Left | MInput.Right)) != 0 &&
+                    !step.Keys[i].IsBack && !step.Keys[i].IsFwd)
                 {
-                    return !downNow && (buf.Ago(age + 1) & key.Bits) != 0;
+                    usePhysical = true;
+                    break;
                 }
-                if (key.Hold)
-                {
-                    return downNow;
-                }
-                // 按下边沿
-                return downNow && (buf.Ago(age + 1) & key.Bits) == 0;
             }
 
-            // 方向键
-            MInput want = ResolveDir(key, facingRight);
-            if (key.ChargeTime > 0)
+            MCommandKey[] directions = usePhysical ? PhysicalDirections : RelativeDirections;
+            for (int i = 0; i < directions.Length; i++)
             {
-                // 连续按住 charge 帧(含 age 起向更早)
-                for (int t = 0; t < key.ChargeTime; t++)
-                {
-                    if (!DirHeld(buf.Ago(age + t), want, key.Dollar))
-                    {
-                        return false;
-                    }
-                }
+                if (ChangedKeyNotAllowed(directions[i], step, input)) return true;
+            }
+            for (int i = 0; i < Buttons.Length; i++)
+            {
+                if (ChangedKeyNotAllowed(Buttons[i], step, input)) return true;
+            }
+            return false;
+        }
+
+        static bool ChangedKeyNotAllowed(MCommandKey key, MCommandStep step, MInputBuffer input)
+        {
+            MCommandKey press = key;
+            press.Release = false;
+            if (input.State(press) == 1 && !Contains(step, press, release: false))
+            {
                 return true;
             }
-            bool dirNow = DirHeld(buf.Ago(age), want, key.Dollar);
-            if (key.Release)
+            MCommandKey release = key;
+            release.Release = true;
+            if (input.State(release) == 1 && !Contains(step, release, release: true))
             {
-                return !dirNow && DirHeld(buf.Ago(age + 1), want, key.Dollar);
+                return true;
             }
-            if (key.Hold)
-            {
-                return dirNow;
-            }
-            // 方向按下边沿：本帧成立、上一帧不成立
-            return dirNow && !DirHeld(buf.Ago(age + 1), want, key.Dollar);
+            return false;
         }
 
-        // 把命令键的方向解析为具体 U/D/L/R 位（B/F 按朝向）。
-        static MInput ResolveDir(MCommandKey key, bool facingRight)
+        static bool Contains(MCommandStep step, MCommandKey key, bool release)
         {
-            MInput dir = key.Bits & MInput.DirMask;   // U/D 分量
-            if (key.IsFwd)
+            for (int i = 0; i < step.Keys.Count; i++)
             {
-                dir |= facingRight ? MInput.Right : MInput.Left;
+                if (step.Keys[i].Release == release && SameKey(step.Keys[i], key)) return true;
             }
-            if (key.IsBack)
-            {
-                dir |= facingRight ? MInput.Left : MInput.Right;
-            }
-            return dir;
+            return false;
         }
 
-        // dollar(4way)：子集匹配(want 的位都按下即可，忽略多余)；否则方向轴精确相等。
-        static bool DirHeld(MInput frame, MInput want, bool dollar)
+        static int[] BuildLoopOrder(List<MCommandStep> steps)
         {
-            MInput fd = frame & MInput.DirMask;
-            if (dollar)
+            List<int> order = new List<int>(steps.Count);
+            for (int i = steps.Count - 1; i >= 0;)
             {
-                return (fd & want) == want && want != MInput.None;
+                if (i > 0 && IsDirToButton(steps[i - 1], steps[i]))
+                {
+                    int start = i - 1;
+                    int end = i;
+                    while (start > 0 && IsDirToButton(steps[start - 1], steps[start])) start--;
+                    for (int j = start; j <= end; j++) order.Add(j);
+                    i = start - 1;
+                }
+                else
+                {
+                    order.Add(i--);
+                }
             }
-            return fd == want && want != MInput.None;
+            return order.ToArray();
         }
+
+        static bool IsDirToButton(MCommandStep current, MCommandStep next)
+        {
+            for (int i = 0; i < next.Keys.Count; i++) if (next.Keys[i].Hold) return false;
+            for (int i = 0; i < current.Keys.Count; i++) if (current.Keys[i].IsButton) return false;
+            for (int i = 0; i < current.Keys.Count; i++)
+            {
+                for (int j = 0; j < next.Keys.Count; j++)
+                {
+                    if (SameKey(current.Keys[i], next.Keys[j])) return false;
+                }
+            }
+            for (int i = 0; i < next.Keys.Count; i++)
+            {
+                if (next.Keys[i].IsButton && !next.Keys[i].Release) return true;
+            }
+            for (int i = 0; i < current.Keys.Count; i++)
+            {
+                if (!current.Keys[i].Release) continue;
+                for (int j = 0; j < next.Keys.Count; j++)
+                {
+                    if (!next.Keys[j].Release) return true;
+                }
+            }
+            return false;
+        }
+
+        static bool SameKey(MCommandKey a, MCommandKey b)
+        {
+            return a.Bits == b.Bits && a.IsBack == b.IsBack && a.IsFwd == b.IsFwd &&
+                   a.IsButton == b.IsButton && a.IsNeutral == b.IsNeutral;
+        }
+
+        static MCommandKey Dir(MInput bits) => new MCommandKey { Bits = bits };
+        static MCommandKey Back() => new MCommandKey { IsBack = true };
+        static MCommandKey Forward() => new MCommandKey { IsFwd = true };
+        static MCommandKey Diagonal(MInput vertical, bool back) => new MCommandKey
+        {
+            Bits = vertical,
+            IsBack = back,
+            IsFwd = !back,
+        };
+        static MCommandKey Button(MInput bit) => new MCommandKey { Bits = bit, IsButton = true };
     }
 }

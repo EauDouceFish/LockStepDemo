@@ -1,6 +1,6 @@
 // Behavior-faithful CMD parser for the ported Mugen engine.
 // 解析 .cmd 的 [Command] 段(name/command/time/buffer.time) → MCommandDef 列表。
-// [Remap]/[Defaults]/状态控制器段在此忽略(状态走 CnsParser)。See Docs/移植方案_Ikemen.md.
+// [Remap]/状态控制器段在此忽略(状态走 CnsParser)；[Defaults] 先扫描后应用到所有命令。
 using System.Collections.Generic;
 using System.Globalization;
 using Lockstep.Mugen.Command;
@@ -13,13 +13,15 @@ namespace Lockstep.Mugen.Parse
         {
             List<MCommandDef> result = new List<MCommandDef>();
 
+            int defaultTime = 15;
+            int defaultBufferTime = 1;
+            ReadDefaults(text, ref defaultTime, ref defaultBufferTime);
+
             bool inCommand = false;
             string name = null;
             string command = null;
             int time = 15;
             int bufferTime = 1;
-            int defaultTime = 15;
-            int defaultBufferTime = 1;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             foreach (string raw in lines)
@@ -69,7 +71,7 @@ namespace Lockstep.Mugen.Parse
                     case "name": name = Unquote(val); break;
                     case "command": command = val; break;
                     case "time": time = ParseInt(val, defaultTime); break;
-                    case "buffer.time": bufferTime = ParseInt(val, defaultBufferTime); break;
+                    case "buffer.time": bufferTime = System.Math.Max(1, ParseInt(val, defaultBufferTime)); break;
                 }
             }
 
@@ -78,6 +80,46 @@ namespace Lockstep.Mugen.Parse
                 result.Add(MCommandParser.Parse(name, command, time, bufferTime));
             }
             return result;
+        }
+
+        static void ReadDefaults(string text, ref int defaultTime, ref int defaultBufferTime)
+        {
+            bool inDefaults = false;
+            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            foreach (string raw in lines)
+            {
+                string line = StripComment(raw).Trim();
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+                if (line[0] == '[')
+                {
+                    int rb = line.IndexOf(']');
+                    string header = (rb > 0 ? line.Substring(1, rb - 1) : line.Substring(1)).Trim();
+                    inDefaults = string.Equals(header, "defaults", System.StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+                if (!inDefaults)
+                {
+                    continue;
+                }
+                int eq = line.IndexOf('=');
+                if (eq < 0)
+                {
+                    continue;
+                }
+                string key = line.Substring(0, eq).Trim().ToLowerInvariant();
+                string val = line.Substring(eq + 1).Trim();
+                if (key == "command.time")
+                {
+                    defaultTime = ParseInt(val, defaultTime);
+                }
+                else if (key == "command.buffer.time")
+                {
+                    defaultBufferTime = System.Math.Max(1, ParseInt(val, defaultBufferTime));
+                }
+            }
         }
 
         static string Unquote(string v)

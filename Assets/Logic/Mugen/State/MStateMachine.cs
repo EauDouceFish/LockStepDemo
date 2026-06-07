@@ -2,6 +2,8 @@
 // Source: src/char.go actionRun + bytecode.go StateBlock.Run — 定点版。
 // See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
+using Lockstep.Math;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
 
 namespace Lockstep.Mugen.State
@@ -140,7 +142,7 @@ namespace Lockstep.Mugen.State
             int reentry = 0;
             while (reentry < MaxReentry)
             {
-                MStateDef def = Lookup(c.StateNo, states, commonStates);
+                MStateDef def = LookupForCurrentOwner(c, c.StateNo, states, commonStates);
                 if (def == null)
                 {
                     return;
@@ -257,23 +259,75 @@ namespace Lockstep.Mugen.State
         static void ApplyTransition(MChar c, IReadOnlyDictionary<int, MStateDef> states,
             IReadOnlyDictionary<int, MStateDef> commonStates)
         {
-            int target = c.PendingStateNo;
-            // SelfState（PendingIsSelf）→ 退出自定义状态归属（回自身状态表）；ChangeState 保持归属（投技中切招仍跑攻方表）。
-            if (c.PendingIsSelf) { c.StateOwner = null; }
-            c.PendingStateNo = -1;
-            c.PendingIsSelf = false;
+            MStateTransition transition = c.PendingTransition;
+            int target = transition.StateNo;
+            int oldOwner = c.StatePlayerNo >= 0 ? c.StatePlayerNo : c.PlayerNo;
+            int newOwner = transition.OwnerPlayerNo >= 0 ? transition.OwnerPlayerNo : oldOwner;
+            if (oldOwner != newOwner) { RescaleStateLocalCoordinates(c, oldOwner, newOwner); }
+
+            c.PendingTransition = MStateTransition.None;
+            c.StatePlayerNo = newOwner;
+            if (newOwner == c.PlayerNo)
+            {
+                c.StateOwner = null;
+            }
+            else if (c.StateOwner != null && c.StateOwner.PlayerNo != newOwner)
+            {
+                c.StateOwner = null;
+            }
+            if (transition.AnimNo >= 0)
+            {
+                c.PlayAnimation(transition.AnimNo, c.PlayerNo, c.PlayerNo);
+            }
+            if (transition.Ctrl >= 0)
+            {
+                c.Ctrl = transition.Ctrl != 0;
+            }
             c.PrevStateNo = c.StateNo;
             c.PrevStateType = c.StateType;   // 保存上一状态 statetype（prevstatetype trigger）
             c.StateNo = target;
             c.Time = 0;
             ClearStatePersist(c, target);   // 重置进入状态的 persistent 计数器（负状态计数器保留）
 
-            MStateDef def = Lookup(target, states, commonStates);
+            MStateDef def = LookupForCurrentOwner(c, target, states, commonStates);
             if (def == null)
             {
                 return;
             }
             def.RunInit(c);   // 应用头部：type/movetype/physics（字面量）+ anim/ctrl/velset/...（表达式求值）
+        }
+
+        static void RescaleStateLocalCoordinates(MChar c, int oldOwner, int newOwner)
+        {
+            int oldWidth = c.LocalCoordWidthFor(oldOwner);
+            int newWidth = c.LocalCoordWidthFor(newOwner);
+            if (oldWidth == newWidth) { return; }
+
+            FFloat ratio = FFloat.FromInt(newWidth) / FFloat.FromInt(oldWidth);
+            c.Pos = c.Pos * ratio;
+            c.OldPos = c.Pos;
+            c.Vel = c.Vel * ratio;
+            c.BindPos = c.BindPos * ratio;
+            c.WidthPlayerFront *= ratio;
+            c.WidthPlayerBack *= ratio;
+            c.WidthEdgeFront *= ratio;
+            c.WidthEdgeBack *= ratio;
+            c.Ghv.XVel *= ratio;
+            c.Ghv.YVel *= ratio;
+            c.Ghv.ZVel *= ratio;
+            c.Ghv.YAccel *= ratio;
+            c.Ghv.FallXVel *= ratio;
+            c.Ghv.FallYVel *= ratio;
+        }
+
+        static MStateDef LookupForCurrentOwner(MChar c, int no,
+            IReadOnlyDictionary<int, MStateDef> fallbackStates,
+            IReadOnlyDictionary<int, MStateDef> fallbackCommonStates)
+        {
+            MCharData data = c.DataFor(c.StatePlayerNo);
+            return data != null
+                ? Lookup(no, data.States, data.CommonStates)
+                : Lookup(no, fallbackStates, fallbackCommonStates);
         }
 
         // 状态查找：先查角色自身状态表，未命中再回退 common states（common1.cns 共享状态）。

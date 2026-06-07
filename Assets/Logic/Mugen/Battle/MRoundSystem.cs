@@ -189,8 +189,7 @@ namespace Lockstep.Mugen.Battle
         {
             c.Life = c.LifeMax;
             // 能量(Power)跨回合保留（MUGEN 行为），故此处不动。
-            c.PendingStateNo = 0;
-            c.PendingIsSelf = true;
+            c.QueueTransition(0, c.PlayerNo);
             c.MoveType = 1;      // I
             c.Ctrl = false;
             c.KeyCtrl = false;

@@ -123,10 +123,7 @@ namespace Lockstep.Mugen.State
             {
                 int animNo = Anim.Run(c).ToI();
                 // -1=不改；目标动画不存在则不切（对齐 changeAnimEx，避免进状态即冻结到无效动画）。
-                if (animNo != -1 && c.CanChangeAnimTo(animNo))
-                {
-                    MAnimSystem.Play(c, animNo, c.AnimTable);
-                }
+                if (animNo != -1) { c.PlayAnimation(animNo, c.PlayerNo, c.PlayerNo); }
             }
             if (Ctrl != null)
             {
@@ -168,16 +165,7 @@ namespace Lockstep.Mugen.State
 
         public override bool Run(MChar c)
         {
-            c.PendingStateNo = Value.Run(c).ToI();
-            c.PendingIsSelf = false;
-            if (Ctrl >= 0)
-            {
-                c.Ctrl = Ctrl != 0;
-            }
-            if (Anim >= 0 && c.CanChangeAnimTo(Anim))
-            {
-                MAnimSystem.Play(c, Anim, c.AnimTable);
-            }
+            c.QueueTransition(Value.Run(c).ToI(), c.StatePlayerNo, Anim, Ctrl);
             return true;
         }
     }
@@ -194,16 +182,7 @@ namespace Lockstep.Mugen.State
 
         public override bool Run(MChar c)
         {
-            c.PendingStateNo = Value.Run(c).ToI();
-            c.PendingIsSelf = true;
-            if (Ctrl >= 0)
-            {
-                c.Ctrl = Ctrl != 0;
-            }
-            if (Anim >= 0 && c.CanChangeAnimTo(Anim))
-            {
-                MAnimSystem.Play(c, Anim, c.AnimTable);
-            }
+            c.QueueTransition(Value.Run(c).ToI(), c.PlayerNo, Anim, Ctrl);
             return true;
         }
     }

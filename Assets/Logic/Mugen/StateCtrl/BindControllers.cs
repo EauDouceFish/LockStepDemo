@@ -193,19 +193,24 @@ namespace Lockstep.Mugen.StateCtrl
                 return false;
             }
             int animNo = Value.Run(character).ToI();
-            IReadOnlyDictionary<int, MAnimData> sourceTable = character.StateOwner != null
-                ? character.StateOwner.AnimTable : character.AnimTable;
-            if (sourceTable != null && !sourceTable.ContainsKey(animNo))
-            {
-                return false;
-            }
-            if (sourceTable != null)
-            {
-                character.AnimTable = sourceTable;
-            }
             int elem = Elem != null ? Elem.Run(character).ToI() - 1 : 0;
             int elemTime = ElemTime != null ? ElemTime.Run(character).ToI() : 0;
-            MAnimSystem.PlayAt(character, animNo, sourceTable, elem, elemTime);
+
+            // Standalone characters used outside MBattleEngine have no registered player identity.
+            // Preserve the legacy StateOwner table fallback while registered matches use playerNo ownership.
+            if (character.StatePlayerNo < 0 && character.StateOwner != null && character.StateOwner.PlayerNo < 0)
+            {
+                IReadOnlyDictionary<int, MAnimData> table = character.StateOwner.AnimTable;
+                if (table != null && !table.ContainsKey(animNo))
+                {
+                    return false;
+                }
+                character.AnimTable = table;
+                MAnimSystem.PlayAt(character, animNo, table, elem, elemTime);
+                return false;
+            }
+
+            character.PlayAnimation(animNo, character.StatePlayerNo, character.PlayerNo, elem, elemTime);
             return false;
         }
     }

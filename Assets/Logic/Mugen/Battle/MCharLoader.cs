@@ -21,26 +21,31 @@ namespace Lockstep.Mugen.Battle
         /// 后者覆盖前者；cnsText 额外作为常量来源；commonText 为公共状态；airText→动画；cmdText→命令。
         /// </summary>
         public static MCharData Load(IReadOnlyList<string> stateTexts, string cnsText,
-            string commonText, string airText, string cmdText, string name = "")
+            string commonText, string airText, string cmdText, string name = "",
+            MCharacterDefinition definition = null)
         {
-            MCharData data = new MCharData { Name = name };
+            MCharData data = new MCharData
+            {
+                Name = name,
+                Definition = definition ?? new MCharacterDefinition { Name = name, DisplayName = name },
+            };
 
             if (stateTexts != null)
             {
                 for (int i = 0; i < stateTexts.Count; i++)
                 {
-                    MergeStates(data.States, MugenCnsParser.Parse(stateTexts[i]));
+                    MergeStates(data.States, MugenCnsParser.Parse(stateTexts[i], data.Compatibility));
                 }
             }
             // cns 文件本身常也含状态（KFM st=cns），并入；同时作为常量来源。
             if (cnsText != null)
             {
-                MergeStates(data.States, MugenCnsParser.Parse(cnsText));
+                MergeStates(data.States, MugenCnsParser.Parse(cnsText, data.Compatibility));
                 data.Constants = MugenConstParser.Parse(cnsText);
             }
             if (commonText != null)
             {
-                MergeStates(data.CommonStates, MugenCnsParser.Parse(commonText));
+                MergeStates(data.CommonStates, MugenCnsParser.Parse(commonText, data.Compatibility));
             }
             if (airText != null)
             {
@@ -53,7 +58,7 @@ namespace Lockstep.Mugen.Battle
                 // .cmd 不仅含 [Command] 定义，还含 [Statedef -1] 命令解释器（一堆 ChangeState 按
                 // command=... 触发出招）。它必须并入 States 才能每帧跑（对齐 MUGEN：.cmd 的状态块与
                 // .cns 状态同属角色状态表）。否则命令能匹配但无人消费 → 角色完全不出招。
-                MergeStates(data.States, MugenCnsParser.Parse(cmdText));
+                MergeStates(data.States, MugenCnsParser.Parse(cmdText, data.Compatibility));
             }
             return data;
         }
@@ -71,6 +76,7 @@ namespace Lockstep.Mugen.Battle
                 PowerMax = data.Constants.Power,
                 Constants = data.Constants,
                 AnimTable = data.Anims,   // 动画存在性守卫 + animexist trigger 用（须在 RunInit 前接好）
+                OwnData = data,
                 StateNo = startStateNo,
                 AnimNo = startAnimNo,
                 CommandList = new MCommandList { Commands = data.Commands },

@@ -1,7 +1,7 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
 // Source: src/input.go (ReadCommandSymbols)。把 CMD 命令串解析为 MCommandDef。
 // 支持：方向 B/F/U/D + 对角 DB/DF/UB/UF；按钮 a/b/c/x/y/z/s；修饰 '~'(释放,带数字=蓄力)、'/'(按住)、'$'(4way)；
-//       步内 '+' (同时按 AND) 或 '|' (任一 OR，二者不混用)；步前 '>' (严格相邻)。See Docs/移植方案_Ikemen.md.
+//       步内 '+' (同时按 AND) 或 '|' (任一 OR，二者不混用)；'>' (禁止中间无关输入变化)。
 using System.Collections.Generic;
 
 namespace Lockstep.Mugen.Command
@@ -25,11 +25,6 @@ namespace Lockstep.Mugen.Command
                     continue;
                 }
                 MCommandStep step = new MCommandStep();
-                if (raw[0] == '>')
-                {
-                    step.Greater = true;
-                    raw = raw.Substring(1).Trim();
-                }
                 // '|' OR（任一键满足）优先于 '+' AND（全部满足）；两者不混用
                 string[] parts;
                 if (raw.IndexOf('|') >= 0)
@@ -46,7 +41,7 @@ namespace Lockstep.Mugen.Command
                     string token = parts[k].Trim();
                     if (token.Length > 0)
                     {
-                        step.Keys.Add(ParseKey(token));
+                        step.Keys.Add(ParseKey(token, ref step.Greater));
                     }
                 }
                 if (step.Keys.Count > 0)
@@ -57,7 +52,7 @@ namespace Lockstep.Mugen.Command
             return def;
         }
 
-        static MCommandKey ParseKey(string token)
+        static MCommandKey ParseKey(string token, ref bool greater)
         {
             MCommandKey key = new MCommandKey();
             int i = 0;
@@ -65,9 +60,15 @@ namespace Lockstep.Mugen.Command
             while (i < token.Length)
             {
                 char ch = token[i];
-                if (ch == '~')
+                if (ch == '>')
                 {
-                    key.Release = true;
+                    greater = true;
+                    i++;
+                }
+                else if (ch == '~' || ch == '/')
+                {
+                    key.Release |= ch == '~';
+                    key.Hold |= ch == '/';
                     i++;
                     int digitsStart = i;
                     while (i < token.Length && char.IsDigit(token[i]))
@@ -77,13 +78,8 @@ namespace Lockstep.Mugen.Command
                     if (i > digitsStart)
                     {
                         key.ChargeTime = int.Parse(token.Substring(digitsStart, i - digitsStart));
-                        key.Release = false;   // 带数字 = 蓄力(按住 N 帧)，非释放
+                        // Ikemen/MUGEN 的 ~N 是“至少按住 N 帧后释放”，不是持续按住。
                     }
-                }
-                else if (ch == '/')
-                {
-                    key.Hold = true;
-                    i++;
                 }
                 else if (ch == '$')
                 {
@@ -107,6 +103,9 @@ namespace Lockstep.Mugen.Command
             {
                 case "B": key.IsBack = true; return;
                 case "F": key.IsFwd = true; return;
+                case "L": key.Bits = MInput.Left; return;
+                case "R": key.Bits = MInput.Right; return;
+                case "N": key.IsNeutral = true; return;
                 case "U": key.Bits = MInput.Up; return;
                 case "D": key.Bits = MInput.Down; return;
                 case "DB": key.Bits = MInput.Down; key.IsBack = true; return;

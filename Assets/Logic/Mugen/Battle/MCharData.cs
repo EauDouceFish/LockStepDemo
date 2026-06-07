@@ -5,6 +5,7 @@ using Lockstep.Mugen.Anim;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.State;
+using Lockstep.Mugen.Parse;
 
 namespace Lockstep.Mugen.Battle
 {
@@ -12,6 +13,8 @@ namespace Lockstep.Mugen.Battle
     public sealed class MCharData
     {
         public string Name = "";
+        public MCharacterDefinition Definition = new MCharacterDefinition();
+        public MCompatibilityReport Compatibility = new MCompatibilityReport();
         public Dictionary<int, MStateDef> States = new Dictionary<int, MStateDef>();         // 角色自身状态（含招式）
         public Dictionary<int, MStateDef> CommonStates = new Dictionary<int, MStateDef>();   // common1.cns 公共状态
         public Dictionary<int, MAnimData> Anims = new Dictionary<int, MAnimData>();           // 动画号→动画

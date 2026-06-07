@@ -28,6 +28,22 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void CmdParser_AppliesDefaultsRegardlessOfSectionOrder()
+        {
+            string cmd =
+                "[Command]\nname = \"defaulted\"\ncommand = a\n" +
+                "[Command]\nname = \"override\"\ncommand = b\ntime = 7\nbuffer.time = 2\n" +
+                "[Defaults]\ncommand.time = 30\ncommand.buffer.time = 4\n";
+
+            System.Collections.Generic.List<MCommandDef> defs = MugenCmdParser.Parse(cmd);
+
+            Assert.That(defs[0].Time, Is.EqualTo(30));
+            Assert.That(defs[0].BufferTime, Is.EqualTo(4));
+            Assert.That(defs[1].Time, Is.EqualTo(7));
+            Assert.That(defs[1].BufferTime, Is.EqualTo(2));
+        }
+
+        [Test]
         public void CommandList_ActivatesOnMatch()
         {
             MCommandList list = new MCommandList();
@@ -78,6 +94,71 @@ namespace Lockstep.Tests.Mugen
             // 再过一帧无输入，buffer.time=1 应失活
             list.Update(MInput.None, true);
             Assert.IsFalse(list.IsActive("fwd"), "buffer.time=1 后失活");
+        }
+
+        [Test]
+        public void ReleaseCharge_RequiresEnoughChargeAndReleaseEdge()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("release", "~3a"));
+
+            list.Update(A, true);
+            list.Update(A, true);
+            list.Update(A, true);
+            Assert.IsFalse(list.IsActive("release"), "~3a 不能在仍按住时完成");
+
+            list.Update(MInput.None, true);
+            Assert.IsTrue(list.IsActive("release"), "蓄满三帧后的释放边沿完成命令");
+        }
+
+        [Test]
+        public void ReleaseCharge_FailsWhenReleasedTooEarly()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("release", "~3a"));
+
+            list.Update(A, true);
+            list.Update(A, true);
+            list.Update(MInput.None, true);
+
+            Assert.IsFalse(list.IsActive("release"));
+        }
+
+        [Test]
+        public void DirectionThenButton_CanCompleteInSameFrame()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("same-frame", "F, a"));
+
+            list.Update(R | A, true);
+
+            Assert.IsTrue(list.IsActive("same-frame"));
+        }
+
+        [Test]
+        public void Greater_AllowsDelayWithoutUnrelatedInputChanges()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("strict", "a, >b"));
+
+            list.Update(A, true);
+            list.Update(A, true);
+            list.Update(A | MInput.B, true);
+
+            Assert.IsTrue(list.IsActive("strict"), "'>' 约束输入变化，不是简单的相邻帧检查");
+        }
+
+        [Test]
+        public void Greater_RejectsUnrelatedInputChange()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("strict", "a, >b"));
+
+            list.Update(A, true);
+            list.Update(A | MInput.C, true);
+            list.Update(A | MInput.B | MInput.C, true);
+
+            Assert.IsFalse(list.IsActive("strict"));
         }
 
         [Test]

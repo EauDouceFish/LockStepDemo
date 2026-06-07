@@ -68,8 +68,8 @@ namespace Lockstep.Mugen.StateCtrl
             for (int index = 0; index < targets.Count; index++)
             {
                 targets[index].Ctrl = false;
-                targets[index].PendingStateNo = stateNo;
-                targets[index].PendingIsSelf = false;
+                targets[index].StateOwner = character;
+                targets[index].QueueTransition(stateNo, character.StatePlayerNo);
             }
             return false;
         }

@@ -26,10 +26,11 @@ namespace Lockstep.Mugen.Command
         public bool Hold;         // '/' 按住(不要求边沿)
         public bool Dollar;       // '$' 4way(子集匹配，忽略另一轴)
         public bool IsButton;     // 是否按钮键
+        public bool IsNeutral;    // N（无方向）
         public int ChargeTime;    // 蓄力：键须连续按住 N 帧（>0 时生效）
     }
 
-    /// <summary>命令的一步(对应 Ikemen CommandStep)：多键 AND(+)；greater='>' 严格相邻。</summary>
+    /// <summary>命令的一步(对应 Ikemen CommandStep)：多键 AND(+)；greater='>' 禁止中间无关输入变化。</summary>
     public sealed class MCommandStep
     {
         public List<MCommandKey> Keys = new List<MCommandKey>();
@@ -44,6 +45,7 @@ namespace Lockstep.Mugen.Command
         public List<MCommandStep> Steps = new List<MCommandStep>();
         public int Time = 15;        // 完成全部步骤的总帧窗(MUGEN command.time 默认 15)
         public int BufferTime = 1;   // 完成后保持 active 的缓冲帧(MUGEN command.buffer.time 默认 1)
+        public int StepTime;         // 单步最大等待时间；<=0 时使用 Time
     }
 
     /// <summary>输入环形缓冲(对应 Ikemen InputBuffer)：保存最近若干帧输入，支持按"帧前偏移"取值。</summary>

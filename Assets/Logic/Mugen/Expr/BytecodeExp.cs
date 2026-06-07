@@ -23,6 +23,24 @@ namespace Lockstep.Mugen.Expr
         IExprContext Redirect(OpCode op, List<BytecodeValue> stack);
     }
 
+    /// <summary>
+    /// Optional variable access contract. It keeps var/fvar/sysvar/sysfvar as four independent
+    /// namespaces without forcing every expression context to expose character storage.
+    /// </summary>
+    public interface IExprVariableContext
+    {
+        BytecodeValue ReadVariable(OpCode op, int index);
+    }
+
+    /// <summary>
+    /// Optional strict contract for two-argument redirects. Arguments are passed in source order:
+    /// first is the requested ID and second is the zero-based match index.
+    /// </summary>
+    public interface IExprTwoArgumentRedirectContext
+    {
+        IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument);
+    }
+
     /// <summary>表达式字节码 + 栈式求值器（对应 Ikemen BytecodeExp.run）。</summary>
     public sealed class BytecodeExp
     {
@@ -97,6 +115,22 @@ namespace Lockstep.Mugen.Expr
                     case OpCode.OC_floor: Unary(stack, BytecodeOps.Floor); break;
                     case OpCode.OC_ceil: Unary(stack, BytecodeOps.Ceil); break;
 
+                    case OpCode.OC_var:
+                    case OpCode.OC_sysvar:
+                    case OpCode.OC_fvar:
+                    case OpCode.OC_sysfvar:
+                        if (cur is IExprVariableContext variables)
+                        {
+                            stack.Add(variables.ReadVariable(op, Pop(stack).ToI()));
+                        }
+                        else
+                        {
+                            stack.Add(cur != null
+                                ? cur.ReadTrigger(op, _code, ref i, stack)
+                                : BytecodeValue.Undefined());
+                        }
+                        break;
+
                     // 区间：弹 max,min,v
                     case OpCode.OC_range_ii: RangeOp(stack, true, true); break;
                     case OpCode.OC_range_ie: RangeOp(stack, true, false); break;
@@ -159,7 +193,18 @@ namespace Lockstep.Mugen.Expr
                         if (op >= OpCode.OC_player && op <= OpCode.OC_stateowner)
                         {
                             // redirect：切上下文并进入后续子块（i+=4 跳过长度头并保留 cur）；失败压 Undefined 跳过整块
-                            IExprContext redirected = cur != null ? cur.Redirect(op, stack) : null;
+                            IExprContext redirected = null;
+                            if ((op == OpCode.OC_helper || op == OpCode.OC_target)
+                                && cur is IExprTwoArgumentRedirectContext twoArgumentContext)
+                            {
+                                BytecodeValue secondArgument = Pop(stack);
+                                BytecodeValue firstArgument = Pop(stack);
+                                redirected = twoArgumentContext.Redirect(op, firstArgument, secondArgument);
+                            }
+                            else if (cur != null)
+                            {
+                                redirected = cur.Redirect(op, stack);
+                            }
                             if (redirected != null)
                             {
                                 cur = redirected;

@@ -30,7 +30,13 @@ namespace Lockstep.Import.Sff
         public int Width;
         public int Height;
         public byte[] Indices;      // length = Width*Height
-        public byte[] Palette;      // 768 字节 RGB（无内嵌调色板时全 0）
+        public byte[] Palette;      // 768 bytes RGB for indexed images
+        public byte[] Rgba;         // length = Width*Height*4 for true-color images
+
+        public bool IsTrueColor
+        {
+            get { return Rgba != null; }
+        }
     }
 
     /// <summary>SFF v2 一个精灵的头（28 字节）。宽高自带、像素压缩、调色板按 PalIndex 取自独立库。</summary>

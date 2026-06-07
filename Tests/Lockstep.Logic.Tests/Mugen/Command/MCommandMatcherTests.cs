@@ -3,7 +3,7 @@ using Lockstep.Mugen.Command;
 
 namespace Lockstep.Tests.Mugen
 {
-    /// <summary>M6：命令解析 + 匹配（QCF/蓄力/释放/朝向相对/$4way/严格相邻）。</summary>
+    /// <summary>M6：命令解析 + 匹配（QCF/蓄力/释放/朝向相对/$4way/greater）。</summary>
     [TestFixture]
     public sealed class MCommandMatcherTests
     {
@@ -73,6 +73,16 @@ namespace Lockstep.Tests.Mugen
             Assert.IsTrue(MCommandMatcher.Matches(cmd, b, true));
             // 一直按住不算释放
             Assert.IsFalse(MCommandMatcher.Matches(cmd, Buf(A, A), true));
+        }
+
+        [Test]
+        public void ReleaseCharge_DoesNotBecomeHoldCommand()
+        {
+            MCommandDef cmd = MCommandParser.Parse("rel", "~3a");
+
+            Assert.IsFalse(MCommandMatcher.Matches(cmd, Buf(A, A, A), true));
+            Assert.IsTrue(MCommandMatcher.Matches(cmd, Buf(A, A, A, MInput.None), true));
+            Assert.IsFalse(MCommandMatcher.Matches(cmd, Buf(A, A, MInput.None), true));
         }
 
         [Test]

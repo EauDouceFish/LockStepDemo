@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Lockstep.Core;
 using Lockstep.Math;
 using Lockstep.Mugen.Expr;
+using Lockstep.Mugen.Battle;
 
 namespace Lockstep.Mugen.Char
 {
@@ -104,6 +105,14 @@ namespace Lockstep.Mugen.Char
         // 角色动画表（动画号→动画）：不可变配置引用，由 SpawnChar 接入（与 Constants 同属配置，
         // Clone 浅拷引用、WriteHash 不混入、不进回滚快照）。用于 ChangeAnim 存在性守卫与 animexist trigger。可为 null。
         public System.Collections.Generic.IReadOnlyDictionary<int, Anim.MAnimData> AnimTable;
+
+        // Ikemen-style resource ownership. Dictionary references are immutable fallbacks used before registration.
+        public MPlayerResourceRegistry Resources;
+        public MCharData OwnData;
+        public int PlayerNo = -1;
+        public int StatePlayerNo = -1;
+        public int AnimPlayerNo = -1;
+        public int SpritePlayerNo = -1;
 
         // 命中系统（M7）：当前 HitDef + 本帧 Clsn 框（Clsn 为动画派生，由 Anim 系统 M8 填，Clone 浅拷不哈希）。
         public Hit.MHitDef HitDef = new Hit.MHitDef();
@@ -207,8 +216,26 @@ namespace Lockstep.Mugen.Char
         }
 
         // 状态机：待应用的切换（>=0 表示本帧要 ChangeState 到此号）
-        public int PendingStateNo = -1;
-        public bool PendingIsSelf;       // 待切换是否为 SelfState（用自身状态表）
+        public MStateTransition PendingTransition = MStateTransition.None;
+        public int PendingStateNo
+        {
+            get => PendingTransition.Active ? PendingTransition.StateNo : -1;
+            set
+            {
+                PendingTransition.Active = value >= 0;
+                PendingTransition.StateNo = value;
+                if (PendingTransition.OwnerPlayerNo < 0) { PendingTransition.OwnerPlayerNo = StatePlayerNo; }
+            }
+        }
+        public bool PendingIsSelf
+        {
+            get => PendingTransition.Active && PendingTransition.OwnerPlayerNo == PlayerNo;
+            set
+            {
+                if (value) { PendingTransition.OwnerPlayerNo = PlayerNo; }
+                else if (PendingTransition.OwnerPlayerNo < 0) { PendingTransition.OwnerPlayerNo = StatePlayerNo; }
+            }
+        }
         // persistent 计数：当前状态内各控制器(按 index)已触发帧数，进入新状态时清空（仅作用当前状态）
         public Dictionary<int, int> PersistCounters = new Dictionary<int, int>();
 
@@ -324,7 +351,61 @@ namespace Lockstep.Mugen.Char
         /// <summary>动画表中是否存在该动画号（无表则 false；animexist/selfanimexist trigger 用）。</summary>
         public bool AnimExists(int animNo)
         {
-            return AnimTable != null && AnimTable.ContainsKey(animNo);
+            IReadOnlyDictionary<int, Anim.MAnimData> table = CurrentAnimTable();
+            return table != null && table.ContainsKey(animNo);
+        }
+
+        public MCharData DataFor(int playerNo)
+        {
+            MCharData data = Resources?.Get(playerNo);
+            if (data != null) { return data; }
+            if (playerNo < 0 || playerNo == PlayerNo) { return OwnData; }
+            if (StateOwner != null && playerNo == StateOwner.PlayerNo) { return StateOwner.OwnData; }
+            return null;
+        }
+
+        public IReadOnlyDictionary<int, Anim.MAnimData> AnimationsFor(int playerNo)
+        {
+            MCharData data = DataFor(playerNo);
+            if (data != null) { return data.Anims; }
+            return playerNo < 0 || playerNo == PlayerNo ? AnimTable : null;
+        }
+
+        public IReadOnlyDictionary<int, Anim.MAnimData> CurrentAnimTable()
+        {
+            return AnimationsFor(AnimPlayerNo >= 0 ? AnimPlayerNo : PlayerNo);
+        }
+
+        public int LocalCoordWidthFor(int playerNo)
+        {
+            if (Resources != null) { return Resources.LocalCoordWidth(playerNo); }
+            MCharData data = DataFor(playerNo);
+            int width = data?.Definition?.LocalCoordWidth ?? 320;
+            return width > 0 ? width : 320;
+        }
+
+        public bool PlayAnimation(int animNo, int animPlayerNo, int spritePlayerNo, int elem = 0, int elemTime = 0)
+        {
+            if (animPlayerNo < 0) { animPlayerNo = PlayerNo; }
+            if (spritePlayerNo < 0) { spritePlayerNo = PlayerNo; }
+            IReadOnlyDictionary<int, Anim.MAnimData> table = AnimationsFor(animPlayerNo);
+            if (table != null && !table.ContainsKey(animNo)) { return false; }
+            AnimPlayerNo = animPlayerNo;
+            SpritePlayerNo = spritePlayerNo;
+            Anim.MAnimSystem.PlayAt(this, animNo, table, elem, elemTime);
+            return true;
+        }
+
+        public void QueueTransition(int stateNo, int ownerPlayerNo, int animNo = -1, int ctrl = -1)
+        {
+            PendingTransition = new MStateTransition
+            {
+                Active = stateNo >= 0,
+                StateNo = stateNo,
+                OwnerPlayerNo = ownerPlayerNo >= 0 ? ownerPlayerNo : StatePlayerNo,
+                AnimNo = animNo,
+                Ctrl = ctrl,
+            };
         }
 
         /// <summary>animelemtime(n)：自元素 n（1-based）起已播 tick。当前元素精确；其余按累积起始时间推算。</summary>
@@ -334,7 +415,8 @@ namespace Lockstep.Mugen.Char
             {
                 return AnimElemTime;   // 当前元素：精确（与 animelem= 首帧语义一致）
             }
-            if (AnimTable == null || !AnimTable.TryGetValue(AnimRunningNo, out Anim.MAnimData anim)
+            IReadOnlyDictionary<int, Anim.MAnimData> table = CurrentAnimTable();
+            if (table == null || !table.TryGetValue(AnimRunningNo, out Anim.MAnimData anim)
                 || anim.Frames == null)
             {
                 return 0;
@@ -429,7 +511,8 @@ namespace Lockstep.Mugen.Char
         /// </summary>
         public bool CanChangeAnimTo(int animNo)
         {
-            return AnimTable == null || AnimTable.ContainsKey(animNo);
+            IReadOnlyDictionary<int, Anim.MAnimData> table = AnimationsFor(PlayerNo);
+            return table == null || table.ContainsKey(animNo);
         }
 
         public void BindTo(MChar target, int time, FVector3 offset, int bindFacing)
@@ -475,7 +558,7 @@ namespace Lockstep.Mugen.Char
                 Life = Life, LifeMax = LifeMax, Power = Power, PowerMax = PowerMax, Juggle = Juggle,
                 AttackMul = AttackMul, CustomDefense = CustomDefense, SuperDefenseMul = SuperDefenseMul,
                 FallDefenseMul = FallDefenseMul, DefenseMulDelay = DefenseMulDelay,
-                Hitstop = Hitstop, PendingLifeDamage = PendingLifeDamage, PendingStateNo = PendingStateNo, PendingIsSelf = PendingIsSelf,
+                Hitstop = Hitstop, PendingLifeDamage = PendingLifeDamage, PendingTransition = PendingTransition,
                 PersistCounters = new Dictionary<int, int>(PersistCounters),
                 BindTarget = BindTarget, BindTime = BindTime, BindPos = BindPos, BindFacing = BindFacing,
                 HitCount = HitCount, UniqHitCount = UniqHitCount, GuardCount = GuardCount, ReceivedHits = ReceivedHits,
@@ -489,6 +572,9 @@ namespace Lockstep.Mugen.Char
                 KeyCtrl = KeyCtrl, AirJumpCount = AirJumpCount,
                 Constants = Constants,   // 不可变配置，浅拷引用
                 AnimTable = AnimTable,   // 不可变配置，浅拷引用（同 Constants，不进哈希）
+                Resources = Resources, OwnData = OwnData,
+                PlayerNo = PlayerNo, StatePlayerNo = StatePlayerNo,
+                AnimPlayerNo = AnimPlayerNo, SpritePlayerNo = SpritePlayerNo,
                 Rng = Rng,   // 共享可变随机源：浅拷引用，引擎级快照统一重链（同 redirect 链接）；哈希在引擎层混入一次
 
                 HitDef = HitDef.Clone(),
@@ -525,10 +611,15 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(StateType); hash.AddInt32(PrevStateType); hash.AddInt32(MoveType); hash.AddInt32(Physics);
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
+            hash.AddInt32(PlayerNo); hash.AddInt32(StatePlayerNo);
+            hash.AddInt32(AnimPlayerNo); hash.AddInt32(SpritePlayerNo);
             hash.AddInt32(Life); hash.AddInt32(LifeMax); hash.AddInt32(Power); hash.AddInt32(PowerMax); hash.AddInt32(Juggle);
             hash.AddFixed(AttackMul); hash.AddFixed(CustomDefense); hash.AddFixed(SuperDefenseMul);
             hash.AddFixed(FallDefenseMul); hash.AddBool(DefenseMulDelay);
-            hash.AddInt32(Hitstop); hash.AddInt32(PendingLifeDamage); hash.AddInt32(PendingStateNo); hash.AddBool(PendingIsSelf);
+            hash.AddInt32(Hitstop); hash.AddInt32(PendingLifeDamage);
+            hash.AddBool(PendingTransition.Active); hash.AddInt32(PendingTransition.StateNo);
+            hash.AddInt32(PendingTransition.OwnerPlayerNo); hash.AddInt32(PendingTransition.AnimNo);
+            hash.AddInt32(PendingTransition.Ctrl);
             HashVars(ref hash, PersistCounters);
             hash.AddInt32(BindTarget != null ? BindTarget.Id : -1); hash.AddInt32(BindTime); hash.AddFixed(BindPos); hash.AddInt32(BindFacing);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount); hash.AddInt32(GuardCount); hash.AddInt32(ReceivedHits);

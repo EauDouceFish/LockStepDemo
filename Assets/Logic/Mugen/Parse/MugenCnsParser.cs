@@ -20,6 +20,11 @@ namespace Lockstep.Mugen.Parse
 
         public static Dictionary<int, MStateDef> Parse(string text)
         {
+            return Parse(text, null);
+        }
+
+        public static Dictionary<int, MStateDef> Parse(string text, MCompatibilityReport report)
+        {
             MugenExprCompiler comp = new MugenExprCompiler();
             Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef>();
 
@@ -46,7 +51,7 @@ namespace Lockstep.Mugen.Parse
                     string header = (rb > 0 ? line.Substring(1, rb - 1) : line.Substring(1)).Trim();
                     string headerLower = header.ToLowerInvariant();
 
-                    FlushController(comp, current, ref ctrlType, triggerAll, triggerGroups, p);
+                    FlushController(comp, current, ref ctrlType, triggerAll, triggerGroups, p, report);
 
                     if (headerLower.StartsWith("statedef"))
                     {
@@ -105,7 +110,7 @@ namespace Lockstep.Mugen.Parse
                 }
             }
 
-            FlushController(comp, current, ref ctrlType, triggerAll, triggerGroups, p);
+            FlushController(comp, current, ref ctrlType, triggerAll, triggerGroups, p, report);
             return states;
         }
 
@@ -138,13 +143,18 @@ namespace Lockstep.Mugen.Parse
         // ───────── 控制器收尾 ─────────
         static void FlushController(MugenExprCompiler comp, MStateDef state, ref string ctrlType,
             List<string> triggerAll, SortedDictionary<int, List<string>> triggerGroups,
-            Dictionary<string, string> p)
+            Dictionary<string, string> p, MCompatibilityReport report)
         {
             if (ctrlType != null && state != null)
             {
-                MStateController c = BuildController(comp, ctrlType, p);
+                MStateController c = BuildController(comp, ctrlType, p, report);
                 if (c != null)
                 {
+                    if (report != null && c is ParameterOnlyController &&
+                        c.GetType().GetMethod(nameof(MStateController.Run)).DeclaringType == typeof(ParameterOnlyController))
+                    {
+                        report.AddParsedOnlyController(ctrlType);
+                    }
                     c.Triggers = BuildTriggers(comp, triggerAll, triggerGroups);
                     c.Persistent = ParseFirstInt(Get(p, "persistent"), 1);
                     c.IgnoreHitPause = ParseFirstInt(Get(p, "ignorehitpause"), 0) != 0;
@@ -178,7 +188,8 @@ namespace Lockstep.Mugen.Parse
         }
 
         // ───────── 控制器工厂 ─────────
-        static MStateController BuildController(MugenExprCompiler comp, string type, Dictionary<string, string> p)
+        static MStateController BuildController(MugenExprCompiler comp, string type, Dictionary<string, string> p,
+            MCompatibilityReport report)
         {
             switch (type)
             {
@@ -479,7 +490,9 @@ namespace Lockstep.Mugen.Parse
                         MemberNo = Expr(comp, p, "memberno"),
                     }, p);
                 case "modifystagevar": return WithParams(new ModifyStageVarController(), p);
-                default: return new NullController();   // 未知控制器降级（容错）
+                default:
+                    report?.AddUnknownController(type);
+                    return new NullController();
             }
         }
 
@@ -841,7 +854,23 @@ namespace Lockstep.Mugen.Parse
 
         static PlaySndController FillPlaySnd(PlaySndController controller, MugenExprCompiler comp, Dictionary<string, string> p)
         {
-            controller.Value = ExprList(comp, p, "value");
+            string soundValue = Get(p, "value");
+            if (!string.IsNullOrWhiteSpace(soundValue))
+            {
+                string[] parts = soundValue.Split(',');
+                string group = parts[0].Trim();
+                if (group.Length > 1 && (group[0] == 's' || group[0] == 'S' || group[0] == 'f' || group[0] == 'F'))
+                {
+                    controller.CommonBank = group[0] == 'f' || group[0] == 'F';
+                    group = group.Substring(1).TrimStart();
+                }
+                controller.Value = new BytecodeExp[parts.Length];
+                controller.Value[0] = comp.Compile(group);
+                for (int index = 1; index < parts.Length; index++)
+                {
+                    controller.Value[index] = comp.Compile(parts[index].Trim());
+                }
+            }
             controller.Channel = Expr(comp, p, "channel");
             controller.LowPriority = Expr(comp, p, "lowpriority");
             controller.Pan = Expr(comp, p, "pan");

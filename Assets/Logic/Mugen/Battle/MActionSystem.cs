@@ -52,7 +52,7 @@ namespace Lockstep.Mugen.Battle
                     {
                         if (c.StateNo != StJumpStart)
                         {
-                            c.PendingStateNo = StJumpStart;   // 跳跃起始
+                            c.QueueTransition(StJumpStart, c.PlayerNo);   // 跳跃起始
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoAirJump) && c.StateType == ST_A && c.Input.Ub == 1 &&
@@ -61,7 +61,7 @@ namespace Lockstep.Mugen.Battle
                         if (c.StateNo != StAirJumpStart || c.Time > 0)
                         {
                             c.AirJumpCount++;
-                            c.PendingStateNo = StAirJumpStart;   // 空中跳跃
+                            c.QueueTransition(StAirJumpStart, c.PlayerNo);   // 空中跳跃
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoCrouch) && c.StateType == ST_S && c.Input.Db > 0)
@@ -72,14 +72,14 @@ namespace Lockstep.Mugen.Battle
                             {
                                 c.Vel = new FVector3(FFloat.Zero, c.Vel.Y, c.Vel.Z);
                             }
-                            c.PendingStateNo = StStandToCrouch;   // 立 → 蹲
+                            c.QueueTransition(StStandToCrouch, c.PlayerNo);   // 立 → 蹲
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoStand) && c.StateType == ST_C && c.Input.Db <= 0)
                     {
                         if (c.StateNo != StCrouchToStand)
                         {
-                            c.PendingStateNo = StCrouchToStand;   // 蹲 → 起立
+                            c.QueueTransition(StCrouchToStand, c.PlayerNo);   // 蹲 → 起立
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoWalk) && c.StateType == ST_S &&
@@ -88,7 +88,7 @@ namespace Lockstep.Mugen.Battle
                         // 走路：前/后恰一方持续按住即走（inguarddist 未接，等价 Ikemen 无敌人靠近时的 XOR 解）。
                         if (c.StateNo != StWalk)
                         {
-                            c.PendingStateNo = StWalk;
+                            c.QueueTransition(StWalk, c.PlayerNo);
                         }
                     }
                 }
@@ -97,7 +97,7 @@ namespace Lockstep.Mugen.Battle
                 if (!Asf(c, MAssertFlag.NoBrake) && c.StateNo == StWalk &&
                     (c.Input.Bb > 0) == (c.Input.Fb > 0))
                 {
-                    c.PendingStateNo = StStand;
+                    c.QueueTransition(StStand, c.PlayerNo);
                 }
             }
 
@@ -121,7 +121,7 @@ namespace Lockstep.Mugen.Battle
             }
             if (c.Physics == PHYS_A && c.Vel.Y.Raw > 0 && c.Pos.Y.Raw >= 0 && c.StateNo != StRunJumpLand)
             {
-                c.PendingStateNo = StLand;
+                c.QueueTransition(StLand, c.PlayerNo);
             }
         }
 

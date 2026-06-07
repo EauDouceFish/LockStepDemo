@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -6,167 +7,245 @@ using Lockstep.Math;
 
 namespace Lockstep.Import.Air
 {
-    /// <summary>
-    /// MUGEN .air → AnimData 解析器。纯文本、整数坐标（像素），无 float、无 Unity → dotnet 可测。
-    /// 处理：[Begin Action N]、Clsn1/Clsn2（Default 持久 / 非 Default 仅作用下一帧）、帧行
-    /// (group,image,offx,offy,duration[,flip])、LoopStart、注释(;)。坐标按 MUGEN 原生（高度上为负）。
-    /// </summary>
+    /// <summary>MUGEN AIR parser. Produces immutable-style animation definitions without Unity types.</summary>
     public static class AirParser
     {
-        /// <summary>读取并解析 .air 文件，返回按出现顺序排列的全部动画。</summary>
+        const int MaxCopyDepth = 8;
+
+        sealed class RawAction
+        {
+            public AnimData Data;
+            public int CopyAction = -1;
+            public bool HasCopyAction;
+            public bool Terminated;
+            public RawAction Next;
+        }
+
         public static List<AnimData> ParseFile(string path)
         {
             return Parse(File.ReadAllText(path));
         }
 
-        /// <summary>解析 .air 文本内容为动画列表。</summary>
         public static List<AnimData> Parse(string text)
         {
-            List<AnimData> result = new List<AnimData>();
+            List<RawAction> parsed = ParseRaw(text ?? string.Empty);
+            Dictionary<int, RawAction> firstById = new Dictionary<int, RawAction>();
+            List<RawAction> unique = new List<RawAction>();
+            for (int i = 0; i < parsed.Count; i++)
+            {
+                if (!firstById.ContainsKey(parsed[i].Data.Id))
+                {
+                    firstById.Add(parsed[i].Data.Id, parsed[i]);
+                    unique.Add(parsed[i]);
+                }
+            }
 
-            AnimData current = null;
+            List<AnimData> result = new List<AnimData>();
+            for (int i = 0; i < unique.Count; i++)
+            {
+                AnimData resolved = Resolve(unique[i], firstById, new HashSet<RawAction>(), 0);
+                if (resolved != null)
+                {
+                    result.Add(resolved);
+                }
+            }
+            return result;
+        }
+
+        public static Dictionary<int, AnimData> ToDictionary(List<AnimData> anims)
+        {
+            Dictionary<int, AnimData> map = new Dictionary<int, AnimData>();
+            for (int i = 0; i < anims.Count; i++)
+            {
+                if (!map.ContainsKey(anims[i].Id))
+                {
+                    map.Add(anims[i].Id, anims[i]);
+                }
+            }
+            return map;
+        }
+
+        static List<RawAction> ParseRaw(string text)
+        {
+            List<RawAction> result = new List<RawAction>();
+            RawAction current = null;
             List<AnimFrame> frames = null;
             int loopStart = 0;
 
-            // Clsn 状态
             List<ClsnBox> default1 = new List<ClsnBox>();
             List<ClsnBox> default2 = new List<ClsnBox>();
             List<ClsnBox> pending1 = new List<ClsnBox>();
             List<ClsnBox> pending2 = new List<ClsnBox>();
             bool pendingSet1 = false;
             bool pendingSet2 = false;
-            bool curDefault1 = false;
-            bool curDefault2 = false;
+            bool currentDefault1 = false;
+            bool currentDefault2 = false;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            foreach (string rawLine in lines)
+            for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
             {
-                string line = StripComment(rawLine).Trim();
+                string line = StripComment(lines[lineIndex]).Trim();
                 if (line.Length == 0)
                 {
                     continue;
                 }
 
-                string lower = line.ToLowerInvariant();
-
-                // ── 新 action ──
+                int actionId;
+                if (TryParseActionId(line, out actionId))
+                {
+                    Flush(result, ref current, ref frames, ref loopStart);
+                    current = new RawAction { Data = new AnimData { Id = actionId } };
+                    frames = new List<AnimFrame>();
+                    ResetCollision(default1, default2, pending1, pending2,
+                        ref pendingSet1, ref pendingSet2, ref currentDefault1, ref currentDefault2);
+                    continue;
+                }
                 if (line[0] == '[')
                 {
-                    FlushAction(result, ref current, ref frames, ref loopStart);
-                    int id = ParseActionId(line);
-                    current = new AnimData { Id = id };
-                    frames = new List<AnimFrame>();
-                    loopStart = 0;
-                    default1.Clear();
-                    default2.Clear();
-                    pending1.Clear();
-                    pending2.Clear();
-                    pendingSet1 = false;
-                    pendingSet2 = false;
+                    Flush(result, ref current, ref frames, ref loopStart);
+                    ResetCollision(default1, default2, pending1, pending2,
+                        ref pendingSet1, ref pendingSet2, ref currentDefault1, ref currentDefault2);
+                    continue;
+                }
+                if (current == null || current.Terminated)
+                {
                     continue;
                 }
 
-                if (current == null)
+                string lower = line.ToLowerInvariant();
+                if (lower.StartsWith("copy action ", StringComparison.Ordinal))
                 {
-                    continue; // action 之前的杂项行
+                    int copyId;
+                    string number = line.Substring(12).Trim();
+                    if (int.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out copyId)
+                        && copyId >= 0)
+                    {
+                        current.CopyAction = copyId;
+                        current.HasCopyAction = true;
+                    }
+                    current.Terminated = true;
+                    continue;
                 }
-
-                // ── LoopStart ──
-                if (lower.StartsWith("loopstart"))
+                if (lower.StartsWith("loopstart", StringComparison.Ordinal))
                 {
                     loopStart = frames.Count;
                     continue;
                 }
-
-                // ── Clsn 头 (含 ':') ──
-                if (lower.StartsWith("clsn") && line.Contains(":"))
+                if (lower.StartsWith("clsn", StringComparison.Ordinal) && line.Contains(":"))
                 {
                     bool isDefault = lower.Contains("default");
-                    int which = lower.Contains("clsn1") ? 1 : 2;
-                    if (which == 1)
+                    bool isClsn1 = lower.Contains("clsn1");
+                    if (isClsn1)
                     {
-                        curDefault1 = isDefault;
-                        if (isDefault)
+                        currentDefault1 = isDefault;
+                        (isDefault ? default1 : pending1).Clear();
+                        if (!isDefault)
                         {
-                            default1.Clear();
-                        }
-                        else
-                        {
-                            pending1.Clear();
                             pendingSet1 = true;
                         }
                     }
                     else
                     {
-                        curDefault2 = isDefault;
-                        if (isDefault)
+                        currentDefault2 = isDefault;
+                        (isDefault ? default2 : pending2).Clear();
+                        if (!isDefault)
                         {
-                            default2.Clear();
-                        }
-                        else
-                        {
-                            pending2.Clear();
                             pendingSet2 = true;
                         }
                     }
                     continue;
                 }
-
-                // ── Clsn 框行 (含 '[' 和 '=') ──
-                if (lower.StartsWith("clsn") && line.Contains("[") && line.Contains("="))
+                if (lower.StartsWith("clsn", StringComparison.Ordinal)
+                    && line.Contains("[") && line.Contains("="))
                 {
-                    int which = lower.StartsWith("clsn1") ? 1 : 2;
                     ClsnBox box = ParseBox(line);
-                    if (which == 1)
+                    bool isClsn1 = lower.StartsWith("clsn1", StringComparison.Ordinal);
+                    if (isClsn1)
                     {
-                        (curDefault1 ? default1 : pending1).Add(box);
+                        (currentDefault1 ? default1 : pending1).Add(box);
                     }
                     else
                     {
-                        (curDefault2 ? default2 : pending2).Add(box);
+                        (currentDefault2 ? default2 : pending2).Add(box);
                     }
                     continue;
                 }
-
-                // ── 帧行 (以数字/负号开头) ──
-                if (line[0] == '-' || (line[0] >= '0' && line[0] <= '9'))
+                if (line[0] == '-' || char.IsDigit(line[0]))
                 {
                     AnimFrame frame = ParseFrame(line);
                     frame.Clsn1 = (pendingSet1 ? pending1 : default1).ToArray();
                     frame.Clsn2 = (pendingSet2 ? pending2 : default2).ToArray();
                     frames.Add(frame);
-
                     pending1.Clear();
                     pending2.Clear();
                     pendingSet1 = false;
                     pendingSet2 = false;
-                    continue;
                 }
             }
 
-            FlushAction(result, ref current, ref frames, ref loopStart);
+            Flush(result, ref current, ref frames, ref loopStart);
+            for (int i = 0; i + 1 < result.Count; i++)
+            {
+                result[i].Next = result[i + 1];
+            }
             return result;
         }
 
-        /// <summary>把动画列表转成"动画号 → AnimData"字典，便于按 Anim 号查。</summary>
-        public static Dictionary<int, AnimData> ToDictionary(List<AnimData> anims)
+        static AnimData Resolve(RawAction action, Dictionary<int, RawAction> firstById,
+            HashSet<RawAction> chain, int depth)
         {
-            Dictionary<int, AnimData> map = new Dictionary<int, AnimData>();
-            for (int i = 0; i < anims.Count; i++)
+            if (!chain.Add(action))
             {
-                map[anims[i].Id] = anims[i];
+                return null;
             }
-            return map;
+
+            RawAction target = null;
+            if (action.HasCopyAction)
+            {
+                if (depth >= MaxCopyDepth || !firstById.TryGetValue(action.CopyAction, out target)
+                    || ReferenceEquals(action, target))
+                {
+                    chain.Remove(action);
+                    return null;
+                }
+            }
+            else if (action.Data.Frames.Length == 0 && action.Next != null)
+            {
+                RawAction canonical;
+                target = firstById.TryGetValue(action.Next.Data.Id, out canonical) ? canonical : action.Next;
+            }
+
+            AnimData result;
+            if (target == null)
+            {
+                result = action.Data;
+            }
+            else
+            {
+                AnimData resolvedTarget = Resolve(target, firstById, chain, depth + 1);
+                result = resolvedTarget == null ? null : CloneWithId(resolvedTarget, action.Data.Id);
+            }
+            chain.Remove(action);
+            return result;
         }
 
-        // ───────────────────── helpers ─────────────────────
+        static AnimData CloneWithId(AnimData source, int id)
+        {
+            return new AnimData
+            {
+                Id = id,
+                Frames = (AnimFrame[])source.Frames.Clone(),
+                LoopStart = source.LoopStart,
+            };
+        }
 
-        static void FlushAction(List<AnimData> result, ref AnimData current, ref List<AnimFrame> frames, ref int loopStart)
+        static void Flush(List<RawAction> result, ref RawAction current,
+            ref List<AnimFrame> frames, ref int loopStart)
         {
             if (current != null)
             {
-                current.Frames = frames.ToArray();
-                current.LoopStart = loopStart;
+                current.Data.Frames = frames.ToArray();
+                current.Data.LoopStart = loopStart;
                 result.Add(current);
             }
             current = null;
@@ -174,36 +253,71 @@ namespace Lockstep.Import.Air
             loopStart = 0;
         }
 
-        static string StripComment(string line)
+        static void ResetCollision(List<ClsnBox> default1, List<ClsnBox> default2,
+            List<ClsnBox> pending1, List<ClsnBox> pending2, ref bool pendingSet1,
+            ref bool pendingSet2, ref bool currentDefault1, ref bool currentDefault2)
         {
-            int semi = line.IndexOf(';');
-            return semi >= 0 ? line.Substring(0, semi) : line;
+            default1.Clear();
+            default2.Clear();
+            pending1.Clear();
+            pending2.Clear();
+            pendingSet1 = false;
+            pendingSet2 = false;
+            currentDefault1 = false;
+            currentDefault2 = false;
         }
 
-        static int ParseActionId(string line)
+        static string StripComment(string line)
         {
-            // "[Begin Action 0]" → 0
-            int rb = line.IndexOf(']');
-            string inner = (rb > 0 ? line.Substring(1, rb - 1) : line.Substring(1)).Trim();
-            int lastSpace = inner.LastIndexOf(' ');
-            string num = lastSpace >= 0 ? inner.Substring(lastSpace + 1) : inner;
-            return ParseInt(num);
+            int semicolon = line.IndexOf(';');
+            return semicolon >= 0 ? line.Substring(0, semicolon) : line;
+        }
+
+        static bool TryParseActionId(string line, out int id)
+        {
+            id = 0;
+            if (line.Length < 3 || line[0] != '[')
+            {
+                return false;
+            }
+            int closing = line.IndexOf(']');
+            if (closing < 0)
+            {
+                return false;
+            }
+            string inner = line.Substring(1, closing - 1).Trim();
+            const string prefix = "begin action";
+            if (!inner.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            string number = inner.Substring(prefix.Length).Trim();
+            return number.Length > 0
+                && int.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out id);
         }
 
         static ClsnBox ParseBox(string line)
         {
-            int equalsAt = line.IndexOf('=');
-            string[] coords = line.Substring(equalsAt + 1).Split(',');
+            int equals = line.IndexOf('=');
+            string[] values = line.Substring(equals + 1).Split(',');
+            if (values.Length < 4)
+            {
+                throw new FormatException("AIR collision box requires four coordinates");
+            }
             return new ClsnBox(
-                FFloat.FromInt(ParseInt(coords[0])),
-                FFloat.FromInt(ParseInt(coords[1])),
-                FFloat.FromInt(ParseInt(coords[2])),
-                FFloat.FromInt(ParseInt(coords[3])));
+                FFloat.FromInt(ParseInt(values[0])),
+                FFloat.FromInt(ParseInt(values[1])),
+                FFloat.FromInt(ParseInt(values[2])),
+                FFloat.FromInt(ParseInt(values[3])));
         }
 
         static AnimFrame ParseFrame(string line)
         {
             string[] parts = line.Split(',');
+            if (parts.Length < 5)
+            {
+                throw new FormatException("AIR frame requires at least five fields");
+            }
             AnimFrame frame = new AnimFrame
             {
                 SpriteGroup = ParseInt(parts[0]),
@@ -216,14 +330,8 @@ namespace Lockstep.Import.Air
             if (parts.Length >= 6)
             {
                 string flip = parts[5].Trim().ToUpperInvariant();
-                if (flip.Contains("H"))
-                {
-                    frame.Flip |= FlipFlags.Horizontal;
-                }
-                if (flip.Contains("V"))
-                {
-                    frame.Flip |= FlipFlags.Vertical;
-                }
+                if (flip.Contains("H")) frame.Flip |= FlipFlags.Horizontal;
+                if (flip.Contains("V")) frame.Flip |= FlipFlags.Vertical;
             }
             return frame;
         }

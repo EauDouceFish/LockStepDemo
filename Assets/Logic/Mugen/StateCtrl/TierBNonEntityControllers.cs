@@ -370,9 +370,10 @@ namespace Lockstep.Mugen.StateCtrl
     public sealed class BGPalFXController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; public PalFXParamSet PalFX = new PalFXParamSet(); }
     public sealed class EnvColorController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp Time; public BytecodeExp Under; }
 
-    /// <summary>PlaySnd: logic-layer no-op until R-SND connects audio events.</summary>
+    /// <summary>PlaySnd emits a deterministic presentation event. The logic layer never owns an audio device.</summary>
     public sealed class PlaySndController : ParameterOnlyController
     {
+        public bool CommonBank;
         public BytecodeExp[] Value;
         public BytecodeExp Channel;
         public BytecodeExp LowPriority;
@@ -389,13 +390,82 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp LoopCount;
         public BytecodeExp StopOnGetHit;
         public BytecodeExp StopOnChangeState;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World == null || Value == null || Value.Length == 0) { return false; }
+            MSoundEvent sound = new MSoundEvent
+            {
+                Type = MSoundEventType.Play,
+                OwnerId = character.Id,
+                CommonBank = CommonBank,
+                Group = Value[0].Run(character).ToI(),
+                Number = Value.Length > 1 ? Value[1].Run(character).ToI() : 0,
+                Channel = Channel != null ? Channel.Run(character).ToI() : -1,
+                VolumeScale = VolumeScale != null ? VolumeScale.Run(character).ToI() : 100,
+                Pan = Pan != null ? Pan.Run(character).ToF() :
+                    (AbsPan != null ? AbsPan.Run(character).ToF() : FFloat.Zero),
+                AbsolutePan = AbsPan != null,
+                Frequency = FreqMul != null ? FreqMul.Run(character).ToF() : FFloat.One,
+                LoopCount = LoopCount != null ? LoopCount.Run(character).ToI() :
+                    (Loop != null && Loop.Run(character).ToB() ? -1 : 0),
+                Priority = Priority != null ? Priority.Run(character).ToI() : 0,
+                LoopStart = LoopStart != null ? LoopStart.Run(character).ToI() : 0,
+                LoopEnd = LoopEnd != null ? LoopEnd.Run(character).ToI() : 0,
+                StartPosition = StartPosition != null ? StartPosition.Run(character).ToI() : 0,
+                LowPriority = LowPriority != null && LowPriority.Run(character).ToB(),
+                StopOnGetHit = StopOnGetHit != null && StopOnGetHit.Run(character).ToB(),
+                StopOnChangeState = StopOnChangeState != null && StopOnChangeState.Run(character).ToB(),
+            };
+            if (Volume != null)
+            {
+                sound.VolumeScale += (Volume.Run(character).ToI() * 25) / 128;
+            }
+            character.World.Events.Sounds.Add(sound);
+            return false;
+        }
     }
 
-    /// <summary>StopSnd: logic-layer no-op until R-SND connects audio events.</summary>
-    public sealed class StopSndController : ParameterOnlyController { public BytecodeExp Channel; }
+    public sealed class StopSndController : ParameterOnlyController
+    {
+        public BytecodeExp Channel;
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Sounds.Add(new MSoundEvent
+                {
+                    Type = MSoundEventType.Stop,
+                    OwnerId = character.Id,
+                    Channel = Channel != null ? Channel.Run(character).ToI() : -1,
+                });
+            }
+            return false;
+        }
+    }
 
-    /// <summary>SndPan: logic-layer no-op until R-SND connects audio events.</summary>
-    public sealed class SndPanController : ParameterOnlyController { public BytecodeExp Channel; public BytecodeExp Pan; public BytecodeExp AbsPan; }
+    public sealed class SndPanController : ParameterOnlyController
+    {
+        public BytecodeExp Channel;
+        public BytecodeExp Pan;
+        public BytecodeExp AbsPan;
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Sounds.Add(new MSoundEvent
+                {
+                    Type = MSoundEventType.SetPan,
+                    OwnerId = character.Id,
+                    Channel = Channel != null ? Channel.Run(character).ToI() : -1,
+                    Pan = Pan != null ? Pan.Run(character).ToF() :
+                        (AbsPan != null ? AbsPan.Run(character).ToF() : FFloat.Zero),
+                    AbsolutePan = AbsPan != null,
+                });
+            }
+            return false;
+        }
+    }
 
     /// <summary>Explod: creates a deterministic logic-layer explod record; rendering is handled later.</summary>
     public class ExplodController : ParameterOnlyController
