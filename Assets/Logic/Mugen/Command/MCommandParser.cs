@@ -46,10 +46,56 @@ namespace Lockstep.Mugen.Command
                 }
                 if (step.Keys.Count > 0)
                 {
-                    def.Steps.Add(step);
+                    AddExpandedStep(def.Steps, step);
                 }
             }
             return def;
+        }
+
+        static void AddExpandedStep(List<MCommandStep> steps, MCommandStep step)
+        {
+            if (steps.Count == 0 || !IsSameSingleDirectionTap(steps[steps.Count - 1], step))
+            {
+                steps.Add(step);
+                return;
+            }
+
+            MCommandKey releaseKey = step.Keys[0];
+            releaseKey.Release = true;
+            releaseKey.Hold = false;
+            releaseKey.ChargeTime = 0;
+            MCommandStep releaseStep = new MCommandStep { Greater = true };
+            releaseStep.Keys.Add(releaseKey);
+            steps.Add(releaseStep);
+
+            step.Greater = true;
+            steps.Add(step);
+        }
+
+        static bool IsSameSingleDirectionTap(MCommandStep previous, MCommandStep current)
+        {
+            if (!IsSingleDirectionTap(previous) || !IsSingleDirectionTap(current))
+            {
+                return false;
+            }
+            MCommandKey a = previous.Keys[0];
+            MCommandKey b = current.Keys[0];
+            return a.Bits == b.Bits && a.IsBack == b.IsBack && a.IsFwd == b.IsFwd &&
+                   a.IsNeutral == b.IsNeutral && a.Dollar == b.Dollar;
+        }
+
+        static bool IsSingleDirectionTap(MCommandStep step)
+        {
+            if (step.OrLogic || step.Keys.Count != 1)
+            {
+                return false;
+            }
+            MCommandKey key = step.Keys[0];
+            if (key.Release || key.Hold || key.IsButton || key.Dollar)
+            {
+                return false;
+            }
+            return key.IsBack || key.IsFwd || key.IsNeutral || (key.Bits & MInput.DirMask) != 0;
         }
 
         static MCommandKey ParseKey(string token, ref bool greater)

@@ -63,6 +63,25 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void ParserExpandsRepeatedDirectionIntoReleaseRetap()
+        {
+            MCommandDef command = MCommandParser.Parse("dash", "F, F");
+
+            Assert.That(command.Steps.Count, Is.EqualTo(3));
+            Assert.That(command.Steps[1].Greater, Is.True);
+            Assert.That(command.Steps[1].Keys[0].Release, Is.True);
+            Assert.That(command.Steps[2].Greater, Is.True);
+
+            MCommandList list = new MCommandList();
+            list.Commands.Add(command);
+            list.Update(R, true);
+            list.Update(MInput.None, true);
+            list.Update(R, true);
+
+            Assert.That(list.IsActive("dash"), Is.True);
+        }
+
+        [Test]
         public void GreaterAllowsWaitFramesWithoutInputChanges()
         {
             MCommandList list = List("strict", "a, >b");

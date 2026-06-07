@@ -12,6 +12,7 @@
 - [ ] `trigger1` 必填及 trigger 组连续性与 Ikemen 一致。
 - [ ] 删除双表达式/双命令运行管线，只保留战斗实际使用的一套。
 - [ ] 按 Ikemen `Command.Step` 重写命令状态机，覆盖 `~N` 释放、`>`、同帧完成、charge、steptime。
+- [x] 解析阶段补齐重复方向 tap 展开：`F,F`/`B,B` 按 MUGEN 读入语义转为 release-retap，可驱动 dash 类命令。
 - [ ] 读取 `[Defaults]`、pause/hitpause command buffer、SOCD 配置并写入 trace/header hash。
 - [ ] 补齐语料实际使用的 trigger；未知 trigger 进入 compatibility report，strict import 失败。
 
@@ -73,6 +74,7 @@
 
 ## 全招式验收
 
+- [x] 建立全角色 `[Command]` 定义激活矩阵：逐角色逐 command 生成输入序列并验证 command active；`time=1` AI 伪随机长命令显式分类为不可人工激活项。
 - [ ] 从 `[Command]` 与 `Statedef -1` 建立 command-to-transition 图，不把 command 名直接等同招式。
 - [ ] 为每条可达招式生成输入序列和前置条件：站立、蹲、空中、能量、距离、受击/防御。
 - [ ] 每个招式从全新 session 或可靠 snapshot 起跑。
