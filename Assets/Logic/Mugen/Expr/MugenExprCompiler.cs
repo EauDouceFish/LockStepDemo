@@ -505,7 +505,7 @@ namespace Lockstep.Mugen.Expr
             }
 
             // redirect 前缀：p2,/root,/parent, + 单值子表达式（用 OC_run 包裹保证全程用重定向上下文）
-            if ((name == "p2" || name == "root" || name == "parent") && IsOp(","))
+            if ((name == "p2" || name == "root" || name == "parent" || name == "stateowner") && IsOp(","))
             {
                 EmitRedirect(name);
                 return;
@@ -907,7 +907,10 @@ namespace Lockstep.Mugen.Expr
         void EmitRedirect(string name)
         {
             Next();   // 吃掉 ','
-            OpCode op = name == "root" ? OpCode.OC_root : name == "parent" ? OpCode.OC_parent : OpCode.OC_p2;
+            OpCode op = name == "root" ? OpCode.OC_root
+                : name == "parent" ? OpCode.OC_parent
+                : name == "stateowner" ? OpCode.OC_stateowner
+                : OpCode.OC_p2;
 
             List<byte> outer = _out;
             _out = new List<byte>();

@@ -15,7 +15,7 @@ namespace Lockstep.Mugen.Char
     /// 实现 <see cref="IExprContext"/>：表达式 VM 的 trigger/redirect opcode 从本 Char 读值。
     /// StateType/MoveType/Physics 暂用 int32 原始 MUGEN 码（枚举映射归 M2 编译器/System）。
     /// </summary>
-    public sealed class MChar : IExprContext
+    public sealed class MChar : IExprContext, IExprVariableContext, IExprTwoArgumentRedirectContext
     {
         public string Name;
 
@@ -254,6 +254,8 @@ namespace Lockstep.Mugen.Char
         // CNS 变量：var(n)/fvar(n)
         public Dictionary<int, int> IntVars = new Dictionary<int, int>();
         public Dictionary<int, FFloat> FloatVars = new Dictionary<int, FFloat>();
+        public Dictionary<int, int> SysIntVars = new Dictionary<int, int>();
+        public Dictionary<int, FFloat> SysFloatVars = new Dictionary<int, FFloat>();
 
         // ───────── redirect 链接（结构性引用，非拥有；Clone 浅拷、Hash 不递归被引者）─────────
         public int Id;                       // 本角色实例 id（playerid / target 匹配用）
@@ -597,6 +599,8 @@ namespace Lockstep.Mugen.Char
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
+                SysIntVars = new Dictionary<int, int>(SysIntVars),
+                SysFloatVars = new Dictionary<int, FFloat>(SysFloatVars),
                 // redirect 链接是结构性引用：浅拷引用本身（指向旧图），由 World 在快照后统一重链到克隆图，
                 // 避免在此深拷造成无限递归。Targets 列表新建容器但元素仍为旧引用，同样待重链。
                 P2 = P2, Root = Root, Parent = Parent, Partner = Partner, StateOwner = StateOwner,
@@ -649,7 +653,12 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);
             HashFloatVars(ref hash, FloatVars);
+            HashVars(ref hash, SysIntVars);
+            HashFloatVars(ref hash, SysFloatVars);
             // redirect 链接不递归哈希（被引 Char 各自 WriteHash）；混入 target id + 自定义状态归属 id（影响跑哪张状态表）
+            hash.AddInt32(P2 != null ? P2.Id : -1);
+            hash.AddInt32(Root != null ? Root.Id : -1);
+            hash.AddInt32(Parent != null ? Parent.Id : -1);
             hash.AddInt32(StateOwner != null ? StateOwner.Id : -1);
             hash.AddInt32(Partner != null ? Partner.Id : -1);
             hash.AddInt32(Targets.Count);
@@ -854,17 +863,6 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(AnimExists(anim.ToI()));
                 }
 
-                case OpCode.OC_var:
-                {
-                    int index = Pop(stack).ToI();
-                    return BytecodeValue.Int(IntVars.TryGetValue(index, out int v) ? v : 0);
-                }
-                case OpCode.OC_fvar:
-                {
-                    int index = Pop(stack).ToI();
-                    return BytecodeValue.Float(FloatVars.TryGetValue(index, out FFloat v) ? v : FFloat.Zero);
-                }
-
                 case OpCode.OC_const_:
                 {
                     // const(field)：OC_const_ + 字段id 字节，从不可变常量集读取
@@ -941,6 +939,7 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_root: return Root;
                 case OpCode.OC_parent: return Parent;
                 case OpCode.OC_p2: return P2;
+                case OpCode.OC_stateowner: return StateOwner;
                 case OpCode.OC_enemy:
                 case OpCode.OC_enemynear:
                 {
@@ -976,6 +975,63 @@ namespace Lockstep.Mugen.Char
                 default:
                     return null;   // 其余 redirect（helper/enemy/partner/...）后续补
             }
+        }
+
+        public BytecodeValue ReadVariable(OpCode op, int index)
+        {
+            switch (op)
+            {
+                case OpCode.OC_var:
+                    return BytecodeValue.Int(IntVars.TryGetValue(index, out int intValue) ? intValue : 0);
+                case OpCode.OC_sysvar:
+                    return BytecodeValue.Int(SysIntVars.TryGetValue(index, out int sysIntValue) ? sysIntValue : 0);
+                case OpCode.OC_fvar:
+                    return BytecodeValue.Float(FloatVars.TryGetValue(index, out FFloat floatValue) ? floatValue : FFloat.Zero);
+                case OpCode.OC_sysfvar:
+                    return BytecodeValue.Float(SysFloatVars.TryGetValue(index, out FFloat sysFloatValue) ? sysFloatValue : FFloat.Zero);
+                default:
+                    return BytecodeValue.Undefined();
+            }
+        }
+
+        public IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument)
+        {
+            switch (op)
+            {
+                case OpCode.OC_target:
+                    return FindTargetRedirect(firstArgument.ToI(), secondArgument.ToI());
+                case OpCode.OC_helper:
+                    return FindHelperRedirect(firstArgument.ToI(), secondArgument.ToI());
+                default:
+                    return null;
+            }
+        }
+
+        IExprContext FindTargetRedirect(int targetId, int matchIndex)
+        {
+            if (matchIndex < 0)
+            {
+                return null;
+            }
+            int seen = 0;
+            for (int index = 0; index < Targets.Count; index++)
+            {
+                MChar target = Targets[index];
+                if (target == null)
+                {
+                    continue;
+                }
+                if (targetId >= 0 && target.Id != targetId)
+                {
+                    continue;
+                }
+                if (seen == matchIndex)
+                {
+                    return target;
+                }
+                seen++;
+            }
+            return null;
         }
 
         IExprContext FindHelperRedirect(int helperType, int matchIndex)

@@ -8,7 +8,7 @@
 
 - [ ] 编译器返回结构化诊断；未知标识符/函数、剩余 token、括号/逗号错误不得静默变 0。
 - [ ] `&&`、`||`、`cond` 实现 Ikemen 短路控制流。
-- [ ] 修复 `target(id,index)` 栈契约、独立 `sysvar/sysfvar`、补 `stateowner` redirect。
+- [x] 修复真实 `MChar` 生产路径的 `target(id,index)` 双参数 redirect、独立 `sysvar/sysfvar`、`stateowner` redirect。
 - [ ] `trigger1` 必填及 trigger 组连续性与 Ikemen 一致。
 - [ ] 删除双表达式/双命令运行管线，只保留战斗实际使用的一套。
 - [ ] 按 Ikemen `Command.Step` 重写命令状态机，覆盖 `~N` 释放、`>`、同帧完成、charge、steptime。
