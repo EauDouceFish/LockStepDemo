@@ -53,6 +53,24 @@ namespace Lockstep.Tests.Mugen.Battle
             Assert.That(firstData.Definition.Files.Sound, Is.Not.Null.And.Not.Empty);
         }
 
+        [TestCaseSource(nameof(CharacterDirectories))]
+        public void FullCharacterPackage_StartRoundKeepsStandingStateOutOfDeathAnimations(string directory)
+        {
+            MCharData data = MugenCharacterPackageTestLoader.Load(directory);
+            MBattleEngine engine = CreateEngine(data);
+
+            engine.Tick(new[] { MInput.None, MInput.None });
+
+            MChar p1 = engine.Chars[0];
+            string name = Path.GetFileName(directory);
+            Assert.That(p1.StateNo, Is.EqualTo(0), name + ": exhibition starts from stand state 0.");
+            Assert.That(p1.StateType, Is.EqualTo(1), name + ": state 0 must stay standing.");
+            Assert.That(p1.MoveType, Is.EqualTo(1), name + ": state 0 must stay idle.");
+            Assert.That(p1.Ctrl, Is.True, name + ": StartRound must grant control.");
+            Assert.That(IsDeathOrDownAnimation(p1.AnimNo), Is.False,
+                name + ": state 0 must not execute liedown/death animations on the first frame, anim=" + p1.AnimNo);
+        }
+
         static MBattleEngine CreateEngine(MCharData data)
         {
             MBattleEngine engine = new MBattleEngine();
@@ -99,6 +117,11 @@ namespace Lockstep.Tests.Mugen.Battle
             if (left) { input |= MInput.Right; }
             if (right) { input |= MInput.Left; }
             return input;
+        }
+
+        static bool IsDeathOrDownAnimation(int animNo)
+        {
+            return animNo == 5110 || animNo == 5111 || animNo == 5120 || animNo == 5150 || animNo == 5188;
         }
     }
 }

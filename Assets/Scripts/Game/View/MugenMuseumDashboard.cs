@@ -109,10 +109,10 @@ namespace Lockstep.View
 
         void OnGUI()
         {
-            GUI.Box(new Rect(10f, 10f, 260f, Screen.height - 20f), "MUGEN Character Museum");
+            GUI.Box(new Rect(10f, 10f, 260f, Screen.height - 20f), "MUGEN 角色展馆");
             if (_characterFolders.Count == 0)
             {
-                GUI.Label(new Rect(24f, 42f, 230f, 24f), "No character DEF packages found.");
+                GUI.Label(new Rect(24f, 42f, 230f, 24f), "没有找到角色 DEF 包。");
                 return;
             }
 
@@ -129,13 +129,13 @@ namespace Lockstep.View
             int visibleRows = Mathf.Min(PerPage, Mathf.Max(3, (Screen.height - 228) / 30));
             int pageCount = (_characterFolders.Count + visibleRows - 1) / visibleRows;
             GUI.Label(new Rect(24f, 42f, 220f, 24f),
-                "Page " + (_page + 1) + "/" + pageCount + "  Characters " + _characterFolders.Count);
+                "第 " + (_page + 1) + "/" + pageCount + " 页  角色 " + _characterFolders.Count);
 
-            if (GUI.Button(new Rect(24f, 70f, 82f, 28f), "Prev"))
+            if (GUI.Button(new Rect(24f, 70f, 82f, 28f), "上一页"))
             {
                 _page = (_page + pageCount - 1) % pageCount;
             }
-            if (GUI.Button(new Rect(114f, 70f, 82f, 28f), "Next"))
+            if (GUI.Button(new Rect(114f, 70f, 82f, 28f), "下一页"))
             {
                 _page = (_page + 1) % pageCount;
             }
@@ -163,15 +163,15 @@ namespace Lockstep.View
 
         void DrawInputPanel(float x, float y)
         {
-            GUI.Box(new Rect(x - 4f, y - 4f, 228f, 94f), "Input");
+            GUI.Box(new Rect(x - 4f, y - 4f, 228f, 94f), "当前输入");
             string active = "";
             if (_engine != null && _engine.Chars.Count > 0)
             {
                 active = ActiveCommandText(_engine.Chars[0]);
             }
-            GUI.Label(new Rect(x + 8f, y + 20f, 200f, 20f), "Current: " + MInputDisplayFormatter.Format(_lastInput));
-            GUI.Label(new Rect(x + 8f, y + 42f, 200f, 20f), "Active: " + (string.IsNullOrEmpty(active) ? "None" : active));
-            GUI.Label(new Rect(x + 8f, y + 64f, 200f, 20f), "Move: Arrows  Hit: A/S/D Z/X/C");
+            GUI.Label(new Rect(x + 8f, y + 20f, 200f, 20f), "输入：" + MInputDisplayFormatter.Format(_lastInput));
+            GUI.Label(new Rect(x + 8f, y + 42f, 200f, 20f), "命令：" + (string.IsNullOrEmpty(active) ? "无" : active));
+            GUI.Label(new Rect(x + 8f, y + 64f, 200f, 20f), "方向键移动，A/S/D 拳，Z/X/C 脚");
         }
 
         void DrawReport()
@@ -184,14 +184,14 @@ namespace Lockstep.View
             float y = 42f;
             DrawLine(x, ref y, "DEF", report.DefPath);
             DrawLine(x, ref y, "localcoord", report.LocalCoord);
-            DrawLine(x, ref y, "states", report.StateCount.ToString());
-            DrawLine(x, ref y, "common states", report.CommonStateCount.ToString());
-            DrawLine(x, ref y, "animations", report.AnimationCount.ToString());
-            DrawLine(x, ref y, "commands", report.CommandCount.ToString());
-            DrawLine(x, ref y, "move entries", _moveEntries.Count.ToString());
-            DrawLine(x, ref y, "command activation", report.ActivatedCommands + "/" + report.CommandCount);
-            DrawLine(x, ref y, "unknown controllers", report.UnknownControllers.ToString());
-            DrawLine(x, ref y, "parsed-only controllers", report.ParsedOnlyControllers.ToString());
+            DrawLine(x, ref y, "状态数", report.StateCount.ToString());
+            DrawLine(x, ref y, "公共状态", report.CommonStateCount.ToString());
+            DrawLine(x, ref y, "动画数", report.AnimationCount.ToString());
+            DrawLine(x, ref y, "命令数", report.CommandCount.ToString());
+            DrawLine(x, ref y, "招式入口", _moveEntries.Count.ToString());
+            DrawLine(x, ref y, "命令激活", report.ActivatedCommands + "/" + report.CommandCount);
+            DrawLine(x, ref y, "未知控制器", report.UnknownControllers.ToString());
+            DrawLine(x, ref y, "仅解析控制器", report.ParsedOnlyControllers.ToString());
             DrawLine(x, ref y, "native hash", report.NativeHash);
             DrawLine(x, ref y, "status", report.Status);
             if (_engine != null)
@@ -199,27 +199,27 @@ namespace Lockstep.View
                 y += 8f;
                 MChar p1 = _engine.Chars[0];
                 MChar p2 = _engine.Chars[1];
-                DrawLine(x, ref y, "live frame", _frame.ToString());
+                DrawLine(x, ref y, "帧", _frame.ToString());
                 DrawLine(x, ref y, "P1", "state " + p1.StateNo + " anim " + p1.AnimNo +
                     " life " + p1.Life + " ctrl " + p1.Ctrl);
                 DrawLine(x, ref y, "P2", "state " + p2.StateNo + " anim " + p2.AnimNo +
                     " life " + p2.Life + " movetype " + p2.MoveType);
-                DrawLine(x, ref y, "input bits", _lastInput.ToString());
-                DrawLine(x, ref y, "active cmd", ActiveCommandText(p1));
-                DrawLine(x, ref y, "controls", "Arrows move, A/S/D punches, Z/X/C kicks");
-                if (GUI.Button(new Rect(x + 18f, y + 8f, 120f, 30f), "Reset Fight"))
+                DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
+                DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
+                DrawLine(x, ref y, "按键说明", MCommandMoveHelpFormatter.KeyboardLegend());
+                if (GUI.Button(new Rect(x + 18f, y + 8f, 90f, 30f), "重置"))
                 {
                     LoadSession(folder);
                 }
-                if (GUI.Button(new Rect(x + 148f, y + 8f, 120f, 30f), "Light Punch"))
+                if (GUI.Button(new Rect(x + 116f, y + 8f, 90f, 30f), "轻拳 x"))
                 {
                     StepManualInput(MInput.X, 8);
                 }
-                if (GUI.Button(new Rect(x + 278f, y + 8f, 120f, 30f), "Light Kick"))
+                if (GUI.Button(new Rect(x + 214f, y + 8f, 90f, 30f), "轻脚 a"))
                 {
                     StepManualInput(MInput.A, 8);
                 }
-                if (GUI.Button(new Rect(x + 348f, y + 8f, 118f, 30f), _showMoveHelp ? "Hide Help" : "Move Help"))
+                if (GUI.Button(new Rect(x + 312f, y + 8f, 110f, 30f), _showMoveHelp ? "关闭说明" : "招式说明"))
                 {
                     _showMoveHelp = !_showMoveHelp;
                     _moveHelpPage = 0;
@@ -511,18 +511,18 @@ namespace Lockstep.View
         {
             if (_moveEntries.Count == 0 || _data == null)
             {
-                DrawLine(x, ref y, "moves", "No Statedef -1 command transitions");
+                DrawLine(x, ref y, "招式", "没有 Statedef -1 命令入口");
                 return;
             }
 
             int perPage = 6;
             int pageCount = (_moveEntries.Count + perPage - 1) / perPage;
-            GUI.Label(new Rect(x + 18f, y, 180f, 24f), "Moves " + (_movePage + 1) + "/" + pageCount);
-            if (GUI.Button(new Rect(x + 200f, y, 66f, 24f), "Prev"))
+            GUI.Label(new Rect(x + 18f, y, 180f, 24f), "招式 " + (_movePage + 1) + "/" + pageCount);
+            if (GUI.Button(new Rect(x + 200f, y, 66f, 24f), "上页"))
             {
                 _movePage = (_movePage + pageCount - 1) % pageCount;
             }
-            if (GUI.Button(new Rect(x + 272f, y, 66f, 24f), "Next"))
+            if (GUI.Button(new Rect(x + 272f, y, 66f, 24f), "下页"))
             {
                 _movePage = (_movePage + 1) % pageCount;
             }
@@ -657,7 +657,7 @@ namespace Lockstep.View
                 MCommandMoveInfo move = _moveCatalog[index];
                 string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
                 GUI.Label(new Rect(x + 22f, rowY, Screen.width - x - 48f, 22f),
-                    move.CommandText + "    " + move.MotionText + "    -> state " + target);
+                    MCommandMoveHelpFormatter.FormatMove(move));
                 rowY += 24f;
             }
             y += perPage * 24f + 66f;
@@ -676,30 +676,36 @@ namespace Lockstep.View
 
             Rect box = new Rect(x, y, w, h);
             Color oldColor = GUI.color;
-            GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.96f);
+            GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.92f);
             GUI.DrawTexture(box, Texture2D.whiteTexture);
             GUI.color = oldColor;
-            GUI.Box(box, "All Move Commands");
+            GUI.Box(box, "全部招式说明");
+            if (GUI.Button(new Rect(x + w - 78f, y + 8f, 64f, 24f), "关闭"))
+            {
+                _showMoveHelp = false;
+                return;
+            }
             if (_moveCatalog.Count == 0)
             {
-                GUI.Label(new Rect(x + 18f, y + 34f, w - 36f, 24f), "No executable move help.");
+                GUI.Label(new Rect(x + 18f, y + 34f, w - 36f, 24f), "没有可执行招式说明。");
                 return;
             }
 
-            int perPage = Mathf.Max(5, Mathf.FloorToInt((h - 92f) / 24f));
+            int perPage = Mathf.Max(5, Mathf.FloorToInt((h - 122f) / 24f));
             int pageCount = (_moveCatalog.Count + perPage - 1) / perPage;
-            GUI.Label(new Rect(x + 18f, y + 34f, 260f, 24f),
-                "Move Help " + (_moveHelpPage + 1) + "/" + pageCount + "  Total " + _moveCatalog.Count);
-            if (GUI.Button(new Rect(x + w - 150f, y + 32f, 64f, 24f), "Prev"))
+            GUI.Label(new Rect(x + 18f, y + 34f, w - 36f, 24f),
+                "第 " + (_moveHelpPage + 1) + "/" + pageCount + " 页，共 " + _moveCatalog.Count + " 条");
+            GUI.Label(new Rect(x + 18f, y + 58f, w - 36f, 24f), MCommandMoveHelpFormatter.KeyboardLegend());
+            if (GUI.Button(new Rect(x + w - 150f, y + 32f, 64f, 24f), "上页"))
             {
                 _moveHelpPage = (_moveHelpPage + pageCount - 1) % pageCount;
             }
-            if (GUI.Button(new Rect(x + w - 78f, y + 32f, 64f, 24f), "Next"))
+            if (GUI.Button(new Rect(x + w - 78f, y + 32f, 64f, 24f), "下页"))
             {
                 _moveHelpPage = (_moveHelpPage + 1) % pageCount;
             }
 
-            float rowY = y + 66f;
+            float rowY = y + 90f;
             int start = _moveHelpPage * perPage;
             for (int i = 0; i < perPage; i++)
             {
@@ -709,9 +715,8 @@ namespace Lockstep.View
                     break;
                 }
                 MCommandMoveInfo move = _moveCatalog[index];
-                string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
                 GUI.Label(new Rect(x + 18f, rowY, w - 36f, 22f),
-                    move.CommandText + "    " + move.MotionText + "    -> state " + target);
+                    MCommandMoveHelpFormatter.FormatMove(move));
                 rowY += 24f;
             }
         }

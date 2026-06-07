@@ -26,6 +26,31 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void ParsesStatedefHeader_FirstNumberBeforeComma()
+        {
+            string cns =
+                "[Statedef 0]\ntype = S\n" +
+                "[State 0, stand]\ntype = ChangeAnim\ntrigger1 = 1\nvalue = 0\n" +
+                "[Statedef 5150, 0]\ntype = L\n" +
+                "[State 5150, dead]\ntype = ChangeAnim\ntrigger1 = !time\nvalue = 5150\n";
+
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+
+            Assert.That(states.ContainsKey(0), Is.True);
+            Assert.That(states.ContainsKey(5150), Is.True, "MUGEN allows labels after a comma; state number is the first integer.");
+            Assert.That(states[0].Controllers.Count, Is.EqualTo(1), "state 5150 controllers must not be merged into state 0.");
+            Assert.That(states[5150].Controllers.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ParsesNegativeStatedefHeader()
+        {
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse("[Statedef -1]\n[State -1, cmd]\ntype = Null\ntrigger1 = 1\n");
+
+            Assert.That(states.ContainsKey(-1), Is.True);
+        }
+
+        [Test]
         public void StatedefHeader_EvaluatesAnimExpression()
         {
             // 关键回归：anim=40+var(11) 这类表达式必须在进入状态时按角色上下文求值（jump/land 状态用）。

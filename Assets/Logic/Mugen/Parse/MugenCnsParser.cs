@@ -55,7 +55,7 @@ namespace Lockstep.Mugen.Parse
 
                     if (headerLower.StartsWith("statedef"))
                     {
-                        current = new MStateDef { No = ParseTrailingInt(header) };
+                        current = new MStateDef { No = ParseStateHeaderNo(header) };
                         states[current.No] = current;
                         mode = Mode.Statedef;
                     }
@@ -1022,15 +1022,44 @@ namespace Lockstep.Mugen.Parse
             return 0;
         }
 
-        static int ParseTrailingInt(string header)
+        static int ParseStateHeaderNo(string header)
         {
-            int i = header.Length - 1;
-            while (i >= 0 && (char.IsDigit(header[i]) || header[i] == '-'))
+            if (string.IsNullOrEmpty(header))
             {
-                i--;
+                return 0;
             }
-            string tail = header.Substring(i + 1).Trim();
-            return int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out int r) ? r : 0;
+
+            int i = 0;
+            while (i < header.Length && !char.IsWhiteSpace(header[i]))
+            {
+                i++;
+            }
+
+            while (i < header.Length)
+            {
+                while (i < header.Length && header[i] != '-' && !char.IsDigit(header[i]))
+                {
+                    i++;
+                }
+                int start = i;
+                if (i < header.Length && header[i] == '-')
+                {
+                    i++;
+                }
+                int digits = i;
+                while (i < header.Length && char.IsDigit(header[i]))
+                {
+                    i++;
+                }
+                if (i > digits &&
+                    int.TryParse(header.Substring(start, i - start), NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out int r))
+                {
+                    return r;
+                }
+            }
+
+            return 0;
         }
 
         static string StripComment(string line)

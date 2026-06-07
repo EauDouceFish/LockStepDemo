@@ -50,6 +50,24 @@ namespace Lockstep.Tests.Mugen
             MCommandMoveInfo qcf = Find(catalog, "QCF_x", 1000);
             Assert.That(qcf, Is.Not.Null);
             Assert.That(qcf.MotionText, Is.EqualTo("~D, DF, F, x"));
+            Assert.That(MCommandMoveHelpFormatter.FormatMove(qcf),
+                Is.EqualTo("招式 QCF_x：搓法 松开下 -> 下前 -> 前 -> 轻拳x(A键)，进入状态 1000"));
+        }
+
+        [Test]
+        public void HelpFormatter_ExplainsKeyboardButtonsForBeginners()
+        {
+            Assert.That(MCommandMoveHelpFormatter.KeyboardLegend(),
+                Does.Contain("A/S/D=轻拳x/重拳y/三拳z"));
+            Assert.That(MCommandMoveHelpFormatter.KeyboardLegend(),
+                Does.Contain("Z/X/C=轻脚a/重脚b/三脚c"));
+        }
+
+        [Test]
+        public void HelpFormatter_ExplainsChargeHoldAndSimultaneousButtons()
+        {
+            Assert.That(MCommandMoveHelpFormatter.FormatMotion("~30$B, F, x+y"),
+                Is.EqualTo("松开按住任意后方向30帧 -> 前 -> 轻拳x(A键)+重拳y(S键)"));
         }
 
         static MCommandMoveInfo Find(List<MCommandMoveInfo> catalog, string commandName, int targetState)
