@@ -76,6 +76,7 @@
 
 - [x] 建立全角色 `[Command]` 定义激活矩阵：逐角色逐 command 生成输入序列并验证 command active；`time=1` AI 伪随机长命令显式分类为不可人工激活项。
 - [x] 从 `[Command]` 与 `Statedef -1` 建立 command-to-transition 图，不把 command 名直接等同招式；missing-command/missing-state 进入矩阵诊断。
+- [x] 建立字面量目标 state 的 fresh-session 执行探针矩阵，支持同一 trigger 组多 command 合成输入；当前作为覆盖率/缺口诊断，不作为完整通过断言。
 - [ ] 为每条可达招式生成输入序列和前置条件：站立、蹲、空中、能量、距离、受击/防御。
 - [ ] 每个招式从全新 session 或可靠 snapshot 起跑。
 - [ ] 验收：command active、目标 state 可达、动画 owner 正确、退出路径正常、无 unsupported diagnostic。

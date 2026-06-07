@@ -54,10 +54,14 @@ namespace Lockstep.Tests.Mugen
             for (int i = 0; i < transitions.Count; i++)
             {
                 CommandTransitionEntry entry = transitions[i];
-                referencedCommands.Add(entry.CommandName);
-                if (!definedCommands.Contains(entry.CommandName))
+                for (int nameIndex = 0; nameIndex < entry.CommandNames.Count; nameIndex++)
                 {
-                    missingCommands.Add(entry.Describe() + " references undefined command");
+                    string commandName = entry.CommandNames[nameIndex];
+                    referencedCommands.Add(commandName);
+                    if (!definedCommands.Contains(commandName))
+                    {
+                        missingCommands.Add(entry.Describe() + " references undefined command " + commandName);
+                    }
                 }
                 if (entry.TargetStateNo.HasValue && entry.TargetStateNo.Value >= 0 &&
                     !data.States.ContainsKey(entry.TargetStateNo.Value) &&
@@ -112,16 +116,17 @@ namespace Lockstep.Tests.Mugen
 
     internal sealed class CommandTransitionEntry
     {
-        public string CommandName;
+        public List<string> CommandNames = new List<string>();
         public string ControllerType;
         public int ControllerOrdinal;
+        public int TriggerGroup;
         public string TargetValue;
         public int? TargetStateNo;
 
         public string Describe()
         {
-            return "#" + ControllerOrdinal + " " + ControllerType + " command=\"" + CommandName +
-                "\" value=" + TargetValue;
+            return "#" + ControllerOrdinal + "/trigger" + TriggerGroup + " " + ControllerType +
+                " commands=\"" + string.Join("+", CommandNames) + "\" value=" + TargetValue;
         }
     }
 
@@ -134,7 +139,8 @@ namespace Lockstep.Tests.Mugen
             bool inController = false;
             string controllerType = null;
             string targetValue = null;
-            List<string> triggers = new List<string>();
+            List<string> triggerAll = new List<string>();
+            SortedDictionary<int, List<string>> triggerGroups = new SortedDictionary<int, List<string>>();
             int controllerOrdinal = 0;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -147,7 +153,7 @@ namespace Lockstep.Tests.Mugen
                 }
                 if (line[0] == '[')
                 {
-                    Flush(result, controllerType, targetValue, triggers, controllerOrdinal);
+                    Flush(result, controllerType, targetValue, triggerAll, triggerGroups, controllerOrdinal);
                     if (inController)
                     {
                         controllerOrdinal++;
@@ -155,7 +161,8 @@ namespace Lockstep.Tests.Mugen
                     inController = false;
                     controllerType = null;
                     targetValue = null;
-                    triggers.Clear();
+                    triggerAll.Clear();
+                    triggerGroups.Clear();
 
                     string header = Header(line);
                     string lower = header.ToLowerInvariant();
@@ -191,35 +198,84 @@ namespace Lockstep.Tests.Mugen
                 }
                 else if (key.StartsWith("trigger"))
                 {
-                    triggers.Add(value);
+                    if (key == "triggerall")
+                    {
+                        triggerAll.Add(value);
+                    }
+                    else if (int.TryParse(key.Substring(7), NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out int groupNo))
+                    {
+                        if (!triggerGroups.TryGetValue(groupNo, out List<string> group))
+                        {
+                            group = new List<string>();
+                            triggerGroups[groupNo] = group;
+                        }
+                        group.Add(value);
+                    }
                 }
             }
 
-            Flush(result, controllerType, targetValue, triggers, controllerOrdinal);
+            Flush(result, controllerType, targetValue, triggerAll, triggerGroups, controllerOrdinal);
             return result;
         }
 
         static void Flush(List<CommandTransitionEntry> result, string controllerType, string targetValue,
-            List<string> triggers, int controllerOrdinal)
+            List<string> triggerAll, SortedDictionary<int, List<string>> triggerGroups, int controllerOrdinal)
         {
             if (controllerType != "changestate" && controllerType != "selfstate")
             {
                 return;
             }
 
-            for (int i = 0; i < triggers.Count; i++)
+            if (triggerGroups.Count == 0)
             {
-                List<string> names = AllCharactersCommandTransitionMatrixTests.ExtractCommandNames(triggers[i]);
+                AddEntry(result, controllerType, targetValue, triggerAll, null, 0, controllerOrdinal);
+                return;
+            }
+
+            foreach (KeyValuePair<int, List<string>> group in triggerGroups)
+            {
+                AddEntry(result, controllerType, targetValue, triggerAll, group.Value, group.Key, controllerOrdinal);
+            }
+        }
+
+        static void AddEntry(List<CommandTransitionEntry> result, string controllerType, string targetValue,
+            List<string> triggerAll, List<string> triggerGroup, int groupNo, int controllerOrdinal)
+        {
+            List<string> names = new List<string>();
+            AppendCommandNames(names, triggerAll);
+            AppendCommandNames(names, triggerGroup);
+            if (names.Count == 0)
+            {
+                return;
+            }
+
+            result.Add(new CommandTransitionEntry
+            {
+                CommandNames = names,
+                ControllerType = controllerType,
+                ControllerOrdinal = controllerOrdinal,
+                TriggerGroup = groupNo,
+                TargetValue = targetValue ?? string.Empty,
+                TargetStateNo = ParseLiteralInt(targetValue),
+            });
+        }
+
+        static void AppendCommandNames(List<string> result, List<string> expressions)
+        {
+            if (expressions == null)
+            {
+                return;
+            }
+            for (int i = 0; i < expressions.Count; i++)
+            {
+                List<string> names = AllCharactersCommandTransitionMatrixTests.ExtractCommandNames(expressions[i]);
                 for (int n = 0; n < names.Count; n++)
                 {
-                    result.Add(new CommandTransitionEntry
+                    if (!result.Contains(names[n]))
                     {
-                        CommandName = names[n],
-                        ControllerType = controllerType,
-                        ControllerOrdinal = controllerOrdinal,
-                        TargetValue = targetValue ?? string.Empty,
-                        TargetStateNo = ParseLiteralInt(targetValue),
-                    });
+                        result.Add(names[n]);
+                    }
                 }
             }
         }
