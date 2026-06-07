@@ -23,8 +23,10 @@ namespace Lockstep.View
         public float PixelsPerUnit = 50f;
         public float TicksPerSecond = 60f;
         public float StartSeparation = 58f;
+        public bool GrantDebugPower = true;
 
         readonly List<string> _characterFolders = new List<string>();
+        readonly List<MCommandTransitionEntry> _moveEntries = new List<MCommandTransitionEntry>();
         readonly Dictionary<string, MugenMuseumReport> _reports = new Dictionary<string, MugenMuseumReport>();
         readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
         readonly HashSet<int> _builtAnims = new HashSet<int>();
@@ -32,6 +34,7 @@ namespace Lockstep.View
         readonly List<MInput> _inputs = new List<MInput> { MInput.None, MInput.None };
         int _page;
         int _selected;
+        int _movePage;
         MBattleEngine _engine;
         MCharData _data;
         MugenSpriteLoader.Source _source;
@@ -160,6 +163,7 @@ namespace Lockstep.View
             DrawLine(x, ref y, "common states", report.CommonStateCount.ToString());
             DrawLine(x, ref y, "animations", report.AnimationCount.ToString());
             DrawLine(x, ref y, "commands", report.CommandCount.ToString());
+            DrawLine(x, ref y, "move entries", _moveEntries.Count.ToString());
             DrawLine(x, ref y, "command activation", report.ActivatedCommands + "/" + report.CommandCount);
             DrawLine(x, ref y, "unknown controllers", report.UnknownControllers.ToString());
             DrawLine(x, ref y, "parsed-only controllers", report.ParsedOnlyControllers.ToString());
@@ -190,6 +194,8 @@ namespace Lockstep.View
                 {
                     StepManualInput(MInput.A, 8);
                 }
+                y += 48f;
+                DrawMoveEntryControls(x, ref y);
             }
         }
 
@@ -256,6 +262,11 @@ namespace Lockstep.View
                 p1.Facing = FFloat.One;
                 p2.Pos = new FVector3(FFloat.FromInt(half), FFloat.Zero, FFloat.Zero);
                 p2.Facing = -FFloat.One;
+                if (GrantDebugPower)
+                {
+                    p1.Power = p1.PowerMax;
+                    p2.Power = p2.PowerMax;
+                }
                 _engine.Add(p1, _data);
                 _engine.Add(p2, _data);
                 _engine.LinkPair();
@@ -273,6 +284,8 @@ namespace Lockstep.View
                 _accumulator = 0f;
                 _lastInput = MInput.None;
                 _loadedFolder = folder;
+                _movePage = 0;
+                LoadMoveEntries(folder, definition);
                 RenderAll();
                 Debug.Log("[MUGEN Museum] Loaded playable session: " + Path.GetFileName(folder));
             }
@@ -447,6 +460,147 @@ namespace Lockstep.View
                 _frame++;
             }
             RenderAll();
+        }
+
+        void DrawMoveEntryControls(float x, ref float y)
+        {
+            if (_moveEntries.Count == 0 || _data == null)
+            {
+                DrawLine(x, ref y, "moves", "No Statedef -1 command transitions");
+                return;
+            }
+
+            int perPage = 6;
+            int pageCount = (_moveEntries.Count + perPage - 1) / perPage;
+            GUI.Label(new Rect(x + 18f, y, 180f, 24f), "Moves " + (_movePage + 1) + "/" + pageCount);
+            if (GUI.Button(new Rect(x + 200f, y, 66f, 24f), "Prev"))
+            {
+                _movePage = (_movePage + pageCount - 1) % pageCount;
+            }
+            if (GUI.Button(new Rect(x + 272f, y, 66f, 24f), "Next"))
+            {
+                _movePage = (_movePage + 1) % pageCount;
+            }
+            y += 30f;
+
+            int start = _movePage * perPage;
+            for (int i = 0; i < perPage; i++)
+            {
+                int index = start + i;
+                if (index >= _moveEntries.Count)
+                {
+                    break;
+                }
+
+                MCommandTransitionEntry entry = _moveEntries[index];
+                string target = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value.ToString() : entry.TargetValue;
+                string label = string.Join("+", entry.CommandNames.ToArray()) + " -> " + target;
+                if (GUI.Button(new Rect(x + 18f, y, 360f, 26f), label))
+                {
+                    StepMoveEntry(entry);
+                }
+                y += 30f;
+            }
+        }
+
+        void StepMoveEntry(MCommandTransitionEntry entry)
+        {
+            if (_engine == null || _data == null || entry == null)
+            {
+                return;
+            }
+
+            List<MCommandDef> commands = FirstDefinitions(entry.CommandNames);
+            if (commands.Count != entry.CommandNames.Count)
+            {
+                Debug.LogWarning("[MUGEN Museum] Missing command definitions for " + entry.Describe());
+                return;
+            }
+
+            bool facingRight = _engine.Chars[0].Facing.Raw >= 0;
+            List<MInput> sequence = MCommandInputSynthesizer.BuildCombinedSequence(commands, facingRight);
+            for (int i = 0; i < sequence.Count; i++)
+            {
+                _lastInput = sequence[i];
+                _engine.Tick(new[] { sequence[i], MInput.None });
+                _frame++;
+            }
+            for (int i = 0; i < 12; i++)
+            {
+                _lastInput = MInput.None;
+                _engine.Tick(new[] { MInput.None, MInput.None });
+                _frame++;
+            }
+            RenderAll();
+        }
+
+        List<MCommandDef> FirstDefinitions(List<string> names)
+        {
+            List<MCommandDef> result = new List<MCommandDef>();
+            for (int nameIndex = 0; nameIndex < names.Count; nameIndex++)
+            {
+                string name = names[nameIndex];
+                for (int i = 0; i < _data.Commands.Count; i++)
+                {
+                    if (_data.Commands[i].Name == name)
+                    {
+                        result.Add(_data.Commands[i]);
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        void LoadMoveEntries(string folder, MCharacterDefinition definition)
+        {
+            _moveEntries.Clear();
+            string cmd = ReadOptional(folder, definition.Files.Cmd);
+            if (cmd == null)
+            {
+                return;
+            }
+
+            List<MCommandTransitionEntry> parsed = MCommandTransitionCatalog.Parse(cmd);
+            for (int i = 0; i < parsed.Count; i++)
+            {
+                if (IsExecutableMoveEntry(parsed[i]))
+                {
+                    _moveEntries.Add(parsed[i]);
+                }
+            }
+        }
+
+        bool IsExecutableMoveEntry(MCommandTransitionEntry entry)
+        {
+            if (entry.CommandNames.Count == 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < entry.CommandNames.Count; i++)
+            {
+                if (FirstDefinition(entry.CommandNames[i]) == null)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        MCommandDef FirstDefinition(string name)
+        {
+            if (_data == null)
+            {
+                return null;
+            }
+            for (int i = 0; i < _data.Commands.Count; i++)
+            {
+                if (_data.Commands[i].Name == name)
+                {
+                    return _data.Commands[i];
+                }
+            }
+            return null;
         }
 
         static string ActiveCommandText(MChar character)
