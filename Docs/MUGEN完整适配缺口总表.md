@@ -77,15 +77,15 @@
 - [x] 建立全角色 `[Command]` 定义激活矩阵：逐角色逐 command 生成输入序列并验证 command active；`time=1` AI 伪随机长命令显式分类为不可人工激活项。
 - [x] 从 `[Command]` 与 `Statedef -1` 建立 command-to-transition 图，不把 command 名直接等同招式；missing-command/missing-state 进入矩阵诊断。
 - [x] 建立字面量目标 state 的 fresh-session 执行探针矩阵，支持同一 trigger 组多 command 合成输入；当前作为覆盖率/缺口诊断，不作为完整通过断言。
-- [ ] 为每条可达招式生成输入序列和前置条件：站立、蹲、空中、能量、距离、受击/防御。
-- [ ] 每个招式从全新 session 或可靠 snapshot 起跑。
+- [ ] 为每条可达招式生成输入序列和前置条件：站立、蹲、空中、能量、距离、受击/防御。（2026-06-07：已抽出 `MCommandInputSynthesizer` 与 `MMoveTestRunner` 默认前置条件集，覆盖 standing/crouching/airborne/距离/满能量/guard-target；受击/防御细分与条件推断仍未完成。）
+- [x] 每个招式从全新 session 或可靠 snapshot 起跑。（2026-06-07：`MMoveTestRunner` 在 warmup+profile 后 `MBattleEngine.Snapshot()`，同一输入恢复重跑并比较 hash。）
 - [ ] 验收：command active、目标 state 可达、动画 owner 正确、退出路径正常、无 unsupported diagnostic。
-- [ ] 同一场景在 Ikemen 与 C# 输出 trace 并收口。
+- [ ] 同一场景在 Ikemen 与 C# 输出 trace 并收口。（2026-06-07：Ikemen 参考仓库存在，但本机缺 Go 工具链；新增 C# trace replay 自比较与 Oracle readiness 测试，真 Ikemen JSONL 仍阻塞。）
 
 ## Unity 展馆验收
 
-- [ ] 一个数据驱动场景，每角色一页，不复制角色专用场景。
-- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。
+- [x] 一个数据驱动场景，每角色一页，不复制角色专用场景。（2026-06-07：新增 `Assets/Scenes/MugenCharacterMuseum.unity` + `MugenMuseumDashboard`，运行时扫描 12 个合法 DEF 角色并分页选择。）
+- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。（2026-06-07：最小面板已显示 DEF/localcoord/状态/动画/命令激活/兼容统计/native hash；命令图、招式结果和 trace 差异仍待接 UI。）
 - [ ] 自动模式使用固定逻辑 tick；交互模式独立。
 - [ ] 角色与木桩、全部实体、碰撞框和当前 state/anim/owner 可视化。
 - [ ] 12 个现有角色全部招式执行完毕；新增任意 DEF 可自动出现新页面并运行同一验证流程。

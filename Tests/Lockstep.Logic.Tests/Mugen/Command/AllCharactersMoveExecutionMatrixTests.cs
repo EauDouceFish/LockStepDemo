@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Lockstep.Math;
 using Lockstep.Mugen.Battle;
-using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using NUnit.Framework;
 
@@ -48,13 +46,15 @@ namespace Lockstep.Tests.Mugen
                 }
 
                 probed++;
-                if (CanReach(data, commandsByName, entry))
+                MMoveTestResult result = Probe(data, commandsByName, entry);
+                if (result.Status == MMoveTestStatus.Passed)
                 {
                     reached++;
                 }
                 else if (misses.Count < 40)
                 {
-                    misses.Add(entry.Describe());
+                    misses.Add(entry.Describe() + " status=" + result.Status +
+                        " profile=" + result.ProfileName + " final=" + result.FinalStateNo);
                 }
             }
 
@@ -111,41 +111,20 @@ namespace Lockstep.Tests.Mugen
             return result;
         }
 
-        static bool CanReach(MCharData data, Dictionary<string, List<MCommandDef>> commandsByName,
+        static MMoveTestResult Probe(MCharData data, Dictionary<string, List<MCommandDef>> commandsByName,
             CommandTransitionEntry entry)
         {
             List<MCommandDef> commandDefinitions = SelectFirstDefinitions(commandsByName, entry.CommandNames);
             if (commandDefinitions.Count == 0)
             {
-                return false;
+                return new MMoveTestResult
+                {
+                    Status = MMoveTestStatus.UnreachablePrerequisite,
+                    TargetStateNo = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value : -1,
+                };
             }
 
-            MBattleEngine engine = CreateEngine(data);
-            MChar actor = engine.Chars[0];
-            actor.Power = actor.PowerMax;
-            List<MInput> sequence = BuildCombinedSequence(commandDefinitions);
-
-            for (int warmup = 0; warmup < 5; warmup++)
-            {
-                engine.Tick(new[] { MInput.None, MInput.None });
-            }
-            for (int frame = 0; frame < sequence.Count; frame++)
-            {
-                engine.Tick(new[] { sequence[frame], MInput.None });
-                if (actor.StateNo == entry.TargetStateNo.Value)
-                {
-                    return true;
-                }
-            }
-            for (int tail = 0; tail < 45; tail++)
-            {
-                engine.Tick(new[] { MInput.None, MInput.None });
-                if (actor.StateNo == entry.TargetStateNo.Value)
-                {
-                    return true;
-                }
-            }
-            return false;
+            return MMoveTestRunner.Run(data, commandDefinitions, entry.TargetStateNo.Value);
         }
 
         static List<MCommandDef> SelectFirstDefinitions(Dictionary<string, List<MCommandDef>> commandsByName,
@@ -163,67 +142,5 @@ namespace Lockstep.Tests.Mugen
             return result;
         }
 
-        static List<MInput> BuildCombinedSequence(List<MCommandDef> commands)
-        {
-            List<List<MInput>> prefixes = new List<List<MInput>>();
-            int max = 0;
-            for (int i = 0; i < commands.Count; i++)
-            {
-                List<MInput> prefix = ActivationPrefix(commands[i]);
-                prefixes.Add(prefix);
-                if (prefix.Count > max)
-                {
-                    max = prefix.Count;
-                }
-            }
-
-            List<MInput> combined = new List<MInput>();
-            for (int frame = 0; frame < max; frame++)
-            {
-                MInput input = MInput.None;
-                for (int p = 0; p < prefixes.Count; p++)
-                {
-                    int offset = max - prefixes[p].Count;
-                    int local = frame - offset;
-                    if (local >= 0 && local < prefixes[p].Count)
-                    {
-                        input |= prefixes[p][local];
-                    }
-                }
-                combined.Add(input);
-            }
-            return combined;
-        }
-
-        static List<MInput> ActivationPrefix(MCommandDef command)
-        {
-            List<MInput> sequence = CommandInputMatrix.BuildSequence(command, facingRight: true);
-            MCommandList list = new MCommandList();
-            list.Commands.Add(command);
-            for (int i = 0; i < sequence.Count; i++)
-            {
-                list.Update(sequence[i], facingRight: true);
-                if (list.IsActive(command.Name))
-                {
-                    return sequence.GetRange(0, i + 1);
-                }
-            }
-            return sequence;
-        }
-
-        static MBattleEngine CreateEngine(MCharData data)
-        {
-            MBattleEngine engine = new MBattleEngine();
-            MChar left = MCharLoader.SpawnChar(data, 1);
-            MChar right = MCharLoader.SpawnChar(data, 2);
-            left.Pos = new FVector3(FFloat.FromInt(-30), FFloat.Zero, FFloat.Zero);
-            right.Pos = new FVector3(FFloat.FromInt(30), FFloat.Zero, FFloat.Zero);
-            right.Facing = -FFloat.One;
-            engine.Add(left, data);
-            engine.Add(right, data);
-            engine.LinkPair();
-            engine.StartRound();
-            return engine;
-        }
     }
 }
