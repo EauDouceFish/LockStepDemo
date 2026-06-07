@@ -19,7 +19,8 @@
 
 - [ ] 建立稳定 `PlayerResourceRegistry`；运行实体保存 state/anim/sprite owner ID。
 - [ ] 删除通过永久替换 `MChar.AnimTable` 实现 `ChangeAnim2` 的方案。
-- [ ] `ChangeAnim`、`ChangeAnim2`、`animexist`、`selfanimexist`、custom state 按 owner 解析。
+- [x] 注册资源路径下，`ChangeAnim`、`ChangeAnim2`、`animexist`、`selfanimexist`、custom state 按 owner 解析；`animexist` 查当前动画 owner，`selfanimexist` 查自身 owner。
+- [ ] 删除 standalone legacy 分支中通过永久替换 `MChar.AnimTable` 实现 `ChangeAnim2` 的兼容路径。
 - [ ] Transition 改为原子值对象，一次性切 owner/state/anim/ctrl 并执行 state init。
 - [ ] SelfState 同帧回自身状态表，不继续使用旧外国 state dictionary。
 - [ ] persistent、ignorehitpause、continue、state re-entry/reset 逐项对齐。

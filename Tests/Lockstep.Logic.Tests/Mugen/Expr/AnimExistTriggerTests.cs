@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.Anim;
@@ -77,6 +78,33 @@ namespace Lockstep.Tests.Mugen
             MChar lacks = new MChar { AnimTable = AnimTableWith(40, 41) };
             Assert.IsTrue(Eval("selfanimexist(44)", has).ToB());
             Assert.IsFalse(Eval("selfanimexist(44)", lacks).ToB(), "缺 44 时守卫拦截（KFM 浮空 bug 的正解）");
+        }
+
+        [Test]
+        public void AnimExistAndSelfAnimExist_SplitAfterChangeAnim2Owner()
+        {
+            MCharData ownerData = new MCharData();
+            ownerData.Anims[900] = new MAnimData { No = 900, Frames = new[] { new MAnimFrame { Time = 1 } } };
+            MCharData selfData = new MCharData();
+            selfData.Anims[0] = new MAnimData { No = 0, Frames = new[] { new MAnimFrame { Time = 1 } } };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int selfPlayerNo = resources.Register(selfData);
+            MChar character = new MChar
+            {
+                Resources = resources,
+                OwnData = selfData,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+                AnimPlayerNo = ownerPlayerNo,
+                SpritePlayerNo = selfPlayerNo,
+            };
+
+            Assert.IsTrue(Eval("animexist(900)", character).ToB(), "animexist 查当前动画 owner");
+            Assert.IsFalse(Eval("selfanimexist(900)", character).ToB(), "selfanimexist 查自身 owner");
+            Assert.IsTrue(Eval("selfanimexist(0)", character).ToB(), "自身动画表仍可见");
+            Assert.IsFalse(Eval("animexist(0)", character).ToB(), "当前动画 owner 不含自身动画时 animexist 为 false");
         }
     }
 }

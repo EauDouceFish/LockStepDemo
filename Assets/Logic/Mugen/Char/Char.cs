@@ -350,10 +350,22 @@ namespace Lockstep.Mugen.Char
             }
         }
 
-        /// <summary>动画表中是否存在该动画号（无表则 false；animexist/selfanimexist trigger 用）。</summary>
+        /// <summary>当前动画 owner 的动画表中是否存在该动画号（animexist trigger）。</summary>
         public bool AnimExists(int animNo)
         {
-            IReadOnlyDictionary<int, Anim.MAnimData> table = CurrentAnimTable();
+            int playerNo = AnimPlayerNo >= 0 ? AnimPlayerNo : PlayerNo;
+            return AnimExistsFor(playerNo, animNo);
+        }
+
+        /// <summary>自身资源 owner 的动画表中是否存在该动画号（selfanimexist trigger）。</summary>
+        public bool SelfAnimExists(int animNo)
+        {
+            return AnimExistsFor(PlayerNo, animNo);
+        }
+
+        public bool AnimExistsFor(int playerNo, int animNo)
+        {
+            IReadOnlyDictionary<int, Anim.MAnimData> table = AnimationsFor(playerNo);
             return table != null && table.ContainsKey(animNo);
         }
 
@@ -848,19 +860,25 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_canrecover: return BytecodeValue.Bool(CanRecover());
 
                 case OpCode.OC_animexist:
-                case OpCode.OC_selfanimexist:
                 {
                     // animexist(n)/selfanimexist(n)：弹参数 n，查本角色动画表是否存在编号 n。
-                    // 对齐 Ikemen char.go:5088 animExist / char.go:5102 selfAnimExist——
-                    // undefined 参数透传 undefined。v1 单角色无 helper/共享动画表，
-                    // animExist(查 animPN 表) 与 selfAnimExist(查 gi 表) 同归本角色 AnimTable；
-                    // 二者分歧待 R-ENT 实体系统（helper 借用 root 动画）落地后再细分。
+                    // animexist 查当前 AnimPlayerNo 表；undefined 参数透传 undefined。
                     BytecodeValue anim = Pop(stack);
                     if (anim.IsUndefined())
                     {
                         return BytecodeValue.Undefined();
                     }
                     return BytecodeValue.Bool(AnimExists(anim.ToI()));
+                }
+                case OpCode.OC_selfanimexist:
+                {
+                    // selfanimexist 查自身 PlayerNo 表。ChangeAnim2 后它必须与 animexist 可分歧。
+                    BytecodeValue anim = Pop(stack);
+                    if (anim.IsUndefined())
+                    {
+                        return BytecodeValue.Undefined();
+                    }
+                    return BytecodeValue.Bool(SelfAnimExists(anim.ToI()));
                 }
 
                 case OpCode.OC_const_:
