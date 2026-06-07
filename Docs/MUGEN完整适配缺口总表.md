@@ -85,9 +85,9 @@
 ## Unity 展馆验收
 
 - [x] 一个数据驱动场景，每角色一页，不复制角色专用场景。（2026-06-07：新增 `Assets/Scenes/MugenCharacterMuseum.unity` + `MugenMuseumDashboard`，运行时扫描 12 个合法 DEF 角色并分页选择。）
-- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。（2026-06-07：最小面板已显示 DEF/localcoord/状态/动画/命令激活/兼容统计/native hash；命令图、招式结果和 trace 差异仍待接 UI。）
-- [ ] 自动模式使用固定逻辑 tick；交互模式独立。
-- [ ] 角色与木桩、全部实体、碰撞框和当前 state/anim/owner 可视化。
+- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。（2026-06-07：最小面板已显示 DEF/localcoord/状态/动画/命令激活/兼容统计/native hash；并接入 playable session 的 live frame、P1/P2 state/anim/life、raw input 与 active command。命令图、招式矩阵结果和 trace 差异仍待接 UI。）
+- [ ] 自动模式使用固定逻辑 tick；交互模式独立。（2026-06-07：展馆交互模式已用 60Hz 定步累加驱动 `MBattleEngine.Tick`；自动招式矩阵仍在 dotnet runner，不在 Unity 面板内运行。）
+- [ ] 角色与木桩、全部实体、碰撞框和当前 state/anim/owner 可视化。（2026-06-07：已显示 P1/P2 两个 SpriteRenderer、当前 state/anim/life；helper/projectile/explod、碰撞框、owner 可视化仍未接。）
 - [ ] 12 个现有角色全部招式执行完毕；新增任意 DEF 可自动出现新页面并运行同一验证流程。
 
 ## 完成定义

@@ -62,6 +62,32 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        public List<string> ActiveNames()
+        {
+            EnsureRuntimes();
+            List<string> names = new List<string>();
+            foreach (string completedName in _completedNames)
+            {
+                if (!names.Contains(completedName))
+                {
+                    names.Add(completedName);
+                }
+            }
+            for (int i = 0; i < _runtimes.Count; i++)
+            {
+                if (!_runtimes[i].Active)
+                {
+                    continue;
+                }
+                string name = _runtimes[i].Definition.Name ?? string.Empty;
+                if (!names.Contains(name))
+                {
+                    names.Add(name);
+                }
+            }
+            return names;
+        }
+
         public MCommandList Clone()
         {
             EnsureRuntimes();

@@ -14,7 +14,7 @@ namespace Lockstep.Tests.Mugen
         {
             MCharData data = LoadKfm();
             MCommandDef command = FirstCommand(data, "x");
-            List<MInput> sequence = MCommandInputSynthesizer.BuildSequence(command, facingRight: true);
+            List<MInput> sequence = MCommandInputSynthesizer.ActivationPrefix(command, facingRight: true);
             MCommandList list = new MCommandList();
             list.Commands.Add(command);
 
@@ -26,6 +26,29 @@ namespace Lockstep.Tests.Mugen
             }
 
             Assert.That(active, Is.True);
+        }
+
+        [Test]
+        public void CommandList_ReportsActiveCommandNamesForPresentation()
+        {
+            MCharData data = LoadKfm();
+            MCommandDef command = FirstCommand(data, "x");
+            List<MInput> sequence = MCommandInputSynthesizer.BuildSequence(command, facingRight: true);
+            MCommandList list = new MCommandList();
+            list.Commands.Add(command);
+
+            List<string> activeNames = new List<string>();
+            for (int i = 0; i < sequence.Count; i++)
+            {
+                list.Update(sequence[i], facingRight: true);
+                activeNames = list.ActiveNames();
+                if (activeNames.Count > 0)
+                {
+                    break;
+                }
+            }
+
+            Assert.That(activeNames, Is.EquivalentTo(new[] { "x" }));
         }
 
         [Test]

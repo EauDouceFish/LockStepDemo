@@ -1,7 +1,12 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using GameData = Lockstep.Game.Data;
+using Lockstep.Import.Air;
+using Lockstep.Math;
+using Lockstep.Mugen.Anim;
 using Lockstep.Mugen.Battle;
+using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Parse;
 
@@ -15,20 +20,58 @@ namespace Lockstep.View
     {
         public int PerPage = 12;
         public string CommonCharacterFolder = "Terrarian";
+        public float PixelsPerUnit = 50f;
+        public float TicksPerSecond = 60f;
+        public float StartSeparation = 58f;
 
         readonly List<string> _characterFolders = new List<string>();
         readonly Dictionary<string, MugenMuseumReport> _reports = new Dictionary<string, MugenMuseumReport>();
+        readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
+        readonly HashSet<int> _builtAnims = new HashSet<int>();
+        readonly SpriteRenderer[] _renderers = new SpriteRenderer[2];
+        readonly List<MInput> _inputs = new List<MInput> { MInput.None, MInput.None };
         int _page;
         int _selected;
+        MBattleEngine _engine;
+        MCharData _data;
+        MugenSpriteLoader.Source _source;
+        string _loadedFolder = "";
+        MInput _lastInput;
+        float _accumulator;
+        int _frame;
 
         void Start()
         {
             Application.runInBackground = true;
+            EnsurePresentationObjects();
             ScanCharacters();
             if (_characterFolders.Count > 0)
             {
                 BuildReport(_characterFolders[0]);
+                LoadSession(_characterFolders[0]);
             }
+        }
+
+        void Update()
+        {
+            if (_engine == null)
+            {
+                return;
+            }
+
+            _accumulator += Time.deltaTime * TicksPerSecond;
+            int guard = 0;
+            while (_accumulator >= 1f && guard < 8)
+            {
+                _accumulator -= 1f;
+                guard++;
+                _lastInput = SampleInput();
+                _inputs[0] = _lastInput;
+                _inputs[1] = MInput.None;
+                _engine.Tick(_inputs);
+                _frame++;
+            }
+            RenderAll();
         }
 
         void ScanCharacters()
@@ -98,6 +141,7 @@ namespace Lockstep.View
                 {
                     _selected = index;
                     BuildReport(_characterFolders[index]);
+                    LoadSession(_characterFolders[index]);
                 }
             }
         }
@@ -121,6 +165,32 @@ namespace Lockstep.View
             DrawLine(x, ref y, "parsed-only controllers", report.ParsedOnlyControllers.ToString());
             DrawLine(x, ref y, "native hash", report.NativeHash);
             DrawLine(x, ref y, "status", report.Status);
+            if (_engine != null)
+            {
+                y += 8f;
+                MChar p1 = _engine.Chars[0];
+                MChar p2 = _engine.Chars[1];
+                DrawLine(x, ref y, "live frame", _frame.ToString());
+                DrawLine(x, ref y, "P1", "state " + p1.StateNo + " anim " + p1.AnimNo +
+                    " life " + p1.Life + " ctrl " + p1.Ctrl);
+                DrawLine(x, ref y, "P2", "state " + p2.StateNo + " anim " + p2.AnimNo +
+                    " life " + p2.Life + " movetype " + p2.MoveType);
+                DrawLine(x, ref y, "input bits", _lastInput.ToString());
+                DrawLine(x, ref y, "active cmd", ActiveCommandText(p1));
+                DrawLine(x, ref y, "controls", "Arrows move, A/S/D punches, Z/X/C kicks");
+                if (GUI.Button(new Rect(x + 18f, y + 8f, 120f, 30f), "Reset Fight"))
+                {
+                    LoadSession(folder);
+                }
+                if (GUI.Button(new Rect(x + 148f, y + 8f, 120f, 30f), "Light Punch"))
+                {
+                    StepManualInput(MInput.X, 8);
+                }
+                if (GUI.Button(new Rect(x + 278f, y + 8f, 120f, 30f), "Light Kick"))
+                {
+                    StepManualInput(MInput.A, 8);
+                }
+            }
         }
 
         static void DrawLine(float x, ref float y, string label, string value)
@@ -161,6 +231,55 @@ namespace Lockstep.View
             }
             _reports[folder] = report;
             return report;
+        }
+
+        void LoadSession(string folder)
+        {
+            try
+            {
+                string defPath = PickMainDef(folder);
+                MCharacterDefinition definition = MDefParser.Parse(File.ReadAllText(defPath));
+                string sffPath = Resolve(folder, definition.Files.Sprite);
+                string airPath = Resolve(folder, definition.Files.Anim);
+                if (sffPath == null || airPath == null)
+                {
+                    Debug.LogWarning("[MUGEN Museum] Missing sprite or anim for " + folder);
+                    return;
+                }
+
+                _data = LoadCharacter(folder, definition);
+                _engine = new MBattleEngine();
+                MChar p1 = MCharLoader.SpawnChar(_data, 1, 0, 0);
+                MChar p2 = MCharLoader.SpawnChar(_data, 2, 0, 0);
+                int half = Mathf.RoundToInt(StartSeparation * 0.5f);
+                p1.Pos = new FVector3(FFloat.FromInt(-half), FFloat.Zero, FFloat.Zero);
+                p1.Facing = FFloat.One;
+                p2.Pos = new FVector3(FFloat.FromInt(half), FFloat.Zero, FFloat.Zero);
+                p2.Facing = -FFloat.One;
+                _engine.Add(p1, _data);
+                _engine.Add(p2, _data);
+                _engine.LinkPair();
+                _engine.StartRound();
+
+                _source = MugenSpriteLoader.Open(sffPath, PixelsPerUnit);
+                _gameAnims.Clear();
+                _builtAnims.Clear();
+                List<GameData.AnimData> anims = AirParser.ParseFile(airPath);
+                for (int i = 0; i < anims.Count; i++)
+                {
+                    _gameAnims[anims[i].Id] = anims[i];
+                }
+                _frame = 0;
+                _accumulator = 0f;
+                _lastInput = MInput.None;
+                _loadedFolder = folder;
+                RenderAll();
+                Debug.Log("[MUGEN Museum] Loaded playable session: " + Path.GetFileName(folder));
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("[MUGEN Museum] Failed to load playable session: " + ex);
+            }
         }
 
         MCharData LoadCharacter(string folder, MCharacterDefinition definition)
@@ -231,6 +350,117 @@ namespace Lockstep.View
                 }
             }
             return false;
+        }
+
+        void EnsurePresentationObjects()
+        {
+            for (int i = 0; i < _renderers.Length; i++)
+            {
+                GameObject character = new GameObject(i == 0 ? "Museum P1" : "Museum P2");
+                character.transform.SetParent(transform, false);
+                _renderers[i] = character.AddComponent<SpriteRenderer>();
+                _renderers[i].sortingOrder = i;
+            }
+        }
+
+        void RenderAll()
+        {
+            if (_engine == null || _source == null || _data == null)
+            {
+                return;
+            }
+            for (int i = 0; i < 2 && i < _engine.Chars.Count; i++)
+            {
+                RenderChar(_engine.Chars[i], _renderers[i]);
+            }
+        }
+
+        void RenderChar(MChar character, SpriteRenderer renderer)
+        {
+            if (renderer == null)
+            {
+                return;
+            }
+            renderer.flipX = character.Facing.Raw < 0;
+            renderer.transform.localPosition = new Vector3(
+                character.Pos.X.ToFloat() / PixelsPerUnit,
+                -character.Pos.Y.ToFloat() / PixelsPerUnit,
+                0f);
+
+            if (!_data.Anims.TryGetValue(character.AnimNo, out MAnimData anim) || anim.Frames.Length == 0)
+            {
+                return;
+            }
+            int elem = Mathf.Clamp(character.AnimElem, 0, anim.Frames.Length - 1);
+            MAnimFrame frame = anim.Frames[elem];
+            EnsureBuilt(character.AnimNo);
+            long key = MugenSpriteAnimator.Key(frame.SpriteGroup, frame.SpriteImage);
+            if (_source.Cache.TryGetValue(key, out Sprite sprite))
+            {
+                renderer.sprite = sprite;
+            }
+        }
+
+        void EnsureBuilt(int animNo)
+        {
+            if (_builtAnims.Contains(animNo))
+            {
+                return;
+            }
+            if (_gameAnims.TryGetValue(animNo, out GameData.AnimData anim))
+            {
+                MugenSpriteLoader.BuildForAnim(_source, anim);
+            }
+            _builtAnims.Add(animNo);
+        }
+
+        static MInput SampleInput()
+        {
+            MInput input = MInput.None;
+            if (UnityEngine.Input.GetKey(KeyCode.UpArrow)) { input |= MInput.Up; }
+            if (UnityEngine.Input.GetKey(KeyCode.DownArrow)) { input |= MInput.Down; }
+            if (UnityEngine.Input.GetKey(KeyCode.LeftArrow)) { input |= MInput.Left; }
+            if (UnityEngine.Input.GetKey(KeyCode.RightArrow)) { input |= MInput.Right; }
+            if (UnityEngine.Input.GetKey(KeyCode.A)) { input |= MInput.X; }
+            if (UnityEngine.Input.GetKey(KeyCode.S)) { input |= MInput.Y; }
+            if (UnityEngine.Input.GetKey(KeyCode.D)) { input |= MInput.Z; }
+            if (UnityEngine.Input.GetKey(KeyCode.Z)) { input |= MInput.A; }
+            if (UnityEngine.Input.GetKey(KeyCode.X)) { input |= MInput.B; }
+            if (UnityEngine.Input.GetKey(KeyCode.C)) { input |= MInput.C; }
+            if (UnityEngine.Input.GetKey(KeyCode.Space)) { input |= MInput.S; }
+            if (UnityEngine.Input.GetKey(KeyCode.Return)) { input |= MInput.S; }
+            return input;
+        }
+
+        void StepManualInput(MInput input, int totalFrames)
+        {
+            if (_engine == null)
+            {
+                return;
+            }
+            _lastInput = input;
+            _engine.Tick(new[] { input, MInput.None });
+            _frame++;
+            for (int i = 1; i < totalFrames; i++)
+            {
+                _engine.Tick(new[] { MInput.None, MInput.None });
+                _frame++;
+            }
+            RenderAll();
+        }
+
+        static string ActiveCommandText(MChar character)
+        {
+            if (character.CommandList == null)
+            {
+                return "";
+            }
+            List<string> names = character.CommandList.ActiveNames();
+            if (names.Count == 0)
+            {
+                return "";
+            }
+            return string.Join(", ", names.ToArray());
         }
 
         static string ComputeInitialHash(MCharData data)

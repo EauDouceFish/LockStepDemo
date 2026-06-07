@@ -153,6 +153,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   PerPage: 12
   CommonCharacterFolder: Terrarian
+  PixelsPerUnit: 50
+  TicksPerSecond: 60
+  StartSeparation: 58
 --- !u!4 &638431265
 Transform:
   m_ObjectHideFlags: 0
