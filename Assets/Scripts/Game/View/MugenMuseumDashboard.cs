@@ -27,6 +27,7 @@ namespace Lockstep.View
 
         readonly List<string> _characterFolders = new List<string>();
         readonly List<MCommandTransitionEntry> _moveEntries = new List<MCommandTransitionEntry>();
+        readonly List<MCommandMoveInfo> _moveCatalog = new List<MCommandMoveInfo>();
         readonly Dictionary<string, MugenMuseumReport> _reports = new Dictionary<string, MugenMuseumReport>();
         readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
         readonly HashSet<int> _builtAnims = new HashSet<int>();
@@ -35,6 +36,9 @@ namespace Lockstep.View
         int _page;
         int _selected;
         int _movePage;
+        int _moveHelpPage;
+        int _lastManualGuiFrame = -1;
+        bool _showMoveHelp;
         MBattleEngine _engine;
         MCharData _data;
         MugenSpriteLoader.Source _source;
@@ -114,11 +118,16 @@ namespace Lockstep.View
 
             DrawList();
             DrawReport();
+            if (_showMoveHelp)
+            {
+                DrawMoveHelpOverlay();
+            }
         }
 
         void DrawList()
         {
-            int pageCount = (_characterFolders.Count + PerPage - 1) / PerPage;
+            int visibleRows = Mathf.Min(PerPage, Mathf.Max(3, (Screen.height - 228) / 30));
+            int pageCount = (_characterFolders.Count + visibleRows - 1) / visibleRows;
             GUI.Label(new Rect(24f, 42f, 220f, 24f),
                 "Page " + (_page + 1) + "/" + pageCount + "  Characters " + _characterFolders.Count);
 
@@ -131,8 +140,11 @@ namespace Lockstep.View
                 _page = (_page + 1) % pageCount;
             }
 
-            int start = _page * PerPage;
-            for (int i = 0; i < PerPage; i++)
+            DrawInputPanel(24f, 106f);
+
+            int start = _page * visibleRows;
+            float listY = 210f;
+            for (int i = 0; i < visibleRows; i++)
             {
                 int index = start + i;
                 if (index >= _characterFolders.Count)
@@ -140,13 +152,26 @@ namespace Lockstep.View
                     break;
                 }
                 string label = Path.GetFileName(_characterFolders[index]);
-                if (GUI.Button(new Rect(24f, 108f + i * 30f, 220f, 26f), label))
+                if (GUI.Button(new Rect(24f, listY + i * 30f, 220f, 26f), label))
                 {
                     _selected = index;
                     BuildReport(_characterFolders[index]);
                     LoadSession(_characterFolders[index]);
                 }
             }
+        }
+
+        void DrawInputPanel(float x, float y)
+        {
+            GUI.Box(new Rect(x - 4f, y - 4f, 228f, 94f), "Input");
+            string active = "";
+            if (_engine != null && _engine.Chars.Count > 0)
+            {
+                active = ActiveCommandText(_engine.Chars[0]);
+            }
+            GUI.Label(new Rect(x + 8f, y + 20f, 200f, 20f), "Current: " + MInputDisplayFormatter.Format(_lastInput));
+            GUI.Label(new Rect(x + 8f, y + 42f, 200f, 20f), "Active: " + (string.IsNullOrEmpty(active) ? "None" : active));
+            GUI.Label(new Rect(x + 8f, y + 64f, 200f, 20f), "Move: Arrows  Hit: A/S/D Z/X/C");
         }
 
         void DrawReport()
@@ -193,6 +218,11 @@ namespace Lockstep.View
                 if (GUI.Button(new Rect(x + 278f, y + 8f, 120f, 30f), "Light Kick"))
                 {
                     StepManualInput(MInput.A, 8);
+                }
+                if (GUI.Button(new Rect(x + 348f, y + 8f, 118f, 30f), _showMoveHelp ? "Hide Help" : "Move Help"))
+                {
+                    _showMoveHelp = !_showMoveHelp;
+                    _moveHelpPage = 0;
                 }
                 y += 48f;
                 DrawMoveEntryControls(x, ref y);
@@ -285,6 +315,7 @@ namespace Lockstep.View
                 _lastInput = MInput.None;
                 _loadedFolder = folder;
                 _movePage = 0;
+                _moveHelpPage = 0;
                 LoadMoveEntries(folder, definition);
                 RenderAll();
                 Debug.Log("[MUGEN Museum] Loaded playable session: " + Path.GetFileName(folder));
@@ -451,6 +482,10 @@ namespace Lockstep.View
             {
                 return;
             }
+            if (ConsumeManualGuiThisFrame())
+            {
+                return;
+            }
             _lastInput = input;
             _engine.Tick(new[] { input, MInput.None });
             _frame++;
@@ -460,6 +495,16 @@ namespace Lockstep.View
                 _frame++;
             }
             RenderAll();
+        }
+
+        bool ConsumeManualGuiThisFrame()
+        {
+            if (_lastManualGuiFrame == Time.frameCount)
+            {
+                return true;
+            }
+            _lastManualGuiFrame = Time.frameCount;
+            return false;
         }
 
         void DrawMoveEntryControls(float x, ref float y)
@@ -509,6 +554,10 @@ namespace Lockstep.View
             {
                 return;
             }
+            if (ConsumeManualGuiThisFrame())
+            {
+                return;
+            }
 
             List<MCommandDef> commands = FirstDefinitions(entry.CommandNames);
             if (commands.Count != entry.CommandNames.Count)
@@ -555,6 +604,7 @@ namespace Lockstep.View
         void LoadMoveEntries(string folder, MCharacterDefinition definition)
         {
             _moveEntries.Clear();
+            _moveCatalog.Clear();
             string cmd = ReadOptional(folder, definition.Files.Cmd);
             if (cmd == null)
             {
@@ -568,6 +618,101 @@ namespace Lockstep.View
                 {
                     _moveEntries.Add(parsed[i]);
                 }
+            }
+            _moveCatalog.AddRange(MCommandMoveCatalog.Build(_data.Commands, _moveEntries));
+        }
+
+        void DrawMoveHelpPanel(float x, ref float y)
+        {
+            if (_moveCatalog.Count == 0)
+            {
+                DrawLine(x, ref y, "move help", "No executable move help.");
+                return;
+            }
+
+            int perPage = Mathf.Max(4, Mathf.Min(12, (Screen.height - Mathf.RoundToInt(y) - 34) / 24));
+            int pageCount = (_moveCatalog.Count + perPage - 1) / perPage;
+            GUI.Box(new Rect(x + 8f, y, Screen.width - x - 28f, perPage * 24f + 58f), "All Move Commands");
+            GUI.Label(new Rect(x + 22f, y + 26f, 240f, 22f),
+                "Move Help " + (_moveHelpPage + 1) + "/" + pageCount + "  Total " + _moveCatalog.Count);
+            if (GUI.Button(new Rect(x + 272f, y + 24f, 64f, 24f), "Prev"))
+            {
+                _moveHelpPage = (_moveHelpPage + pageCount - 1) % pageCount;
+            }
+            if (GUI.Button(new Rect(x + 342f, y + 24f, 64f, 24f), "Next"))
+            {
+                _moveHelpPage = (_moveHelpPage + 1) % pageCount;
+            }
+
+            float rowY = y + 52f;
+            int start = _moveHelpPage * perPage;
+            for (int i = 0; i < perPage; i++)
+            {
+                int index = start + i;
+                if (index >= _moveCatalog.Count)
+                {
+                    break;
+                }
+
+                MCommandMoveInfo move = _moveCatalog[index];
+                string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
+                GUI.Label(new Rect(x + 22f, rowY, Screen.width - x - 48f, 22f),
+                    move.CommandText + "    " + move.MotionText + "    -> state " + target);
+                rowY += 24f;
+            }
+            y += perPage * 24f + 66f;
+        }
+
+        void DrawMoveHelpOverlay()
+        {
+            float x = 286f;
+            float y = 16f;
+            float w = Screen.width - x - 16f;
+            float h = Screen.height - 32f;
+            if (w < 260f || h < 180f)
+            {
+                return;
+            }
+
+            Rect box = new Rect(x, y, w, h);
+            Color oldColor = GUI.color;
+            GUI.color = new Color(0.05f, 0.07f, 0.10f, 0.96f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = oldColor;
+            GUI.Box(box, "All Move Commands");
+            if (_moveCatalog.Count == 0)
+            {
+                GUI.Label(new Rect(x + 18f, y + 34f, w - 36f, 24f), "No executable move help.");
+                return;
+            }
+
+            int perPage = Mathf.Max(5, Mathf.FloorToInt((h - 92f) / 24f));
+            int pageCount = (_moveCatalog.Count + perPage - 1) / perPage;
+            GUI.Label(new Rect(x + 18f, y + 34f, 260f, 24f),
+                "Move Help " + (_moveHelpPage + 1) + "/" + pageCount + "  Total " + _moveCatalog.Count);
+            if (GUI.Button(new Rect(x + w - 150f, y + 32f, 64f, 24f), "Prev"))
+            {
+                _moveHelpPage = (_moveHelpPage + pageCount - 1) % pageCount;
+            }
+            if (GUI.Button(new Rect(x + w - 78f, y + 32f, 64f, 24f), "Next"))
+            {
+                _moveHelpPage = (_moveHelpPage + 1) % pageCount;
+            }
+
+            float rowY = y + 66f;
+            int start = _moveHelpPage * perPage;
+            for (int i = 0; i < perPage; i++)
+            {
+                int index = start + i;
+                if (index >= _moveCatalog.Count)
+                {
+                    break;
+                }
+                MCommandMoveInfo move = _moveCatalog[index];
+                string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
+                GUI.Label(new Rect(x + 18f, rowY, w - 36f, 22f),
+                    move.CommandText + "    " + move.MotionText + "    -> state " + target);
+                rowY += 24f;
             }
         }
 

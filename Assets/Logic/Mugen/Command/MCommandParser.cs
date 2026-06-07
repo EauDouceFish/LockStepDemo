@@ -11,7 +11,7 @@ namespace Lockstep.Mugen.Command
         /// <summary>解析命令动作串(如 "~D, DF, F, x")为步骤序列。</summary>
         public static MCommandDef Parse(string name, string motion, int time = 15, int bufferTime = 1)
         {
-            MCommandDef def = new MCommandDef { Name = name, Time = time, BufferTime = bufferTime };
+            MCommandDef def = new MCommandDef { Name = name, Motion = motion ?? string.Empty, Time = time, BufferTime = bufferTime };
             if (string.IsNullOrWhiteSpace(motion))
             {
                 return def;

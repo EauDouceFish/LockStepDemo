@@ -97,9 +97,20 @@ namespace Lockstep.Mugen.State
             {
                 ghv.HitTime--;
             }
-            if (ghv.DownRecoverTime > 0 && c.StateNo == 5110)
+            if (c.StateNo == 5110 && c.Alive)
             {
-                ghv.DownRecoverTime--;
+                if (ghv.DownRecoverTime <= 0 && c.Time == 0)
+                {
+                    ghv.DownRecoverTime = c.Constants != null ? c.Constants.LiedownTime : 60;
+                }
+                if (ghv.DownRecoverTime > 0)
+                {
+                    ghv.DownRecoverTime--;
+                }
+                if (ghv.DownRecoverTime <= 0)
+                {
+                    c.QueueTransition(5120, c.PlayerNo);
+                }
             }
         }
 

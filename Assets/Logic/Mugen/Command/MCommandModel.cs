@@ -42,6 +42,7 @@ namespace Lockstep.Mugen.Command
     public sealed class MCommandDef
     {
         public string Name;
+        public string Motion;
         public List<MCommandStep> Steps = new List<MCommandStep>();
         public int Time = 15;        // 完成全部步骤的总帧窗(MUGEN command.time 默认 15)
         public int BufferTime = 1;   // 完成后保持 active 的缓冲帧(MUGEN command.buffer.time 默认 1)
