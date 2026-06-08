@@ -85,6 +85,39 @@ namespace Lockstep.Tests.Mugen
             Assert.That(result.UsedSnapshot, Is.True);
         }
 
+        [Test]
+        public void AnanziFatal_Reaches4000_WhenFatalPrerequisitesAreSatisfied()
+        {
+            string directory = TestAssets.CharDir("Ananzi");
+            if (!Directory.Exists(directory))
+            {
+                Assert.Ignore("Ananzi test character is missing.");
+            }
+
+            MCharData data = MugenCharacterPackageTestLoader.Load(directory);
+            MMoveTestResult result = MMoveTestRunner.Run(
+                data,
+                new[] { FirstCommand(data, "fatal") },
+                4000,
+                new[]
+                {
+                    new MMovePrerequisiteProfile
+                    {
+                        Name = "fatal-low-life-standing",
+                        Distance = 70,
+                        ActorPower = 3000,
+                        TargetLife = 100,
+                    },
+                },
+                warmupFrames: 5,
+                tailFrames: 90);
+
+            Assert.That(result.CommandMatched, Is.True, "fatal command should become active.");
+            Assert.That(result.Status, Is.EqualTo(MMoveTestStatus.Passed),
+                "fatal should enter state 4000 when power/target life/roundstate/ctrl prerequisites are satisfied; final=" +
+                result.FinalStateNo + " profile=" + result.ProfileName);
+        }
+
         static MCharData LoadKfm()
         {
             string directory = TestAssets.KfmDir();

@@ -216,12 +216,21 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
-    /// <summary>AttackDist: Ikemen writes HitDef guard distance arrays; MHitDef lacks them in this worktree.</summary>
+    /// <summary>AttackDist: writes the attack guard distance used by enemy inguarddist checks.</summary>
     public sealed class AttackDistController : ParameterOnlyController
     {
         public BytecodeExp[] XValues;
         public BytecodeExp[] YValues;
         public BytecodeExp[] ZValues;
+
+        public override bool Run(MChar character)
+        {
+            if (XValues != null && XValues.Length > 0)
+            {
+                character.AttackDistX = XValues[0].Run(character).ToF();
+            }
+            return false;
+        }
     }
 
     /// <summary>HitOverride: 写 MChar.HitOverrides[slot]（移植 char.go HitOverride，默认 time=1）。命中系统据此改受击态。</summary>
@@ -272,7 +281,7 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
-    /// <summary>ReversalDef: requires active reversal definition container and hit detection integration.</summary>
+    /// <summary>ReversalDef: installs an active reversal definition consumed by hit detection.</summary>
     public sealed class ReversalDefController : ParameterOnlyController
     {
         public int Attr;
@@ -280,6 +289,23 @@ namespace Lockstep.Mugen.StateCtrl
         public int GuardFlagNot;
         public MHitDef Template;
         public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            character.ReversalDef = new MReversalDefRuntime
+            {
+                Active = true,
+                Attr = Attr,
+                GuardFlag = GuardFlag,
+                GuardFlagNot = GuardFlagNot,
+                Template = Template != null ? Template.Clone() : new MHitDef(),
+            };
+            if (character.ReversalDef.Template != null)
+            {
+                character.ReversalDef.Template.Active = true;
+            }
+            return false;
+        }
     }
 
     /// <summary>VarRandom: var(v)=Rand(min,max), inclusive bounds, using the shared Ikemen RNG.</summary>

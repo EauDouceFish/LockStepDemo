@@ -21,7 +21,7 @@ namespace Lockstep.Mugen.Hit
             {
                 return false;
             }
-            if (attacker.Targets.Contains(defender))
+            if (attacker.HasTarget(defender))
             {
                 return false;   // 同招对同目标只命中一次
             }
@@ -44,6 +44,10 @@ namespace Lockstep.Mugen.Hit
             {
                 return false;
             }
+            if (TryReversal(defender, attacker, hd, deferDamage))
+            {
+                return true;
+            }
             bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
             if (!guarded && !CanJuggle(attacker, defender, hd, false))
             {
@@ -57,6 +61,25 @@ namespace Lockstep.Mugen.Hit
             {
                 ApplyHit(attacker, defender, hd, deferDamage, false);
             }
+            return true;
+        }
+
+        static bool TryReversal(MChar defender, MChar attacker, MHitDef incoming, bool deferDamage)
+        {
+            MReversalDefRuntime reversal = defender.ReversalDef;
+            if (reversal == null || !reversal.Active || reversal.Template == null || !reversal.Template.Active)
+            {
+                return false;
+            }
+            if ((reversal.Attr & incoming.Attr) == 0)
+            {
+                return false;
+            }
+
+            MHitDef reversalHit = reversal.Template;
+            reversalHit.Active = true;
+            ApplyHit(defender, attacker, reversalHit, deferDamage, false);
+            defender.MoveReversed = 1;
             return true;
         }
 
@@ -90,6 +113,11 @@ namespace Lockstep.Mugen.Hit
                 return false;
             }
             proj.ContactCount++;
+            if (proj.Owner != null && TryReversal(defender, proj.Owner, hd, deferDamage))
+            {
+                proj.Owner.RecordProjectileContact(proj.ProjId, false);
+                return true;
+            }
             bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
             if (!guarded && !CanJuggle(proj.Owner, defender, hd, true))
             {
@@ -154,7 +182,7 @@ namespace Lockstep.Mugen.Hit
             attacker.MoveGuarded = 1;
             attacker.MoveHit = 0;
             attacker.GuardCount += hd.NumHits;   // char.go:12191（被防按 numhits 计）
-            attacker.Targets.Add(defender);
+            attacker.AddTarget(defender, hd.Id);
             if (hd.HitOnce > 0)
             {
                 hd.Active = false;   // hitonce 在被防（接触）时同样停用（char.go:12171 hitdefContact）
@@ -213,6 +241,12 @@ namespace Lockstep.Mugen.Hit
             int stateType = defender.StateType;
             bool isAir = stateType == 4;
             bool wasFalling = defender.Ghv.Fall;
+            MHitOverride hitOverride = FindHitOverride(defender, hd.Attr);
+            if (hitOverride.Active && hitOverride.ForceAir)
+            {
+                stateType = 4;
+                isAir = true;
+            }
 
             // 守方先进受击态 H（受击当帧成立）：使 DefenceMulSet onHit 的 customDefense 对本次命中即生效
             // （对齐 char.go finalDefense 在 movetype==MT_H 下取 customDefense）。
@@ -295,7 +329,9 @@ namespace Lockstep.Mugen.Hit
             ghv.AnimType = defender.GetHitAnimType();
 
             // 守方进入受击状态 + movetype H + 失控
-            int getHitState = ResolveGetHitState(defender, hd, ghv);
+            int getHitState = hitOverride.Active && hitOverride.StateNo >= 0
+                ? hitOverride.StateNo
+                : ResolveGetHitState(defender, hd, ghv);
             // 自定义状态（投技）：p2stateno 且 p2getp1state → 守方跑攻方状态表（StateOwner=attacker）；否则用自身状态表。
             if (hd.P2StateNo >= 0 && hd.P2GetP1State)
             {
@@ -305,7 +341,10 @@ namespace Lockstep.Mugen.Hit
             else
             {
                 defender.StateOwner = null;
-                defender.QueueTransition(getHitState, defender.PlayerNo);
+                if (!hitOverride.Active || !hitOverride.KeepState)
+                {
+                    defender.QueueTransition(getHitState, defender.PlayerNo);
+                }
             }
             defender.Ctrl = false;        // MoveType=2(H) 已在伤害计算前设置
 
@@ -317,7 +356,7 @@ namespace Lockstep.Mugen.Hit
             attacker.MoveHit = 1;
             attacker.HitCount += hd.NumHits;   // char.go:12189（按 numhits 计，非 +1）
             attacker.UniqHitCount++;
-            attacker.Targets.Add(defender);
+            attacker.AddTarget(defender, hd.Id);
             if (hd.HitOnce > 0)
             {
                 hd.Active = false;   // hitonce：只命中一个目标，命中即停用本招（char.go:11283/12172）
@@ -326,6 +365,23 @@ namespace Lockstep.Mugen.Hit
             {
                 attacker.QueueTransition(hd.P1StateNo, attacker.StatePlayerNo);
             }
+        }
+
+        static MHitOverride FindHitOverride(MChar defender, int hitAttr)
+        {
+            if (defender.HitOverrides == null)
+            {
+                return default;
+            }
+            for (int i = 0; i < defender.HitOverrides.Length; i++)
+            {
+                MHitOverride hitOverride = defender.HitOverrides[i];
+                if (hitOverride.Active && (hitOverride.Attr & hitAttr) != 0)
+                {
+                    return hitOverride;
+                }
+            }
+            return default;
         }
 
         static void UpdateJuggleAfterHit(MChar attacker, MChar defender, MHitDef hd, bool projectile, bool falling)

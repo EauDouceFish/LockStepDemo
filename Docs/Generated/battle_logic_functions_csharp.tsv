@@ -1,0 +1,609 @@
+﻿path	line	namespace	type	method	signature	status	explicit_reference
+Assets/Logic/Mugen/Anim/MAnim.cs	35	Lockstep.Mugen.Anim	MAnimData	ComputePacing	void ComputePacing()	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimImport.cs	14	Lockstep.Mugen.Anim	MAnimImport	FromAir	MAnimData FromAir(GameData.AnimData src)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimImport.cs	34	Lockstep.Mugen.Anim	MAnimImport	FromAirTable	Dictionary<int, MAnimData> FromAirTable(IEnumerable<GameData.AnimData> anims)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimImport.cs	50	Lockstep.Mugen.Anim	MAnimImport	FromAirFrame	MAnimFrame FromAirFrame(GameData.AnimFrame f)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimImport.cs	65	Lockstep.Mugen.Anim	MAnimImport	ConvertClsn	MClsnBox[] ConvertClsn(GameData.ClsnBox[] src)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	20	Lockstep.Mugen.Anim	MAnimSystem	Action	void Action(MChar c, IReadOnlyDictionary<int, MAnimData> table)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	73	Lockstep.Mugen.Anim	MAnimSystem	Play	void Play(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	79	Lockstep.Mugen.Anim	MAnimSystem	PlayAt	void PlayAt(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table, int elem, int elemTime)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	98	Lockstep.Mugen.Anim	MAnimSystem	SumTimeBefore	int SumTimeBefore(MAnimData anim, int elem)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	112	Lockstep.Mugen.Anim	MAnimSystem	Clamp	int Clamp(int value, int min, int max)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	122	Lockstep.Mugen.Anim	MAnimSystem	Next	void Next(MChar c, MAnimData a)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	140	Lockstep.Mugen.Anim	MAnimSystem	Reinit	void Reinit(MChar c, MAnimData a)	needs-reference	
+Assets/Logic/Mugen/Anim/MAnimSystem.cs	150	Lockstep.Mugen.Anim	MAnimSystem	DeriveAndPopulate	void DeriveAndPopulate(MChar c, MAnimData a)	needs-reference	
+Assets/Logic/Mugen/Battle/MActionSystem.cs	38	Lockstep.Mugen.Battle	MActionSystem	Prepare	void Prepare(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MActionSystem.cs	116	Lockstep.Mugen.Battle	MActionSystem	LandCheck	void LandCheck(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MActionSystem.cs	128	Lockstep.Mugen.Battle	MActionSystem	Asf	bool Asf(MChar c, MAssertFlag flag)	needs-reference	
+Assets/Logic/Mugen/Battle/MActionSystem.cs	133	Lockstep.Mugen.Battle	MActionSystem	AirjumpHeight	FFloat AirjumpHeight(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MActionSystem.cs	138	Lockstep.Mugen.Battle	MActionSystem	AirjumpNum	int AirjumpNum(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	41	Lockstep.Mugen.Battle	MBattleEngine	Add	void Add(MChar c, MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	58	Lockstep.Mugen.Battle	MBattleEngine	DataOf	MCharData DataOf(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	72	Lockstep.Mugen.Battle	MBattleEngine	DrainSpawns	void DrainSpawns()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	129	Lockstep.Mugen.Battle	MBattleEngine	ProjAnimClsn1	Hit.MClsnBox[] ProjAnimClsn1(MCharData data, int animNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	140	Lockstep.Mugen.Battle	MBattleEngine	StepProjectiles	void StepProjectiles()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	170	Lockstep.Mugen.Battle	MBattleEngine	RemoveDestroyed	void RemoveDestroyed()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	183	Lockstep.Mugen.Battle	MBattleEngine	LinkPair	void LinkPair()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	197	Lockstep.Mugen.Battle	MBattleEngine	StartRound	void StartRound()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	206	Lockstep.Mugen.Battle	MBattleEngine	Snapshot	MBattleEngineSnapshot Snapshot()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	242	Lockstep.Mugen.Battle	MBattleEngine	Restore	void Restore(MBattleEngineSnapshot snapshot)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	315	Lockstep.Mugen.Battle	MBattleEngine	Tick	void Tick(IReadOnlyList<MInput> inputs)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	391	Lockstep.Mugen.Battle	MBattleEngine	StepProjectileContactTime	void StepProjectileContactTime(MChar character)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	400	Lockstep.Mugen.Battle	MBattleEngine	TeamOf	int TeamOf(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	406	Lockstep.Mugen.Battle	MBattleEngine	StateDataFor	MCharData StateDataFor(MChar c, MCharData own)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	420	Lockstep.Mugen.Battle	MBattleEngine	RunHits	void RunHits()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	440	Lockstep.Mugen.Battle	MBattleEngine	FlushPendingDamage	void FlushPendingDamage()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	453	Lockstep.Mugen.Battle	MBattleEngine	StepPhysics	void StepPhysics(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	466	Lockstep.Mugen.Battle	MBattleEngine	ComputeHash	ulong ComputeHash()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	491	Lockstep.Mugen.Battle	MBattleEngine	ResourceForPlayer	MCharData ResourceForPlayer(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	498	Lockstep.Mugen.Battle	MBattleEngine	AttachSharedState	void AttachSharedState(MChar character, MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	507	Lockstep.Mugen.Battle	MBattleEngine	CopyPause	void CopyPause(MPauseState source, MPauseState target)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	517	Lockstep.Mugen.Battle	MBattleEngine	RelinkChar	void RelinkChar(MChar target, MChar source, Dictionary<int, MChar> map)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	541	Lockstep.Mugen.Battle	MBattleEngine	Remap	MChar Remap(MChar character, Dictionary<int, MChar> map)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	547	Lockstep.Mugen.Battle	MBattleEngine	CloneRequest	MHelperRequest CloneRequest(MHelperRequest request)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleEngine.cs	552	Lockstep.Mugen.Battle	MBattleEngine	CloneRequest	MProjectileRequest CloneRequest(MProjectileRequest request)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	390	Lockstep.Mugen.Battle	MBattleTraceRecorder	CreateHeader	MBattleTraceHeader CreateHeader(MTraceScenario scenario, string commit = "")	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	399	Lockstep.Mugen.Battle	MBattleTraceRecorder	CapturePostTick	MBattleTraceFrame CapturePostTick( MBattleEngine engine, int step, IReadOnlyList<MInput> consumedInputs)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	449	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureGlobal	MTraceGlobal CaptureGlobal(MBattleEngine engine)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	467	Lockstep.Mugen.Battle	MBattleTraceRecorder	PrepareEntityKeys	void PrepareEntityKeys(MBattleEngine engine)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	510	Lockstep.Mugen.Battle	MBattleTraceRecorder	AllocateOrdinal	int AllocateOrdinal(string counterKey)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	518	Lockstep.Mugen.Battle	MBattleTraceRecorder	RootPlayerKey	string RootPlayerKey(MChar character)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	531	Lockstep.Mugen.Battle	MBattleTraceRecorder	RootPlayerKeyById	string RootPlayerKeyById(int runtimeId)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	542	Lockstep.Mugen.Battle	MBattleTraceRecorder	KeyOf	string KeyOf(MChar character)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	549	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureEntity	MEntityTrace CaptureEntity(MChar character, MCharData data, bool helper, int creationOrdinal)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	655	Lockstep.Mugen.Battle	MBattleTraceRecorder	KeyByRuntimeId	string KeyByRuntimeId(int id)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	661	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureTransform	MTraceTransform CaptureTransform(MChar character, int width, int height)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	676	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureCombat	MTraceCombat CaptureCombat(MChar character)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	707	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureGetHit	MTraceGetHit CaptureGetHit(MGetHitVar value)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	724	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureProjectile	MProjectileTrace CaptureProjectile(MProjectile value, MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	748	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureExplod	MExplodTrace CaptureExplod(MExplod value, MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	775	Lockstep.Mugen.Battle	MBattleTraceRecorder	CaptureEvents	void CaptureEvents(MBattleEngine engine, List<MEventTrace> destination)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	812	Lockstep.Mugen.Battle	MBattleTraceRecorder	DataForOwner	MCharData DataForOwner(MBattleEngine engine, MChar character)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	826	Lockstep.Mugen.Battle	MBattleTraceRecorder	DataForOwnerId	MCharData DataForOwnerId(MBattleEngine engine, int ownerId)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	839	Lockstep.Mugen.Battle	MBattleTraceRecorder	CreationOrdinal	int CreationOrdinal(string key)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	849	Lockstep.Mugen.Battle	MBattleTraceRecorder	LocalVector	long[] LocalVector(FVector3 value)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	854	Lockstep.Mugen.Battle	MBattleTraceRecorder	WorldVector	long[] WorldVector(FVector3 value, int localCoordWidth)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	866	Lockstep.Mugen.Battle	MBattleTraceRecorder	ToQ20	long ToQ20(FFloat value)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	880	Lockstep.Mugen.Battle	MBattleTraceRecorder	ScaleRoundEven	long ScaleRoundEven(long value, int numerator, int denominator)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	895	Lockstep.Mugen.Battle	MBattleTraceRecorder	Sort	void Sort(List<T> values)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	909	Lockstep.Mugen.Battle	MTraceTolerance	Exact	MTraceTolerance Exact()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	930	Lockstep.Mugen.Battle	MTraceDifference	ToString	string ToString()	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	943	Lockstep.Mugen.Battle	MBattleTraceComparer	Compare	List<MTraceDifference> Compare( MBattleTrace expected, MBattleTrace actual, MTraceTolerance tolerance = null)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	959	Lockstep.Mugen.Battle	MBattleTraceComparer	Compare	List<MTraceDifference> Compare( IReadOnlyList<MBattleTraceFrame> expected, IReadOnlyList<MBattleTraceFrame> actual, MTraceTolerance tolerance = null)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	970	Lockstep.Mugen.Battle	MBattleTraceComparer	CompareValue	void CompareValue(string path, object expected, object actual, int frame, MTraceTolerance tolerance, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1029	Lockstep.Mugen.Battle	MBattleTraceComparer	IsScalar	bool IsScalar(Type type)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1034	Lockstep.Mugen.Battle	MBattleTraceComparer	ContainsKeyedRecords	bool ContainsKeyedRecords(IList values)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1043	Lockstep.Mugen.Battle	MBattleTraceComparer	CompareKeyedList	void CompareKeyedList(string path, object expectedValue, object actualValue, int frame, MTraceTolerance tolerance, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1081	Lockstep.Mugen.Battle	MBattleTraceComparer	ToList	IList ToList(object value)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1093	Lockstep.Mugen.Battle	MBattleTraceComparer	IndexByKey	SortedDictionary<string, object> IndexByKey(string path, IList values, int frame, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1116	Lockstep.Mugen.Battle	MBattleTraceComparer	ComparePositionalValues	void ComparePositionalValues(string path, IList expected, IList actual, int frame, MTraceTolerance tolerance, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1131	Lockstep.Mugen.Battle	MBattleTraceComparer	CompareDictionary	void CompareDictionary(string path, IDictionary expected, IDictionary actual, int frame, MTraceTolerance tolerance, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1157	Lockstep.Mugen.Battle	MBattleTraceComparer	DictionaryByTextKey	SortedDictionary<string, object> DictionaryByTextKey(IDictionary values)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1168	Lockstep.Mugen.Battle	MBattleTraceComparer	CompareQ20	void CompareQ20(string path, long expected, long actual, int frame, MTraceTolerance tolerance, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1179	Lockstep.Mugen.Battle	MBattleTraceComparer	ToleranceFor	long ToleranceFor(string path, MTraceTolerance tolerance)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1205	Lockstep.Mugen.Battle	MBattleTraceComparer	Add	void Add(int frame, string path, object expected, object actual, List<MTraceDifference> differences)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1218	Lockstep.Mugen.Battle	MBattleTraceComparer	CategoryFor	string CategoryFor(string path)	needs-reference	
+Assets/Logic/Mugen/Battle/MBattleTrace.cs	1259	Lockstep.Mugen.Battle	MBattleTraceComparer	Format	string Format(object value)	needs-reference	
+Assets/Logic/Mugen/Battle/MCharLoader.cs	23	Lockstep.Mugen.Battle	MCharLoader	Load	MCharData Load(IReadOnlyList<string> stateTexts, string cnsText, string commonText, string airText, string cmdText, string name = "", MCharacterDefinition definition = null)	needs-reference	
+Assets/Logic/Mugen/Battle/MCharLoader.cs	67	Lockstep.Mugen.Battle	MCharLoader	SpawnChar	MChar SpawnChar(MCharData data, int id, int startStateNo = 0, int startAnimNo = 0)	needs-reference	
+Assets/Logic/Mugen/Battle/MCharLoader.cs	90	Lockstep.Mugen.Battle	MCharLoader	ApplyInitialStateHeader	void ApplyInitialStateHeader(MChar c, MCharData data, int stateNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MCharLoader.cs	100	Lockstep.Mugen.Battle	MCharLoader	MergeStates	void MergeStates(Dictionary<int, MStateDef> into, Dictionary<int, MStateDef> from)	needs-reference	
+Assets/Logic/Mugen/Battle/MMovePreviewSession.cs	31	Lockstep.Mugen.Battle	MMovePreviewSession	MMovePreviewSession	MMovePreviewSession(IReadOnlyList<MCommandDef> commands, bool facingRight, int targetStateNo, string label = "", int maxSearchFrames = 90, int maxMoveFrames = 180)	needs-reference	
+Assets/Logic/Mugen/Battle/MMovePreviewSession.cs	47	Lockstep.Mugen.Battle	MMovePreviewSession	NextInput	MInput NextInput()	needs-reference	
+Assets/Logic/Mugen/Battle/MMovePreviewSession.cs	56	Lockstep.Mugen.Battle	MMovePreviewSession	AfterTick	void AfterTick(MBattleEngine engine)	needs-reference	
+Assets/Logic/Mugen/Battle/MMovePreviewSession.cs	112	Lockstep.Mugen.Battle	MMovePreviewSession	IsDefaultReady	bool IsDefaultReady(MChar actor)	needs-reference	
+Assets/Logic/Mugen/Battle/MMovePreviewSession.cs	117	Lockstep.Mugen.Battle	MMovePreviewSession	FormatStatus	string FormatStatus(string status, MChar actor)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	31	Lockstep.Mugen.Battle	MMovePrerequisiteProfile	DefaultSet	List<MMovePrerequisiteProfile> DefaultSet()	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	76	Lockstep.Mugen.Battle	MMoveTestRunner	Run	MMoveTestResult Run( MCharData data, IReadOnlyList<MCommandDef> commands, int targetStateNo, IReadOnlyList<MMovePrerequisiteProfile> profiles = null, int warmupFrames = 5, int tailFrames = 45)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	116	Lockstep.Mugen.Battle	MMoveTestRunner	RunProfile	MMoveTestResult RunProfile( MCharData data, IReadOnlyList<MCommandDef> commands, int targetStateNo, MMovePrerequisiteProfile profile, int warmupFrames, int tailFrames)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	155	Lockstep.Mugen.Battle	MMoveTestRunner	RunAttempt	MMoveAttempt RunAttempt( MBattleEngine engine, IReadOnlyList<MCommandDef> commands, int targetStateNo, int tailFrames)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	197	Lockstep.Mugen.Battle	MMoveTestRunner	AnyCommandActive	bool AnyCommandActive(MChar actor, IReadOnlyList<MCommandDef> commands)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	213	Lockstep.Mugen.Battle	MMoveTestRunner	Classify	MMoveTestStatus Classify(MMoveAttempt attempt, bool deterministic)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	226	Lockstep.Mugen.Battle	MMoveTestRunner	ApplyProfile	void ApplyProfile(MBattleEngine engine, MMovePrerequisiteProfile profile)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	254	Lockstep.Mugen.Battle	MMoveTestRunner	CreateEngine	MBattleEngine CreateEngine(MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MMoveTestRunner.cs	269	Lockstep.Mugen.Battle	MMoveTestRunner	Rank	int Rank(MMoveTestStatus status)	needs-reference	
+Assets/Logic/Mugen/Battle/MPhysics.cs	21	Lockstep.Mugen.Battle	MPhysics	Step	void Step(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MPhysics.cs	51	Lockstep.Mugen.Battle	MPhysics	ApplyGroundFriction	void ApplyGroundFriction(MChar c, FFloat friction, FFloat threshold)	needs-reference	
+Assets/Logic/Mugen/Battle/MPlayerResourceRegistry.cs	13	Lockstep.Mugen.Battle	MPlayerResourceRegistry	Register	int Register(MCharData data)	needs-reference	
+Assets/Logic/Mugen/Battle/MPlayerResourceRegistry.cs	20	Lockstep.Mugen.Battle	MPlayerResourceRegistry	Get	MCharData Get(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MPlayerResourceRegistry.cs	25	Lockstep.Mugen.Battle	MPlayerResourceRegistry	Animations	IReadOnlyDictionary<int, MAnimData> Animations(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MPlayerResourceRegistry.cs	30	Lockstep.Mugen.Battle	MPlayerResourceRegistry	LocalCoordWidth	int LocalCoordWidth(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	48	Lockstep.Mugen.Battle	MRoundSystem	MRoundSystem	MRoundSystem(MBattleEngine engine)	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	55	Lockstep.Mugen.Battle	MRoundSystem	Tick	void Tick(IReadOnlyList<MInput> inputs)	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	67	Lockstep.Mugen.Battle	MRoundSystem	StepRoundState	void StepRoundState()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	101	Lockstep.Mugen.Battle	MRoundSystem	EnterFight	void EnterFight()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	110	Lockstep.Mugen.Battle	MRoundSystem	CheckRoundEnd	void CheckRoundEnd()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	136	Lockstep.Mugen.Battle	MRoundSystem	DecideWinner	int DecideWinner(bool ko0, bool ko1, int life0, int life1)	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	145	Lockstep.Mugen.Battle	MRoundSystem	EnterPreOver	void EnterPreOver()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	157	Lockstep.Mugen.Battle	MRoundSystem	EnterOver	void EnterOver()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	167	Lockstep.Mugen.Battle	MRoundSystem	AdvanceAfterRound	void AdvanceAfterRound()	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	188	Lockstep.Mugen.Battle	MRoundSystem	ResetCombatant	void ResetCombatant(MChar c)	needs-reference	
+Assets/Logic/Mugen/Battle/MRoundSystem.cs	201	Lockstep.Mugen.Battle	MRoundSystem	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	174	Lockstep.Mugen.Char	MChar	RequestHelper	void RequestHelper(int stateNo, int helperType, FFloat posX, FFloat posY, int facing, bool keyCtrl)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	185	Lockstep.Mugen.Char	MChar	RequestProjectile	void RequestProjectile(int projId, FFloat velX, FFloat velY, FFloat accelX, FFloat accelY, FFloat posX, FFloat posY, int removeTime, int animNo, Hit.MHitDef hitDef)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	197	Lockstep.Mugen.Char	MChar	RecordProjectileContact	void RecordProjectileContact(int projId, bool guarded)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	204	Lockstep.Mugen.Char	MChar	ProjectileContactTimeValue	BytecodeValue ProjectileContactTimeValue(int projId, int wantedType)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	278	Lockstep.Mugen.Char	MChar	ComputeFinalDefense	FFloat ComputeFinalDefense()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	286	Lockstep.Mugen.Char	MChar	AttackDamageMul	FFloat AttackDamageMul()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	293	Lockstep.Mugen.Char	MChar	Control	bool Control()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	302	Lockstep.Mugen.Char	MChar	SetPause	void SetPause(int pausetime, int movetime)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	316	Lockstep.Mugen.Char	MChar	SetSuperPause	void SetSuperPause(int pausetime, int movetime, bool unhittable)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	332	Lockstep.Mugen.Char	MChar	ComputePauseBool	void ComputePauseBool()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	357	Lockstep.Mugen.Char	MChar	AnimExists	bool AnimExists(int animNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	364	Lockstep.Mugen.Char	MChar	SelfAnimExists	bool SelfAnimExists(int animNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	369	Lockstep.Mugen.Char	MChar	AnimExistsFor	bool AnimExistsFor(int playerNo, int animNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	375	Lockstep.Mugen.Char	MChar	DataFor	MCharData DataFor(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	384	Lockstep.Mugen.Char	MChar	AnimationsFor	IReadOnlyDictionary<int, Anim.MAnimData> AnimationsFor(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	391	Lockstep.Mugen.Char	MChar	CurrentAnimTable	IReadOnlyDictionary<int, Anim.MAnimData> CurrentAnimTable()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	396	Lockstep.Mugen.Char	MChar	LocalCoordWidthFor	int LocalCoordWidthFor(int playerNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	404	Lockstep.Mugen.Char	MChar	PlayAnimation	bool PlayAnimation(int animNo, int animPlayerNo, int spritePlayerNo, int elem = 0, int elemTime = 0)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	416	Lockstep.Mugen.Char	MChar	QueueTransition	void QueueTransition(int stateNo, int ownerPlayerNo, int animNo = -1, int ctrl = -1)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	429	Lockstep.Mugen.Char	MChar	ComputeAnimElemTime	int ComputeAnimElemTime(int elemNo1Based)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	460	Lockstep.Mugen.Char	MChar	DistX	FFloat DistX(MChar opp)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	466	Lockstep.Mugen.Char	MChar	BodyDistX	FFloat BodyDistX(MChar opp)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	474	Lockstep.Mugen.Char	MChar	AbsDistX	FFloat AbsDistX(MChar opp)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	483	Lockstep.Mugen.Char	MChar	HitShakeOver	bool HitShakeOver()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	489	Lockstep.Mugen.Char	MChar	HitOver	bool HitOver()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	495	Lockstep.Mugen.Char	MChar	CanRecover	bool CanRecover()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	505	Lockstep.Mugen.Char	MChar	GetHitAnimType	int GetHitAnimType()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	526	Lockstep.Mugen.Char	MChar	CanChangeAnimTo	bool CanChangeAnimTo(int animNo)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	532	Lockstep.Mugen.Char	MChar	BindTo	void BindTo(MChar target, int time, FVector3 offset, int bindFacing)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	540	Lockstep.Mugen.Char	MChar	ApplyBind	void ApplyBind()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	564	Lockstep.Mugen.Char	MChar	ClearTargets	void ClearTargets()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	570	Lockstep.Mugen.Char	MChar	AddTarget	void AddTarget(MChar target, int hitDefId)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	580	Lockstep.Mugen.Char	MChar	HasTarget	bool HasTarget(MChar target)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	592	Lockstep.Mugen.Char	MChar	SelectTargetsByHitId	List<MChar> SelectTargetsByHitId(int hitDefId, int matchIndex)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	630	Lockstep.Mugen.Char	MChar	Clone	MChar Clone()	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	692	Lockstep.Mugen.Char	MChar	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	760	Lockstep.Mugen.Char	MChar	HashVars	void HashVars(ref Hash64 hash, Dictionary<int, int> vars)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	772	Lockstep.Mugen.Char	MChar	HashFloatVars	void HashFloatVars(ref Hash64 hash, Dictionary<int, FFloat> vars)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	786	Lockstep.Mugen.Char	MChar	ReadTrigger	BytecodeValue ReadTrigger(OpCode op, byte[] code, ref int i, List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	983	Lockstep.Mugen.Char	MChar	JugglePoints	int JugglePoints(int targetId)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	998	Lockstep.Mugen.Char	MChar	ReadGetHitVar	BytecodeValue ReadGetHitVar(int fieldId)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1028	Lockstep.Mugen.Char	MChar	Redirect	IExprContext Redirect(OpCode op, List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1067	Lockstep.Mugen.Char	MChar	ReadVariable	BytecodeValue ReadVariable(OpCode op, int index)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1084	Lockstep.Mugen.Char	MChar	Redirect	IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1097	Lockstep.Mugen.Char	MChar	FindTargetRedirect	IExprContext FindTargetRedirect(int targetId, int matchIndex)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1107	Lockstep.Mugen.Char	MChar	FindHelperRedirect	IExprContext FindHelperRedirect(int helperType, int matchIndex)	needs-reference	
+Assets/Logic/Mugen/Char/Char.cs	1140	Lockstep.Mugen.Char	MChar	Pop	BytecodeValue Pop(List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Char/GetHitVar.cs	63	Lockstep.Mugen.Char	MGetHitVar	GetJuggle	int GetJuggle(int playerId, int defaultJuggle)	needs-reference	
+Assets/Logic/Mugen/Char/GetHitVar.cs	75	Lockstep.Mugen.Char	MGetHitVar	SetJuggle	void SetJuggle(int playerId, int points)	needs-reference	
+Assets/Logic/Mugen/Char/GetHitVar.cs	88	Lockstep.Mugen.Char	MGetHitVar	Clone	MGetHitVar Clone()	needs-reference	
+Assets/Logic/Mugen/Char/GetHitVar.cs	106	Lockstep.Mugen.Char	MGetHitVar	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MConstants.cs	66	Lockstep.Mugen.Char	MConstants	Read	BytecodeValue Read(MConstId id)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	63	Lockstep.Mugen.Char	MExplod	Clone	MExplod Clone()	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	87	Lockstep.Mugen.Char	MExplod	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	124	Lockstep.Mugen.Char	MEntityWorld	AllocId	int AllocId()	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	129	Lockstep.Mugen.Char	MEntityWorld	RequestHelper	void RequestHelper(MHelperRequest request)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	134	Lockstep.Mugen.Char	MEntityWorld	RequestProjectile	void RequestProjectile(MProjectileRequest request)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	139	Lockstep.Mugen.Char	MEntityWorld	CountHelpers	int CountHelpers(int helperType)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	150	Lockstep.Mugen.Char	MEntityWorld	CountProjectiles	int CountProjectiles(int projId)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	161	Lockstep.Mugen.Char	MEntityWorld	AddExplod	void AddExplod(MExplod explod)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	166	Lockstep.Mugen.Char	MEntityWorld	CountExplods	int CountExplods(int explodId, int ownerId)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	180	Lockstep.Mugen.Char	MEntityWorld	FindExplods	List<MExplod> FindExplods(int explodId, int ownerId, int matchIndex)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	208	Lockstep.Mugen.Char	MEntityWorld	RemoveExplods	void RemoveExplods(int explodId, int ownerId, int matchIndex)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	232	Lockstep.Mugen.Char	MEntityWorld	Clone	MEntityWorld Clone()	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	249	Lockstep.Mugen.Char	MEntityWorld	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	269	Lockstep.Mugen.Char	MEntityWorld	WriteHash	void WriteHash(ref Hash64 hash, MHelperRequest request)	needs-reference	
+Assets/Logic/Mugen/Char/MEntityWorld.cs	281	Lockstep.Mugen.Char	MEntityWorld	WriteHash	void WriteHash(ref Hash64 hash, MProjectileRequest request)	needs-reference	
+Assets/Logic/Mugen/Char/MFrameEvents.cs	42	Lockstep.Mugen.Char	MFrameEvents	BeginFrame	void BeginFrame(int frame)	needs-reference	
+Assets/Logic/Mugen/Char/MHitOverride.cs	23	Lockstep.Mugen.Char	MHitOverride	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MPauseState.cs	28	Lockstep.Mugen.Char	MPauseState	Step	void Step()	needs-reference	
+Assets/Logic/Mugen/Char/MPauseState.cs	50	Lockstep.Mugen.Char	MPauseState	Clone	MPauseState Clone()	needs-reference	
+Assets/Logic/Mugen/Char/MPauseState.cs	60	Lockstep.Mugen.Char	MPauseState	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MProjectile.cs	37	Lockstep.Mugen.Char	MProjectile	Step	void Step()	needs-reference	
+Assets/Logic/Mugen/Char/MProjectile.cs	50	Lockstep.Mugen.Char	MProjectile	Clone	MProjectile Clone()	needs-reference	
+Assets/Logic/Mugen/Char/MProjectile.cs	63	Lockstep.Mugen.Char	MProjectile	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Char/MProjectile.cs	79	Lockstep.Mugen.Char	MProjectile	WriteClsn	void WriteClsn(ref Hash64 hash, Hit.MClsnBox[] boxes)	needs-reference	
+Assets/Logic/Mugen/Char/MRandom.cs	19	Lockstep.Mugen.Char	MRandom	MRandom	MRandom(int seed)	needs-reference	
+Assets/Logic/Mugen/Char/MRandom.cs	26	Lockstep.Mugen.Char	MRandom	Random	int Random()	needs-reference	
+Assets/Logic/Mugen/Char/MRandom.cs	38	Lockstep.Mugen.Char	MRandom	Rand	int Rand(int min, int max)	needs-reference	
+Assets/Logic/Mugen/Char/MReversalDefRuntime.cs	15	Lockstep.Mugen.Char	MReversalDefRuntime	Clone	MReversalDefRuntime Clone()	needs-reference	
+Assets/Logic/Mugen/Char/MReversalDefRuntime.cs	27	Lockstep.Mugen.Char	MReversalDefRuntime	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	11	Lockstep.Mugen.Command	MCommandInputSynthesizer	BuildSequence	List<MInput> BuildSequence(MCommandDef command, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	24	Lockstep.Mugen.Command	MCommandInputSynthesizer	BuildCombinedSequence	List<MInput> BuildCombinedSequence(IReadOnlyList<MCommandDef> commands, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	56	Lockstep.Mugen.Command	MCommandInputSynthesizer	ActivationPrefix	List<MInput> ActivationPrefix(MCommandDef command, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	72	Lockstep.Mugen.Command	MCommandInputSynthesizer	AppendStep	void AppendStep(List<MInput> frames, MCommandStep step, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	109	Lockstep.Mugen.Command	MCommandInputSynthesizer	SelectedKeys	List<MCommandKey> SelectedKeys(MCommandStep step)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandInputSynthesizer.cs	128	Lockstep.Mugen.Command	MCommandInputSynthesizer	KeyBits	MInput KeyBits(MCommandKey key, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	20	Lockstep.Mugen.Command	MCommandList	Update	void Update(MInput input, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	52	Lockstep.Mugen.Command	MCommandList	IsActive	bool IsActive(string name)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	65	Lockstep.Mugen.Command	MCommandList	ActiveNames	List<string> ActiveNames()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	91	Lockstep.Mugen.Command	MCommandList	ResetRuntime	void ResetRuntime()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	104	Lockstep.Mugen.Command	MCommandList	Clone	MCommandList Clone()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	122	Lockstep.Mugen.Command	MCommandList	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandList.cs	134	Lockstep.Mugen.Command	MCommandList	EnsureRuntimes	void EnsureRuntimes()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	15	Lockstep.Mugen.Command	MCommandMatcher	Matches	bool Matches(MCommandDef cmd, MCommandBuffer buf, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	65	Lockstep.Mugen.Command	MCommandRuntime	MCommandRuntime	MCommandRuntime(MCommandDef definition)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	73	Lockstep.Mugen.Command	MCommandRuntime	MCommandRuntime	MCommandRuntime(MCommandRuntime source)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	85	Lockstep.Mugen.Command	MCommandRuntime	Clone	MCommandRuntime Clone()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	87	Lockstep.Mugen.Command	MCommandRuntime	Step	bool Step(MInputBuffer input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	173	Lockstep.Mugen.Command	MCommandRuntime	ClearProgress	void ClearProgress()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	180	Lockstep.Mugen.Command	MCommandRuntime	Reset	void Reset()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	186	Lockstep.Mugen.Command	MCommandRuntime	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	198	Lockstep.Mugen.Command	MCommandRuntime	StepMatches	bool StepMatches(MCommandStep step, MInputBuffer input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	219	Lockstep.Mugen.Command	MCommandRuntime	KeyMatches	bool KeyMatches(MCommandKey key, MInputBuffer input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	226	Lockstep.Mugen.Command	MCommandRuntime	GreaterCheckFail	bool GreaterCheckFail(MCommandStep step, MInputBuffer input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	252	Lockstep.Mugen.Command	MCommandRuntime	ChangedKeyNotAllowed	bool ChangedKeyNotAllowed(MCommandKey key, MCommandStep step, MInputBuffer input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	269	Lockstep.Mugen.Command	MCommandRuntime	Contains	bool Contains(MCommandStep step, MCommandKey key, bool release)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	278	Lockstep.Mugen.Command	MCommandRuntime	BuildLoopOrder	int[] BuildLoopOrder(List<MCommandStep> steps)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	299	Lockstep.Mugen.Command	MCommandRuntime	IsDirToButton	bool IsDirToButton(MCommandStep current, MCommandStep next)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	325	Lockstep.Mugen.Command	MCommandRuntime	SameKey	bool SameKey(MCommandKey a, MCommandKey b)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	331	Lockstep.Mugen.Command	MCommandRuntime	Dir	MCommandKey Dir(MInput bits)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	332	Lockstep.Mugen.Command	MCommandRuntime	Back	MCommandKey Back()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	333	Lockstep.Mugen.Command	MCommandRuntime	Forward	MCommandKey Forward()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	334	Lockstep.Mugen.Command	MCommandRuntime	Diagonal	MCommandKey Diagonal(MInput vertical, bool back)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMatcher.cs	340	Lockstep.Mugen.Command	MCommandRuntime	Button	MCommandKey Button(MInput bit)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	58	Lockstep.Mugen.Command	MCommandBuffer	MCommandBuffer	MCommandBuffer(int capacity = 60)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	66	Lockstep.Mugen.Command	MCommandBuffer	Push	void Push(MInput input)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	73	Lockstep.Mugen.Command	MCommandBuffer	Ago	MInput Ago(int n)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	82	Lockstep.Mugen.Command	MCommandBuffer	Clear	void Clear()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	91	Lockstep.Mugen.Command	MCommandBuffer	Clone	MCommandBuffer Clone()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandModel.cs	98	Lockstep.Mugen.Command	MCommandBuffer	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveCatalog.cs	18	Lockstep.Mugen.Command	MCommandMoveCatalog	Build	List<MCommandMoveInfo> Build( IReadOnlyList<MCommandDef> commands, IReadOnlyList<MCommandTransitionEntry> transitions)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveCatalog.cs	57	Lockstep.Mugen.Command	MCommandMoveCatalog	First	MCommandDef First(IReadOnlyList<MCommandDef> commands, string name)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	7	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	FormatMotion	string FormatMotion(string motion)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	28	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	FormatMove	string FormatMove(MCommandMoveInfo move)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	39	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	FormatMoveInput	string FormatMoveInput(MCommandMoveInfo move)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	54	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	KeyboardLegend	string KeyboardLegend()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	59	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	FormatStep	string FormatStep(string step)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	74	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	FormatToken	string FormatToken(string token)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	105	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	KeyLabel	string KeyLabel(string key)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandMoveHelpFormatter.cs	128	Lockstep.Mugen.Command	MCommandMoveHelpFormatter	AnyDirectionLabel	string AnyDirectionLabel(string key)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	12	Lockstep.Mugen.Command	MCommandParser	Parse	MCommandDef Parse(string name, string motion, int time = 15, int bufferTime = 1)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	55	Lockstep.Mugen.Command	MCommandParser	AddExpandedStep	void AddExpandedStep(List<MCommandStep> steps, MCommandStep step)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	75	Lockstep.Mugen.Command	MCommandParser	IsSameSingleDirectionTap	bool IsSameSingleDirectionTap(MCommandStep previous, MCommandStep current)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	87	Lockstep.Mugen.Command	MCommandParser	IsSingleDirectionTap	bool IsSingleDirectionTap(MCommandStep step)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	101	Lockstep.Mugen.Command	MCommandParser	ParseKey	MCommandKey ParseKey(string token, ref bool greater)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandParser.cs	146	Lockstep.Mugen.Command	MCommandParser	ApplyKeyBody	void ApplyKeyBody(ref MCommandKey key, string body)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	17	Lockstep.Mugen.Command	MCommandTransitionEntry	Describe	string Describe()	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	29	Lockstep.Mugen.Command	MCommandTransitionCatalog	Parse	List<MCommandTransitionEntry> Parse(string text)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	116	Lockstep.Mugen.Command	MCommandTransitionCatalog	ExtractPositiveCommandNames	List<string> ExtractPositiveCommandNames(string expression)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	127	Lockstep.Mugen.Command	MCommandTransitionCatalog	Flush	void Flush(List<MCommandTransitionEntry> result, string controllerType, string targetValue, List<string> triggerAll, SortedDictionary<int, List<string>> triggerGroups, int controllerOrdinal)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	147	Lockstep.Mugen.Command	MCommandTransitionCatalog	AddEntry	void AddEntry(List<MCommandTransitionEntry> result, string controllerType, string targetValue, List<string> triggerAll, List<string> triggerGroup, int groupNo, int controllerOrdinal)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	169	Lockstep.Mugen.Command	MCommandTransitionCatalog	AppendCommandNames	void AppendCommandNames(List<string> result, List<string> expressions)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	189	Lockstep.Mugen.Command	MCommandTransitionCatalog	Header	string Header(string line)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	195	Lockstep.Mugen.Command	MCommandTransitionCatalog	StripComment	string StripComment(string line)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	201	Lockstep.Mugen.Command	MCommandTransitionCatalog	ParseTrailingInt	int ParseTrailingInt(string text)	needs-reference	
+Assets/Logic/Mugen/Command/MCommandTransitionCatalog.cs	214	Lockstep.Mugen.Command	MCommandTransitionCatalog	ParseLiteralInt	int? ParseLiteralInt(string text)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	29	Lockstep.Mugen.Command	MInputBuffer	Update	void Update(MInput input, bool facingRight)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	68	Lockstep.Mugen.Command	MInputBuffer	Step	void Step(bool held, ref int buffer)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	79	Lockstep.Mugen.Command	MInputBuffer	State	int State(MCommandKey key)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	106	Lockstep.Mugen.Command	MInputBuffer	StateCharge	int StateCharge(MCommandKey key)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	124	Lockstep.Mugen.Command	MInputBuffer	DollarState	int DollarState(MCommandKey key)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	139	Lockstep.Mugen.Command	MInputBuffer	StrictDirectionState	int StrictDirectionState(MCommandKey key, bool previous)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	165	Lockstep.Mugen.Command	MInputBuffer	DirectionReleaseEligible	bool DirectionReleaseEligible(MCommandKey key)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	176	Lockstep.Mugen.Command	MInputBuffer	DirectionHeld	bool DirectionHeld(MCommandKey key, bool previous)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	193	Lockstep.Mugen.Command	MInputBuffer	DirectionComponentMinimum	int DirectionComponentMinimum(MCommandKey key, bool previous)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	205	Lockstep.Mugen.Command	MInputBuffer	MinimumRelevantDirectionAge	int MinimumRelevantDirectionAge(MCommandKey key)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	214	Lockstep.Mugen.Command	MInputBuffer	ButtonCurrent	int ButtonCurrent(MInput bit)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	226	Lockstep.Mugen.Command	MInputBuffer	ButtonPrevious	int ButtonPrevious(MInput bit)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	238	Lockstep.Mugen.Command	MInputBuffer	Released	bool Released(int current, int previous)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	239	Lockstep.Mugen.Command	MInputBuffer	Min	int Min(int a, int b)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	240	Lockstep.Mugen.Command	MInputBuffer	Max	int Max(int a, int b)	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	242	Lockstep.Mugen.Command	MInputBuffer	Clone	MInputBuffer Clone()	needs-reference	
+Assets/Logic/Mugen/Command/MInputBuffer.cs	253	Lockstep.Mugen.Command	MInputBuffer	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Command/MInputDisplayFormatter.cs	7	Lockstep.Mugen.Command	MInputDisplayFormatter	Format	string Format(MInput input)	needs-reference	
+Assets/Logic/Mugen/Command/MInputDisplayFormatter.cs	29	Lockstep.Mugen.Command	MInputDisplayFormatter	Add	void Add(List<string> names, MInput input, MInput bit, string label)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	16	Lockstep.Mugen.Expr	IExprContext	ReadTrigger	BytecodeValue ReadTrigger(OpCode op, byte[] code, ref int i, List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	23	Lockstep.Mugen.Expr	IExprContext	Redirect	IExprContext Redirect(OpCode op, List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	32	Lockstep.Mugen.Expr	IExprVariableContext	ReadVariable	BytecodeValue ReadVariable(OpCode op, int index)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	41	Lockstep.Mugen.Expr	IExprTwoArgumentRedirectContext	Redirect	IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	49	Lockstep.Mugen.Expr	BytecodeExp	BytecodeExp	BytecodeExp(byte[] code)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	57	Lockstep.Mugen.Expr	BytecodeExp	Run	BytecodeValue Run(IExprContext context)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	238	Lockstep.Mugen.Expr	BytecodeExp	Binary	void Binary(List<BytecodeValue> stack, BinOp op)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	245	Lockstep.Mugen.Expr	BytecodeExp	Unary	void Unary(List<BytecodeValue> stack, UnOp op)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	250	Lockstep.Mugen.Expr	BytecodeExp	RangeOp	void RangeOp(List<BytecodeValue> stack, bool incMin, bool incMax)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	258	Lockstep.Mugen.Expr	BytecodeExp	Pop	BytecodeValue Pop(List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	269	Lockstep.Mugen.Expr	BytecodeExp	Peek	BytecodeValue Peek(List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	274	Lockstep.Mugen.Expr	BytecodeExp	Swap	void Swap(List<BytecodeValue> stack)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	287	Lockstep.Mugen.Expr	BytecodeExp	Jump8	int Jump8(int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	294	Lockstep.Mugen.Expr	BytecodeExp	Jump32	int Jump32(int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	300	Lockstep.Mugen.Expr	BytecodeExp	Peek32	int Peek32(int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	306	Lockstep.Mugen.Expr	BytecodeExp	Slice	byte[] Slice(int start, int len)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	313	Lockstep.Mugen.Expr	BytecodeExp	ReadInt32	int ReadInt32(ref int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeExp.cs	320	Lockstep.Mugen.Expr	BytecodeExp	ReadInt64	long ReadInt64(ref int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	15	Lockstep.Mugen.Expr	BytecodeOps	IsFloatOp	bool IsFloatOp(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	22	Lockstep.Mugen.Expr	BytecodeOps	Neg	BytecodeValue Neg(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	27	Lockstep.Mugen.Expr	BytecodeOps	Not	BytecodeValue Not(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	32	Lockstep.Mugen.Expr	BytecodeOps	BlNot	BytecodeValue BlNot(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	37	Lockstep.Mugen.Expr	BytecodeOps	Abs	BytecodeValue Abs(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	47	Lockstep.Mugen.Expr	BytecodeOps	Add	BytecodeValue Add(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	52	Lockstep.Mugen.Expr	BytecodeOps	Sub	BytecodeValue Sub(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	57	Lockstep.Mugen.Expr	BytecodeOps	Mul	BytecodeValue Mul(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	62	Lockstep.Mugen.Expr	BytecodeOps	Div	BytecodeValue Div(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	71	Lockstep.Mugen.Expr	BytecodeOps	Mod	BytecodeValue Mod(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	81	Lockstep.Mugen.Expr	BytecodeOps	Pow	BytecodeValue Pow(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	103	Lockstep.Mugen.Expr	BytecodeOps	Eq	BytecodeValue Eq(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	108	Lockstep.Mugen.Expr	BytecodeOps	Ne	BytecodeValue Ne(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	113	Lockstep.Mugen.Expr	BytecodeOps	Gt	BytecodeValue Gt(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	118	Lockstep.Mugen.Expr	BytecodeOps	Ge	BytecodeValue Ge(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	123	Lockstep.Mugen.Expr	BytecodeOps	Lt	BytecodeValue Lt(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	128	Lockstep.Mugen.Expr	BytecodeOps	Le	BytecodeValue Le(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	134	Lockstep.Mugen.Expr	BytecodeOps	And	BytecodeValue And(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	135	Lockstep.Mugen.Expr	BytecodeOps	Or	BytecodeValue Or(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	136	Lockstep.Mugen.Expr	BytecodeOps	Xor	BytecodeValue Xor(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	137	Lockstep.Mugen.Expr	BytecodeOps	BlAnd	BytecodeValue BlAnd(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	138	Lockstep.Mugen.Expr	BytecodeOps	BlOr	BytecodeValue BlOr(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	139	Lockstep.Mugen.Expr	BytecodeOps	BlXor	BytecodeValue BlXor(BytecodeValue a, BytecodeValue b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	142	Lockstep.Mugen.Expr	BytecodeOps	Range	BytecodeValue Range(BytecodeValue v, BytecodeValue min, BytecodeValue max, bool incMin, bool incMax)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	167	Lockstep.Mugen.Expr	BytecodeOps	Exp	BytecodeValue Exp(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	168	Lockstep.Mugen.Expr	BytecodeOps	Cos	BytecodeValue Cos(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	169	Lockstep.Mugen.Expr	BytecodeOps	Sin	BytecodeValue Sin(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	170	Lockstep.Mugen.Expr	BytecodeOps	Tan	BytecodeValue Tan(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	171	Lockstep.Mugen.Expr	BytecodeOps	Acos	BytecodeValue Acos(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	172	Lockstep.Mugen.Expr	BytecodeOps	Asin	BytecodeValue Asin(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	173	Lockstep.Mugen.Expr	BytecodeOps	Atan	BytecodeValue Atan(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	175	Lockstep.Mugen.Expr	BytecodeOps	Ln	BytecodeValue Ln(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	180	Lockstep.Mugen.Expr	BytecodeOps	Log	BytecodeValue Log(BytecodeValue baseV, BytecodeValue x)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	190	Lockstep.Mugen.Expr	BytecodeOps	Floor	BytecodeValue Floor(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeOps.cs	199	Lockstep.Mugen.Expr	BytecodeOps	Ceil	BytecodeValue Ceil(BytecodeValue v)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	34	Lockstep.Mugen.Expr	BytecodeValue	BytecodeValue	BytecodeValue(ValueType vtype, long ival, FFloat fval)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	43	Lockstep.Mugen.Expr	BytecodeValue	IsNone	bool IsNone()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	48	Lockstep.Mugen.Expr	BytecodeValue	IsUndefined	bool IsUndefined()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	54	Lockstep.Mugen.Expr	BytecodeValue	ToF	FFloat ToF()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	68	Lockstep.Mugen.Expr	BytecodeValue	ToI	int ToI()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	73	Lockstep.Mugen.Expr	BytecodeValue	ToI64	long ToI64()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	87	Lockstep.Mugen.Expr	BytecodeValue	ToB	bool ToB()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	101	Lockstep.Mugen.Expr	BytecodeValue	TruncToLong	long TruncToLong(FFloat value)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	115	Lockstep.Mugen.Expr	BytecodeValue	None	BytecodeValue None()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	120	Lockstep.Mugen.Expr	BytecodeValue	Undefined	BytecodeValue Undefined()	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	125	Lockstep.Mugen.Expr	BytecodeValue	Float	BytecodeValue Float(FFloat f)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	130	Lockstep.Mugen.Expr	BytecodeValue	Int	BytecodeValue Int(int i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	135	Lockstep.Mugen.Expr	BytecodeValue	Int64	BytecodeValue Int64(long i)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	140	Lockstep.Mugen.Expr	BytecodeValue	Bool	BytecodeValue Bool(bool b)	needs-reference	
+Assets/Logic/Mugen/Expr/BytecodeValue.cs	145	Lockstep.Mugen.Expr	BytecodeValue	ToString	string ToString()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	32	Lockstep.Mugen.Expr	MugenExprCompiler	Compile	BytecodeExp Compile(string expr)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	41	Lockstep.Mugen.Expr	MugenExprCompiler	CompileStrict	MugenExprCompileResult CompileStrict(string expr)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	46	Lockstep.Mugen.Expr	MugenExprCompiler	CompileCore	MugenExprCompileResult CompileCore(string expr)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	67	Lockstep.Mugen.Expr	MugenExprCompiler	Tokenize	List<Tok> Tokenize(string s, List<MugenExprDiagnostic> diagnostics)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	204	Lockstep.Mugen.Expr	MugenExprCompiler	ParseFixed	FFloat ParseFixed(string num)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	228	Lockstep.Mugen.Expr	MugenExprCompiler	IsOp	bool IsOp(string op)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	229	Lockstep.Mugen.Expr	MugenExprCompiler	Next	void Next()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	231	Lockstep.Mugen.Expr	MugenExprCompiler	Error	void Error(MugenExprDiagnosticCode code, Tok token, string message)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	241	Lockstep.Mugen.Expr	MugenExprCompiler	ParseBoolOr	void ParseBoolOr()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	251	Lockstep.Mugen.Expr	MugenExprCompiler	ParseBoolXor	void ParseBoolXor()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	256	Lockstep.Mugen.Expr	MugenExprCompiler	ParseBoolAnd	void ParseBoolAnd()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	266	Lockstep.Mugen.Expr	MugenExprCompiler	ParseOr	void ParseOr()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	271	Lockstep.Mugen.Expr	MugenExprCompiler	ParseXor	void ParseXor()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	276	Lockstep.Mugen.Expr	MugenExprCompiler	ParseAnd	void ParseAnd()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	281	Lockstep.Mugen.Expr	MugenExprCompiler	ParseEqne	void ParseEqne()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	303	Lockstep.Mugen.Expr	MugenExprCompiler	EmitRange	void EmitRange(bool negate)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	318	Lockstep.Mugen.Expr	MugenExprCompiler	ParseGrls	void ParseGrls()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	330	Lockstep.Mugen.Expr	MugenExprCompiler	ParseAddSub	void ParseAddSub()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	340	Lockstep.Mugen.Expr	MugenExprCompiler	ParseMulDiv	void ParseMulDiv()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	351	Lockstep.Mugen.Expr	MugenExprCompiler	ParsePow	void ParsePow()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	357	Lockstep.Mugen.Expr	MugenExprCompiler	ParseUnary	void ParseUnary()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	366	Lockstep.Mugen.Expr	MugenExprCompiler	ParseValue	void ParseValue()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	403	Lockstep.Mugen.Expr	MugenExprCompiler	ParseIdent	void ParseIdent()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	542	Lockstep.Mugen.Expr	MugenExprCompiler	ParseFunction	void ParseFunction(string name, Tok identifier)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	633	Lockstep.Mugen.Expr	MugenExprCompiler	EmitProjectileContactAlias	void EmitProjectileContactAlias(string name)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	652	Lockstep.Mugen.Expr	MugenExprCompiler	Expect	void Expect(string op)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	664	Lockstep.Mugen.Expr	MugenExprCompiler	Capture	List<byte> Capture(Action parser)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	674	Lockstep.Mugen.Expr	MugenExprCompiler	EmitShortCircuit	void EmitShortCircuit(OpCode shortJump, OpCode longJump, List<byte> right)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	681	Lockstep.Mugen.Expr	MugenExprCompiler	EmitConditional	void EmitConditional(List<byte> trueValue, List<byte> falseValue)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	697	Lockstep.Mugen.Expr	MugenExprCompiler	AppendJump	void AppendJump(OpCode shortJump, OpCode longJump, int skippedByteCount)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	702	Lockstep.Mugen.Expr	MugenExprCompiler	AppendJump	void AppendJump( List<byte> output, OpCode shortJump, OpCode longJump, int skippedByteCount)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	723	Lockstep.Mugen.Expr	MugenExprCompiler	ReadDottedName	string ReadDottedName()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	742	Lockstep.Mugen.Expr	MugenExprCompiler	ConstFieldId	MConstId ConstFieldId(string field)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	749	Lockstep.Mugen.Expr	MugenExprCompiler	EmitTypeCompare	void EmitTypeCompare(string trigger)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	768	Lockstep.Mugen.Expr	MugenExprCompiler	EmitAnimElemCompare	void EmitAnimElemCompare()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	787	Lockstep.Mugen.Expr	MugenExprCompiler	TypeOpcode	OpCode TypeOpcode(string trigger)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	798	Lockstep.Mugen.Expr	MugenExprCompiler	EmitP2TypeCompare	void EmitP2TypeCompare(string baseTrigger)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	815	Lockstep.Mugen.Expr	MugenExprCompiler	EmitCommandCompare	void EmitCommandCompare()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	833	Lockstep.Mugen.Expr	MugenExprCompiler	EmitNameCompare	void EmitNameCompare()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	851	Lockstep.Mugen.Expr	MugenExprCompiler	EmitRedirectedNameCompare	void EmitRedirectedNameCompare()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	867	Lockstep.Mugen.Expr	MugenExprCompiler	EmitTypeCheck	void EmitTypeCheck(OpCode op, bool isMove)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	881	Lockstep.Mugen.Expr	MugenExprCompiler	StateTypeMask	int StateTypeMask(char letter)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	894	Lockstep.Mugen.Expr	MugenExprCompiler	MoveTypeMask	int MoveTypeMask(char letter)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	907	Lockstep.Mugen.Expr	MugenExprCompiler	EmitRedirect	void EmitRedirect(string name)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	932	Lockstep.Mugen.Expr	MugenExprCompiler	EmitEnemyRedirect	void EmitEnemyRedirect(string name)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	961	Lockstep.Mugen.Expr	MugenExprCompiler	EmitIndexedRedirect	void EmitIndexedRedirect(string name)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	990	Lockstep.Mugen.Expr	MugenExprCompiler	EmitTwoArgRedirect	void EmitTwoArgRedirect(string name)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1029	Lockstep.Mugen.Expr	MugenExprCompiler	AppendI32	void AppendI32(int v)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1035	Lockstep.Mugen.Expr	MugenExprCompiler	GetHitVarFieldId	int GetHitVarFieldId(string field)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1064	Lockstep.Mugen.Expr	MugenExprCompiler	AxisOpcode	OpCode AxisOpcode(string name, string axis)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1078	Lockstep.Mugen.Expr	MugenExprCompiler	IsValidAxis	bool IsValidAxis(string name, string axis)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1172	Lockstep.Mugen.Expr	MugenExprCompiler	Emit	void Emit(OpCode op)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1174	Lockstep.Mugen.Expr	MugenExprCompiler	EmitInt	void EmitInt(int v)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprCompiler.cs	1180	Lockstep.Mugen.Expr	MugenExprCompiler	EmitFloat	void EmitFloat(FFloat v)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprDiagnostic.cs	22	Lockstep.Mugen.Expr	MugenExprDiagnostic	MugenExprDiagnostic	MugenExprDiagnostic( MugenExprDiagnosticCode code, int position, int length, string message)	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprDiagnostic.cs	39	Lockstep.Mugen.Expr	MugenExprDiagnostic	ToString	string ToString()	needs-reference	
+Assets/Logic/Mugen/Expr/MugenExprDiagnostic.cs	49	Lockstep.Mugen.Expr	MugenExprCompileResult	MugenExprCompileResult	MugenExprCompileResult(BytecodeExp expression, List<MugenExprDiagnostic> diagnostics)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	35	Lockstep.Mugen.Hit	MAabb	MAabb	MAabb(FFloat minX, FFloat minY, FFloat maxX, FFloat maxY)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	45	Lockstep.Mugen.Hit	MClsnBox	MClsnBox	MClsnBox(FFloat x1, FFloat y1, FFloat x2, FFloat y2)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	54	Lockstep.Mugen.Hit	MClsn	ToWorld	MAabb ToWorld(MClsnBox box, FFloat originX, FFloat originY, FFloat facing)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	63	Lockstep.Mugen.Hit	MClsn	Overlap	bool Overlap(MAabb a, MAabb b)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	68	Lockstep.Mugen.Hit	MClsn	AnyOverlap	bool AnyOverlap(MClsnBox[] attack, FFloat ax, FFloat ay, FFloat af, MClsnBox[] hurt, FFloat hx, FFloat hy, FFloat hf)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	89	Lockstep.Mugen.Hit	MClsn	Min	FFloat Min(FFloat a, FFloat b)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	90	Lockstep.Mugen.Hit	MClsn	Max	FFloat Max(FFloat a, FFloat b)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	175	Lockstep.Mugen.Hit	MHitDef	Clone	MHitDef Clone()	needs-reference	
+Assets/Logic/Mugen/Hit/MHitDef.cs	180	Lockstep.Mugen.Hit	MHitDef	WriteHash	void WriteHash(ref Hash64 hash)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	17	Lockstep.Mugen.Hit	MHitSystem	TryHit	bool TryHit(MChar attacker, MChar defender, bool deferDamage = false)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	67	Lockstep.Mugen.Hit	MHitSystem	TryReversal	bool TryReversal(MChar defender, MChar attacker, MHitDef incoming, bool deferDamage)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	90	Lockstep.Mugen.Hit	MHitSystem	TryProjectileHit	bool TryProjectileHit(MProjectile proj, MChar defender, bool deferDamage = false)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	142	Lockstep.Mugen.Hit	MHitSystem	GuardFlagAllows	bool GuardFlagAllows(MHitDef hd, int defenderStateType)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	154	Lockstep.Mugen.Hit	MHitSystem	ApplyGuard	void ApplyGuard(MChar attacker, MChar defender, MHitDef hd, bool deferDamage)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	192	Lockstep.Mugen.Hit	MHitSystem	HitFlagMatches	bool HitFlagMatches(MHitDef hd, int defenderStateType)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	204	Lockstep.Mugen.Hit	MHitSystem	CanJuggle	bool CanJuggle(MChar attacker, MChar defender, MHitDef hd, bool projectile)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	222	Lockstep.Mugen.Hit	MHitSystem	NeedsJuggleCheck	bool NeedsJuggleCheck(MChar defender)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	227	Lockstep.Mugen.Hit	MHitSystem	AirJuggleMax	int AirJuggleMax(MChar character)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	239	Lockstep.Mugen.Hit	MHitSystem	ApplyHit	void ApplyHit(MChar attacker, MChar defender, MHitDef hd, bool deferDamage, bool projectile)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	370	Lockstep.Mugen.Hit	MHitSystem	FindHitOverride	MHitOverride FindHitOverride(MChar defender, int hitAttr)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	387	Lockstep.Mugen.Hit	MHitSystem	UpdateJuggleAfterHit	void UpdateJuggleAfterHit(MChar attacker, MChar defender, MHitDef hd, bool projectile, bool falling)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	408	Lockstep.Mugen.Hit	MHitSystem	ResolveGetHitState	int ResolveGetHitState(MChar defender, MHitDef hd, MGetHitVar ghv)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	443	Lockstep.Mugen.Hit	MHitSystem	ComputeDamage	int ComputeDamage(int life, int damage, bool kill, FFloat atkMul, FFloat finalDefense)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	468	Lockstep.Mugen.Hit	MHitSystem	ClampLife	int ClampLife(int life, int lifeMax)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	481	Lockstep.Mugen.Hit	MHitSystem	ApplySelfDamage	void ApplySelfDamage(MChar character, int rawDamage, bool kill)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	491	Lockstep.Mugen.Hit	MHitSystem	QueueLifeDamage	void QueueLifeDamage(MChar defender, int dealt, bool deferDamage)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	503	Lockstep.Mugen.Hit	MHitSystem	ApplyPendingDamage	void ApplyPendingDamage(MChar character)	needs-reference	
+Assets/Logic/Mugen/Hit/MHitSystem.cs	514	Lockstep.Mugen.Hit	MHitSystem	AddPower	int AddPower(int current, int add, int powerMax)	needs-reference	
+Assets/Logic/Mugen/Parse/MCompatibilityReport.cs	13	Lockstep.Mugen.Parse	MCompatibilityReport	AddUnknownController	void AddUnknownController(string type)	needs-reference	
+Assets/Logic/Mugen/Parse/MCompatibilityReport.cs	18	Lockstep.Mugen.Parse	MCompatibilityReport	AddParsedOnlyController	void AddParsedOnlyController(string type)	needs-reference	
+Assets/Logic/Mugen/Parse/MCompatibilityReport.cs	23	Lockstep.Mugen.Parse	MCompatibilityReport	Add	void Add(Dictionary<string, int> target, string type)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	35	Lockstep.Mugen.Parse	MDefParser	ParseFiles	MDefFiles ParseFiles(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	40	Lockstep.Mugen.Parse	MDefParser	Parse	MCharacterDefinition Parse(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	66	Lockstep.Mugen.Parse	MDefParser	AssignInfo	void AssignInfo(MCharacterDefinition definition, string key, string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	84	Lockstep.Mugen.Parse	MDefParser	AssignFile	void AssignFile(MDefFiles files, string key, string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	108	Lockstep.Mugen.Parse	MDefParser	ParseInts	int[] ParseInts(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	119	Lockstep.Mugen.Parse	MDefParser	IsDigits	bool IsDigits(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	129	Lockstep.Mugen.Parse	MDefParser	StripComment	string StripComment(string line)	needs-reference	
+Assets/Logic/Mugen/Parse/MDefParser.cs	135	Lockstep.Mugen.Parse	MDefParser	Unquote	string Unquote(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCmdParser.cs	12	Lockstep.Mugen.Parse	MugenCmdParser	Parse	List<MCommandDef> Parse(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCmdParser.cs	85	Lockstep.Mugen.Parse	MugenCmdParser	ReadDefaults	void ReadDefaults(string text, ref int defaultTime, ref int defaultBufferTime)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCmdParser.cs	125	Lockstep.Mugen.Parse	MugenCmdParser	Unquote	string Unquote(string v)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCmdParser.cs	135	Lockstep.Mugen.Parse	MugenCmdParser	ParseInt	int ParseInt(string v, int def)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCmdParser.cs	140	Lockstep.Mugen.Parse	MugenCmdParser	StripComment	string StripComment(string line)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	21	Lockstep.Mugen.Parse	MugenCnsParser	Parse	Dictionary<int, MStateDef> Parse(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	26	Lockstep.Mugen.Parse	MugenCnsParser	Parse	Dictionary<int, MStateDef> Parse(string text, MCompatibilityReport report)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	120	Lockstep.Mugen.Parse	MugenCnsParser	ApplyStatedefField	void ApplyStatedefField(MugenExprCompiler comp, MStateDef s, string key, string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	144	Lockstep.Mugen.Parse	MugenCnsParser	FlushController	void FlushController(MugenExprCompiler comp, MStateDef state, ref string ctrlType, List<string> triggerAll, SortedDictionary<int, List<string>> triggerGroups, Dictionary<string, string> p, MCompatibilityReport report)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	170	Lockstep.Mugen.Parse	MugenCnsParser	BuildTriggers	MTriggerSet BuildTriggers(MugenExprCompiler comp, List<string> triggerAll, SortedDictionary<int, List<string>> triggerGroups)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	191	Lockstep.Mugen.Parse	MugenCnsParser	BuildController	MStateController BuildController(MugenExprCompiler comp, string type, Dictionary<string, string> p, MCompatibilityReport report)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	501	Lockstep.Mugen.Parse	MugenCnsParser	BuildRelayVar	MStateController BuildRelayVar(MugenExprCompiler comp, Dictionary<string, string> p, MVarTarget target, bool isAdd)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	516	Lockstep.Mugen.Parse	MugenCnsParser	BuildVarSet	MStateController BuildVarSet(MugenExprCompiler comp, Dictionary<string, string> p, bool isAdd)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	546	Lockstep.Mugen.Parse	MugenCnsParser	BuildHitBy	MStateController BuildHitBy(Dictionary<string, string> p, bool isNot)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	554	Lockstep.Mugen.Parse	MugenCnsParser	BuildHitDef	MHitDef BuildHitDef(MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	641	Lockstep.Mugen.Parse	MugenCnsParser	FillPowerDefaults	void FillPowerDefaults(MugenExprCompiler comp, Dictionary<string, string> p, MHitDef hd)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	668	Lockstep.Mugen.Parse	MugenCnsParser	TruncMul	int TruncMul(int value, int num, int den)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	674	Lockstep.Mugen.Parse	MugenCnsParser	ParseVel	void ParseVel(MugenExprCompiler comp, Dictionary<string, string> p, string key, out FFloat x, out FFloat y)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	686	Lockstep.Mugen.Parse	MugenCnsParser	ParseReaction	MReaction ParseReaction(string v)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	699	Lockstep.Mugen.Parse	MugenCnsParser	ParseHitType	MHitType ParseHitType(string v)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	710	Lockstep.Mugen.Parse	MugenCnsParser	EvalI	int EvalI(MugenExprCompiler comp, string expr)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	715	Lockstep.Mugen.Parse	MugenCnsParser	EvalF	FFloat EvalF(MugenExprCompiler comp, string expr)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	720	Lockstep.Mugen.Parse	MugenCnsParser	ParseFlags	int ParseFlags(Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	733	Lockstep.Mugen.Parse	MugenCnsParser	FlagCode	int FlagCode(string name)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	761	Lockstep.Mugen.Parse	MugenCnsParser	Expr	BytecodeExp Expr(MugenExprCompiler comp, Dictionary<string, string> p, string key)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	766	Lockstep.Mugen.Parse	MugenCnsParser	ExprList	BytecodeExp[] ExprList(MugenExprCompiler comp, Dictionary<string, string> p, string key)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	781	Lockstep.Mugen.Parse	MugenCnsParser	WithParams	TController WithParams(TController controller, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	787	Lockstep.Mugen.Parse	MugenCnsParser	ParseHitFlagMask	int ParseHitFlagMask(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	798	Lockstep.Mugen.Parse	MugenCnsParser	FillPalFX	PalFXController FillPalFX(PalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	804	Lockstep.Mugen.Parse	MugenCnsParser	FillPalFX	AllPalFXController FillPalFX(AllPalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	810	Lockstep.Mugen.Parse	MugenCnsParser	FillPalFX	BGPalFXController FillPalFX(BGPalFXController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	816	Lockstep.Mugen.Parse	MugenCnsParser	FillPalFXParams	void FillPalFXParams(PalFXParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	831	Lockstep.Mugen.Parse	MugenCnsParser	FillAfterImage	AfterImageController FillAfterImage(AfterImageController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	837	Lockstep.Mugen.Parse	MugenCnsParser	FillAfterImageParams	void FillAfterImageParams(AfterImageParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	856	Lockstep.Mugen.Parse	MugenCnsParser	FillPlaySnd	PlaySndController FillPlaySnd(PlaySndController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	893	Lockstep.Mugen.Parse	MugenCnsParser	FillExplod	TController FillExplod(TController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	948	Lockstep.Mugen.Parse	MugenCnsParser	FillExplodInterpolation	void FillExplodInterpolation(ExplodInterpolationParamSet target, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	964	Lockstep.Mugen.Parse	MugenCnsParser	FillText	TController FillText(TController controller, MugenExprCompiler comp, Dictionary<string, string> p)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	995	Lockstep.Mugen.Parse	MugenCnsParser	Get	string Get(Dictionary<string, string> p, string key)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	1000	Lockstep.Mugen.Parse	MugenCnsParser	IntP	int IntP(Dictionary<string, string> p, string key, int def)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	1005	Lockstep.Mugen.Parse	MugenCnsParser	ParseFirstInt	int ParseFirstInt(string v, int def)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	1015	Lockstep.Mugen.Parse	MugenCnsParser	ExtractParenInt	int ExtractParenInt(string key)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	1026	Lockstep.Mugen.Parse	MugenCnsParser	ParseStateHeaderNo	int ParseStateHeaderNo(string header)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCnsParser.cs	1066	Lockstep.Mugen.Parse	MugenCnsParser	StripComment	string StripComment(string line)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	14	Lockstep.Mugen.Parse	MugenCodes	StateType	int StateType(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	27	Lockstep.Mugen.Parse	MugenCodes	MoveType	int MoveType(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	39	Lockstep.Mugen.Parse	MugenCodes	Physics	int Physics(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	52	Lockstep.Mugen.Parse	MugenCodes	AttackType	int AttackType(string token)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	77	Lockstep.Mugen.Parse	MugenCodes	Attr	int Attr(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	92	Lockstep.Mugen.Parse	MugenCodes	HitFlags	void HitFlags(string flags, out bool high, out bool low, out bool air, out bool down)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenCodes.cs	102	Lockstep.Mugen.Parse	MugenCodes	FirstLetter	char FirstLetter(string value)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	17	Lockstep.Mugen.Parse	MugenConstParser	Parse	MConstants Parse(string text)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	58	Lockstep.Mugen.Parse	MugenConstParser	SectionOf	Section SectionOf(string header)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	70	Lockstep.Mugen.Parse	MugenConstParser	ApplyData	void ApplyData(MugenExprCompiler comp, MConstants k, string key, string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	84	Lockstep.Mugen.Parse	MugenConstParser	ApplySize	void ApplySize(MugenExprCompiler comp, MConstants k, string key, string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	98	Lockstep.Mugen.Parse	MugenConstParser	ApplyVelocity	void ApplyVelocity(MugenExprCompiler comp, MConstants k, string key, string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	117	Lockstep.Mugen.Parse	MugenConstParser	ApplyMovement	void ApplyMovement(MugenExprCompiler comp, MConstants k, string key, string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	132	Lockstep.Mugen.Parse	MugenConstParser	Pair	void Pair(MugenExprCompiler comp, string val, out FFloat x, out FFloat y)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	139	Lockstep.Mugen.Parse	MugenConstParser	First	string First(string val)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	144	Lockstep.Mugen.Parse	MugenConstParser	EvalI	int EvalI(MugenExprCompiler comp, string expr)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	149	Lockstep.Mugen.Parse	MugenConstParser	EvalF	FFloat EvalF(MugenExprCompiler comp, string expr)	needs-reference	
+Assets/Logic/Mugen/Parse/MugenConstParser.cs	154	Lockstep.Mugen.Parse	MugenConstParser	StripComment	string StripComment(string line)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/AttackMulControllers.cs	22	Lockstep.Mugen.StateCtrl	AttackMulSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/AttackMulControllers.cs	48	Lockstep.Mugen.StateCtrl	DefenceMulSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	17	Lockstep.Mugen.StateCtrl	NullController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	29	Lockstep.Mugen.StateCtrl	VelSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	44	Lockstep.Mugen.StateCtrl	VelAddController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	59	Lockstep.Mugen.StateCtrl	PosSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	74	Lockstep.Mugen.StateCtrl	PosAddController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	88	Lockstep.Mugen.StateCtrl	ChangeAnimController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	105	Lockstep.Mugen.StateCtrl	CtrlSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	122	Lockstep.Mugen.StateCtrl	VarSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	147	Lockstep.Mugen.StateCtrl	VarAddController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	178	Lockstep.Mugen.StateCtrl	HitByController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BasicControllers.cs	198	Lockstep.Mugen.StateCtrl	StateTypeSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	19	Lockstep.Mugen.StateCtrl	BindToParentController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	25	Lockstep.Mugen.StateCtrl	BindToParentController	Bind	void Bind(MChar character, MChar target)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	42	Lockstep.Mugen.StateCtrl	BindToParentController	ReadPosition	FVector3 ReadPosition(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	69	Lockstep.Mugen.StateCtrl	BindToRootController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	84	Lockstep.Mugen.StateCtrl	BindToRootController	ReadPosition	FVector3 ReadPosition(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	110	Lockstep.Mugen.StateCtrl	TargetBindController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	122	Lockstep.Mugen.StateCtrl	TargetBindController	ReadPosition	FVector3 ReadPosition(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	149	Lockstep.Mugen.StateCtrl	BindToTargetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	162	Lockstep.Mugen.StateCtrl	BindToTargetController	ReadPosition	FVector3 ReadPosition(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/BindControllers.cs	189	Lockstep.Mugen.StateCtrl	ChangeAnim2Controller	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	19	Lockstep.Mugen.StateCtrl	HitVelSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	51	Lockstep.Mugen.StateCtrl	VelMulController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	66	Lockstep.Mugen.StateCtrl	HitAddController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	103	Lockstep.Mugen.StateCtrl	HitFallSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	130	Lockstep.Mugen.StateCtrl	HitFallVelController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitControllers.cs	143	Lockstep.Mugen.StateCtrl	GravityController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitDefController.cs	16	Lockstep.Mugen.StateCtrl	HitDefController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitDefController.cs	25	Lockstep.Mugen.StateCtrl	HitDefController	CopyInto	void CopyInto(MHitDef src, MHitDef dst)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/HitFallDamageController.cs	17	Lockstep.Mugen.StateCtrl	HitFallDamageController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/MEntityControllers.cs	26	Lockstep.Mugen.StateCtrl	HelperController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/MEntityControllers.cs	54	Lockstep.Mugen.StateCtrl	RelayVarSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/MEntityControllers.cs	78	Lockstep.Mugen.StateCtrl	DestroySelfController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/MEntityControllers.cs	105	Lockstep.Mugen.StateCtrl	ProjectileController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	18	Lockstep.Mugen.StateCtrl	LifeAddController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	33	Lockstep.Mugen.StateCtrl	LifeAddController	Clamp	int Clamp(int v, int lo, int hi)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	44	Lockstep.Mugen.StateCtrl	LifeSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	59	Lockstep.Mugen.StateCtrl	PowerAddController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	74	Lockstep.Mugen.StateCtrl	PowerSetController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	87	Lockstep.Mugen.StateCtrl	TurnController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/StatControllers.cs	99	Lockstep.Mugen.StateCtrl	AssertSpecialController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	20	Lockstep.Mugen.StateCtrl	TargetControllerBase	SelectTargets	List<MChar> SelectTargets(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	33	Lockstep.Mugen.StateCtrl	TargetStateController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	66	Lockstep.Mugen.StateCtrl	TargetLifeAddController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	89	Lockstep.Mugen.StateCtrl	TargetLifeAddController	Clamp	int Clamp(int value, int low, int high)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	100	Lockstep.Mugen.StateCtrl	TargetPowerAddController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	117	Lockstep.Mugen.StateCtrl	TargetPowerAddController	Clamp	int Clamp(int value, int low, int high)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	130	Lockstep.Mugen.StateCtrl	TargetVelSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	152	Lockstep.Mugen.StateCtrl	TargetVelAddController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	172	Lockstep.Mugen.StateCtrl	TargetFacingController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TargetControllers.cs	201	Lockstep.Mugen.StateCtrl	TargetDropController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	27	Lockstep.Mugen.StateCtrl	ParameterOnlyController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	94	Lockstep.Mugen.StateCtrl	PauseController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	119	Lockstep.Mugen.StateCtrl	SuperPauseController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	133	Lockstep.Mugen.StateCtrl	SuperPauseController	Clamp	int Clamp(int value, int low, int high)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	144	Lockstep.Mugen.StateCtrl	PosFreezeController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	158	Lockstep.Mugen.StateCtrl	WidthController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	190	Lockstep.Mugen.StateCtrl	PlayerPushController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	206	Lockstep.Mugen.StateCtrl	ScreenBoundController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	226	Lockstep.Mugen.StateCtrl	AttackDistController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	249	Lockstep.Mugen.StateCtrl	HitOverrideController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	274	Lockstep.Mugen.StateCtrl	MoveHitResetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	293	Lockstep.Mugen.StateCtrl	ReversalDefController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	317	Lockstep.Mugen.StateCtrl	VarRandomController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	350	Lockstep.Mugen.StateCtrl	VarRangeSetController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	420	Lockstep.Mugen.StateCtrl	PlaySndController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	458	Lockstep.Mugen.StateCtrl	StopSndController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	478	Lockstep.Mugen.StateCtrl	SndPanController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	550	Lockstep.Mugen.StateCtrl	ExplodController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	566	Lockstep.Mugen.StateCtrl	ExplodController	ApplyToExplod	void ApplyToExplod(MChar character, MExplod explod)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	611	Lockstep.Mugen.StateCtrl	ModifyExplodController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/StateCtrl/TierBNonEntityControllers.cs	633	Lockstep.Mugen.StateCtrl	RemoveExplodController	Run	bool Run(MChar character)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	24	Lockstep.Mugen.State	MTriggerSet	Passes	bool Passes(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	58	Lockstep.Mugen.State	MTriggerSet	Single	MTriggerSet Single(BytecodeExp trigger)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	100	Lockstep.Mugen.State	MStateDef	RunInit	void RunInit(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	151	Lockstep.Mugen.State	MStateController	TriggerPasses	bool TriggerPasses(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	156	Lockstep.Mugen.State	MStateController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	166	Lockstep.Mugen.State	ChangeStateController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateDef.cs	183	Lockstep.Mugen.State	SelfStateController	Run	bool Run(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	22	Lockstep.Mugen.State	MStateMachine	RunFrame	void RunFrame(MChar c, IReadOnlyDictionary<int, MStateDef> states)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	27	Lockstep.Mugen.State	MStateMachine	RunFrame	void RunFrame(MChar c, IReadOnlyDictionary<int, MStateDef> states, IReadOnlyDictionary<int, MStateDef> commonStates)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	76	Lockstep.Mugen.State	MStateMachine	UpdateGetHitTimers	void UpdateGetHitTimers(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	121	Lockstep.Mugen.State	MStateMachine	UpdateHitOverrides	void UpdateHitOverrides(MChar c)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	135	Lockstep.Mugen.State	MStateMachine	RunNegativeState	void RunNegativeState(MChar c, int no, IReadOnlyDictionary<int, MStateDef> states, IReadOnlyDictionary<int, MStateDef> commonStates, bool hitpause)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	167	Lockstep.Mugen.State	MStateMachine	RunCurrentState	void RunCurrentState(MChar c, IReadOnlyDictionary<int, MStateDef> states, IReadOnlyDictionary<int, MStateDef> commonStates, bool hitpause)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	222	Lockstep.Mugen.State	MStateMachine	PersistKey	int PersistKey(int stateNo, int ctrlIndex)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	227	Lockstep.Mugen.State	MStateMachine	ResolvePersist	int ResolvePersist(int raw)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	241	Lockstep.Mugen.State	MStateMachine	PersistGate	bool PersistGate(MChar c, int stateNo, int ctrlIndex)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	254	Lockstep.Mugen.State	MStateMachine	ResetPersist	void ResetPersist(MChar c, int stateNo, int ctrlIndex, int rawPersistent)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	261	Lockstep.Mugen.State	MStateMachine	ClearStatePersist	void ClearStatePersist(MChar c, int stateNo)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	287	Lockstep.Mugen.State	MStateMachine	ApplyTransition	void ApplyTransition(MChar c, IReadOnlyDictionary<int, MStateDef> states, IReadOnlyDictionary<int, MStateDef> commonStates)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	328	Lockstep.Mugen.State	MStateMachine	RescaleStateLocalCoordinates	void RescaleStateLocalCoordinates(MChar c, int oldOwner, int newOwner)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	351	Lockstep.Mugen.State	MStateMachine	LookupForCurrentOwner	MStateDef LookupForCurrentOwner(MChar c, int no, IReadOnlyDictionary<int, MStateDef> fallbackStates, IReadOnlyDictionary<int, MStateDef> fallbackCommonStates)	needs-reference	
+Assets/Logic/Mugen/State/MStateMachine.cs	362	Lockstep.Mugen.State	MStateMachine	Lookup	MStateDef Lookup(int no, IReadOnlyDictionary<int, MStateDef> states, IReadOnlyDictionary<int, MStateDef> commonStates)	needs-reference	

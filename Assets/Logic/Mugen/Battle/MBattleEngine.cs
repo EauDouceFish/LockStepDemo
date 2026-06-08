@@ -527,6 +527,15 @@ namespace Lockstep.Mugen.Battle
             {
                 target.Targets.Add(Remap(source.Targets[i], map));
             }
+            target.TargetRefs.Clear();
+            for (int i = 0; i < source.TargetRefs.Count; i++)
+            {
+                target.TargetRefs.Add(new MTargetRef
+                {
+                    Target = Remap(source.TargetRefs[i].Target, map),
+                    HitDefId = source.TargetRefs[i].HitDefId,
+                });
+            }
         }
 
         static MChar Remap(MChar character, Dictionary<int, MChar> map)

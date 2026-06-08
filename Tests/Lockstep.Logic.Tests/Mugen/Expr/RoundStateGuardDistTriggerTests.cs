@@ -70,6 +70,17 @@ namespace Lockstep.Tests.Mugen.Expr
         }
 
         [Test]
+        public void InGuardDist_UsesEnemyAttackDist()
+        {
+            MChar c = SelfWithEnemy(selfX: 100, p2X: 220, p2MoveType: 4);
+            c.P2.AttackDistX = FFloat.FromInt(100);
+            Assert.That(Eval("inguarddist", c), Is.EqualTo(0), "distance 120 is outside attackdist 100");
+
+            c.P2.AttackDistX = FFloat.FromInt(130);
+            Assert.That(Eval("inguarddist", c), Is.EqualTo(1), "distance 120 is inside attackdist 130");
+        }
+
+        [Test]
         public void InGuardDist_NoEnemy_False()
         {
             MChar lonely = new MChar { Pos = new FVector3(FFloat.FromInt(100), FFloat.Zero, FFloat.Zero) };

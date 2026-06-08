@@ -25,6 +25,7 @@ namespace Lockstep.Mugen.Battle
         public int ActorPower = -1;
         public int Distance = 60;
         public int ActorY;
+        public int TargetLife = -1;
         public bool TargetGuarding;
 
         public static List<MMovePrerequisiteProfile> DefaultSet()
@@ -33,6 +34,10 @@ namespace Lockstep.Mugen.Battle
             {
                 new MMovePrerequisiteProfile { Name = "standing-close", Distance = 35, ActorPower = -1 },
                 new MMovePrerequisiteProfile { Name = "standing-mid", Distance = 80, ActorPower = -1 },
+                new MMovePrerequisiteProfile
+                {
+                    Name = "standing-fatal-ready", Distance = 70, ActorPower = -1, TargetLife = 100,
+                },
                 new MMovePrerequisiteProfile
                 {
                     Name = "crouching-close", ActorStateNo = 11, ActorStateType = 2,
@@ -236,6 +241,10 @@ namespace Lockstep.Mugen.Battle
             actor.KeyCtrl = true;
             actor.Time = 0;
             actor.Power = profile.ActorPower < 0 ? actor.PowerMax : profile.ActorPower;
+            if (profile.TargetLife >= 0)
+            {
+                target.Life = profile.TargetLife;
+            }
             target.Guarding = profile.TargetGuarding;
             target.Ctrl = true;
             target.KeyCtrl = false;

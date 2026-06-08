@@ -21,28 +21,7 @@ namespace Lockstep.Mugen.StateCtrl
         {
             int targetId = Id != null ? Id.Run(character).ToI() : -1;
             int targetIndex = Index != null ? Index.Run(character).ToI() : -1;
-            List<MChar> filtered = new List<MChar>();
-
-            for (int index = 0; index < character.Targets.Count; index++)
-            {
-                MChar target = character.Targets[index];
-                if (target != null && (targetId < 0 || target.Id == targetId))
-                {
-                    filtered.Add(target);
-                }
-            }
-
-            if (targetIndex >= 0)
-            {
-                List<MChar> single = new List<MChar>();
-                if (targetIndex < filtered.Count)
-                {
-                    single.Add(filtered[targetIndex]);
-                }
-                return single;
-            }
-
-            return filtered;
+            return character.SelectTargetsByHitId(targetId, targetIndex);
         }
     }
 
@@ -224,15 +203,29 @@ namespace Lockstep.Mugen.StateCtrl
             int excludeId = ExcludeId != null ? ExcludeId.Run(character).ToI() : -1;
             bool keepOne = KeepOne == null || KeepOne.Run(character).ToB();
             List<MChar> kept = new List<MChar>();
+            List<MTargetRef> keptRefs = new List<MTargetRef>();
 
             if (excludeId >= 0)
             {
                 for (int index = 0; index < character.Targets.Count; index++)
                 {
                     MChar target = character.Targets[index];
-                    if (target != null && target.Id == excludeId)
+                    bool keep = target != null && target.Id == excludeId;
+                    if (!keep && character.TargetRefs.Count > index)
+                    {
+                        keep = character.TargetRefs[index].HitDefId == excludeId;
+                    }
+                    if (keep)
                     {
                         kept.Add(target);
+                        if (character.TargetRefs.Count > index)
+                        {
+                            keptRefs.Add(character.TargetRefs[index]);
+                        }
+                        else
+                        {
+                            keptRefs.Add(new MTargetRef { Target = target, HitDefId = target != null ? target.Id : -1 });
+                        }
                         if (keepOne)
                         {
                             break;
@@ -242,6 +235,7 @@ namespace Lockstep.Mugen.StateCtrl
             }
 
             character.Targets = kept;
+            character.TargetRefs = keptRefs;
             return false;
         }
     }

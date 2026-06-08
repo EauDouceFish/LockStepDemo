@@ -97,5 +97,13 @@ namespace Lockstep.Tests.Mugen.StateCtrl
             Assert.That(c.HitOverrides[2].Time, Is.EqualTo(60));
             Assert.That(c.HitOverrides[2].Active, Is.True);
         }
+
+        [Test]
+        public void AttackDist_WritesRuntimeGuardDistance()
+        {
+            MChar c = new MChar();
+            new AttackDistController { XValues = new[] { E("96") } }.Run(c);
+            Assert.That(c.AttackDistX.ToInt(), Is.EqualTo(96));
+        }
     }
 }

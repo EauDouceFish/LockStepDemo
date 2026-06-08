@@ -69,6 +69,20 @@ namespace Lockstep.Logic.Tests.Mugen.Expr
         }
 
         [Test]
+        public void TargetRedirect_FiltersByHitDefIdWhenTargetRefsExist()
+        {
+            MChar owner = new MChar();
+            MChar first = new MChar { Id = 20, Life = 111 };
+            MChar second = new MChar { Id = 30, Life = 222 };
+            owner.AddTarget(first, 7);
+            owner.AddTarget(second, 9);
+
+            Assert.That(Eval("target(7), life", owner), Is.EqualTo(111));
+            Assert.That(Eval("target(9), life", owner), Is.EqualTo(222));
+            Assert.That(new MugenExprCompiler().Compile("target(20), life").Run(owner).IsUndefined(), Is.True);
+        }
+
+        [Test]
         public void SysVarNamespaces_AreIndependentOnRealChar()
         {
             MChar owner = new MChar();

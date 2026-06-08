@@ -153,6 +153,7 @@ namespace Lockstep.Mugen.Char
         public bool CounterHit;
         // HitOverride 槽（8 个，对齐 Ikemen c.ho[8]）：受击改写。命中系统据此改受击方目标态。
         public MHitOverride[] HitOverrides = new MHitOverride[8];
+        public MReversalDefRuntime ReversalDef = new MReversalDefRuntime();
 
         // 回合状态（roundstate trigger）：1 入场/2 战斗/3 已分胜负缓冲/4 胜利姿态（对齐 MUGEN roundstate）。
         // 默认 2(Fight)：无回合系统驱动时多数 `roundstate=2` 门控即通过；MRoundSystem 驱动时每帧写入实际相位。
@@ -167,6 +168,7 @@ namespace Lockstep.Mugen.Char
         public int ProjectileContactId;
         public int ProjectileContactType; // 0=hit, 1=guarded, 2=cancel
         public int ProjectileContactTime = -1;
+        public FFloat AttackDistX = FFloat.FromInt(160);
 
         /// <summary>请求创建一个 helper（移植 Helper 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
         public void RequestHelper(int stateNo, int helperType, FFloat posX, FFloat posY, int facing, bool keyCtrl)
@@ -265,6 +267,7 @@ namespace Lockstep.Mugen.Char
         public MChar Parent;                 // 父角色（helper 的创建者；root 为 null）
         public MChar Partner;                // 同队 partner；v1 无组队时为空，partner redirect 用
         public List<MChar> Targets = new List<MChar>();   // 本角色 HitDef 命中的目标
+        public List<MTargetRef> TargetRefs = new List<MTargetRef>();
 
         public bool Alive => Life > 0;
 
@@ -467,9 +470,6 @@ namespace Lockstep.Mugen.Char
             return DistX(opp) - selfFront - oppFront;
         }
 
-        // inguarddist 默认守备距离（MUGEN attack.dist 默认 160；逐角色 HitDef guard dist 待 AttackDist 控制器接入后替换）。
-        static readonly FFloat GuardDistDefault = FFloat.FromInt(160);
-
         /// <summary>到对手的水平距离绝对值（inguarddist 判定用，不分前后）。</summary>
         FFloat AbsDistX(MChar opp)
         {
@@ -561,6 +561,72 @@ namespace Lockstep.Mugen.Char
 
         // ───────── 回滚支持 ─────────
 
+        public void ClearTargets()
+        {
+            Targets.Clear();
+            TargetRefs.Clear();
+        }
+
+        public void AddTarget(MChar target, int hitDefId)
+        {
+            if (target == null)
+            {
+                return;
+            }
+            Targets.Add(target);
+            TargetRefs.Add(new MTargetRef { Target = target, HitDefId = hitDefId });
+        }
+
+        public bool HasTarget(MChar target)
+        {
+            for (int index = 0; index < TargetRefs.Count; index++)
+            {
+                if (ReferenceEquals(TargetRefs[index].Target, target))
+                {
+                    return true;
+                }
+            }
+            return Targets.Contains(target);
+        }
+
+        public List<MChar> SelectTargetsByHitId(int hitDefId, int matchIndex)
+        {
+            List<MChar> selected = new List<MChar>();
+            if (TargetRefs.Count > 0)
+            {
+                for (int index = 0; index < TargetRefs.Count; index++)
+                {
+                    MTargetRef targetRef = TargetRefs[index];
+                    if (targetRef.Target != null && (hitDefId < 0 || targetRef.HitDefId == hitDefId))
+                    {
+                        selected.Add(targetRef.Target);
+                    }
+                }
+            }
+            else
+            {
+                for (int index = 0; index < Targets.Count; index++)
+                {
+                    MChar target = Targets[index];
+                    if (target != null && (hitDefId < 0 || target.Id == hitDefId))
+                    {
+                        selected.Add(target);
+                    }
+                }
+            }
+
+            if (matchIndex >= 0)
+            {
+                List<MChar> single = new List<MChar>();
+                if (matchIndex < selected.Count)
+                {
+                    single.Add(selected[matchIndex]);
+                }
+                return single;
+            }
+            return selected;
+        }
+
         public MChar Clone()
         {
             MChar c = new MChar
@@ -606,8 +672,9 @@ namespace Lockstep.Mugen.Char
                 MoveContactTime = MoveContactTime, CounterHit = CounterHit, RoundState = RoundState,
                 World = World, IsHelper = IsHelper, HelperType = HelperType, Destroyed = Destroyed,
                 ProjectileContactId = ProjectileContactId, ProjectileContactType = ProjectileContactType,
-                ProjectileContactTime = ProjectileContactTime,
+                ProjectileContactTime = ProjectileContactTime, AttackDistX = AttackDistX,
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
+                ReversalDef = ReversalDef != null ? ReversalDef.Clone() : null,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
                 IntVars = new Dictionary<int, int>(IntVars),
                 FloatVars = new Dictionary<int, FFloat>(FloatVars),
@@ -617,6 +684,7 @@ namespace Lockstep.Mugen.Char
                 // 避免在此深拷造成无限递归。Targets 列表新建容器但元素仍为旧引用，同样待重链。
                 P2 = P2, Root = Root, Parent = Parent, Partner = Partner, StateOwner = StateOwner,
                 Targets = new List<MChar>(Targets),
+                TargetRefs = new List<MTargetRef>(TargetRefs),
             };
             return c;
         }
@@ -660,7 +728,9 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(MoveContactTime); hash.AddBool(CounterHit); hash.AddInt32(RoundState);
             hash.AddBool(IsHelper); hash.AddInt32(HelperType); hash.AddBool(Destroyed);
             hash.AddInt32(ProjectileContactId); hash.AddInt32(ProjectileContactType); hash.AddInt32(ProjectileContactTime);
+            hash.AddFixed(AttackDistX);
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
+            if (ReversalDef != null) { ReversalDef.WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);
             hash.AddInt32(Id);
             HashVars(ref hash, IntVars);
@@ -677,6 +747,12 @@ namespace Lockstep.Mugen.Char
             for (int t = 0; t < Targets.Count; t++)
             {
                 hash.AddInt32(Targets[t] != null ? Targets[t].Id : -1);
+            }
+            hash.AddInt32(TargetRefs.Count);
+            for (int t = 0; t < TargetRefs.Count; t++)
+            {
+                hash.AddInt32(TargetRefs[t].Target != null ? TargetRefs[t].Target.Id : -1);
+                hash.AddInt32(TargetRefs[t].HitDefId);
             }
         }
 
@@ -849,9 +925,8 @@ namespace Lockstep.Mugen.Char
                 }
                 case OpCode.OC_roundstate: return BytecodeValue.Int(RoundState);
                 case OpCode.OC_inguarddist:
-                    // 简化：对手在攻击态(MoveType=A=4)且水平体距在守备范围内 → 可进入守招判定。
-                    // 守备距离用 MUGEN 默认 attack.dist 160（AttackDist 控制器写入 HitDef guard dist 待后续，归 R-HITDEF 余项）。
-                    return BytecodeValue.Bool(P2 != null && P2.MoveType == 4 && AbsDistX(P2) <= GuardDistDefault);
+                    // 对手在攻击态(MoveType=A=4)且水平体距在对手 AttackDist 范围内 → 可进入守招判定。
+                    return BytecodeValue.Bool(P2 != null && P2.MoveType == 4 && AbsDistX(P2) <= P2.AttackDistX);
 
                 // 受击触发器（common1 5000-5160 状态机用）
                 case OpCode.OC_hitshakeover: return BytecodeValue.Bool(HitShakeOver());
@@ -970,14 +1045,8 @@ namespace Lockstep.Mugen.Char
                 {
                     // 弹目标 id（<0 表示任意 → 取第一个）。对齐我方编译器约定（Ikemen 原弹 2 个参数）。
                     int wantId = Pop(stack).ToI();
-                    for (int t = 0; t < Targets.Count; t++)
-                    {
-                        if (Targets[t] != null && (wantId < 0 || Targets[t].Id == wantId))
-                        {
-                            return Targets[t];
-                        }
-                    }
-                    return null;
+                    List<MChar> targets = SelectTargetsByHitId(wantId, -1);
+                    return targets.Count > 0 ? targets[0] : null;
                 }
                 case OpCode.OC_helper:
                 {
@@ -1031,25 +1100,8 @@ namespace Lockstep.Mugen.Char
             {
                 return null;
             }
-            int seen = 0;
-            for (int index = 0; index < Targets.Count; index++)
-            {
-                MChar target = Targets[index];
-                if (target == null)
-                {
-                    continue;
-                }
-                if (targetId >= 0 && target.Id != targetId)
-                {
-                    continue;
-                }
-                if (seen == matchIndex)
-                {
-                    return target;
-                }
-                seen++;
-            }
-            return null;
+            List<MChar> targets = SelectTargetsByHitId(targetId, matchIndex);
+            return targets.Count > 0 ? targets[0] : null;
         }
 
         IExprContext FindHelperRedirect(int helperType, int matchIndex)

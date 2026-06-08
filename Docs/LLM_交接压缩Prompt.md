@@ -20,7 +20,7 @@
 
 ## 不能再误报的边界
 
-- 当前测试大量是 C# 自洽测试，不是 Ikemen oracle。
+- 当前测试大量是 C# 自洽测试，不是 Ikemen oracle。2026-06-08 已新增 `Tools/BattleAudit`，可生成 C#/Ikemen 函数清单与自动候选映射，但该映射不是逐行等价证明。
 - “全角色全招式矩阵”是诊断/覆盖率，不等于全招式 Ikemen 等价通过。
 - 展馆只显示 P1/P2 主 SpriteRenderer；helper/projectile/explod/spark/sound/palfx/collision box 还没完整表现。
 - controller 还有 parsed-only 或简化项，尤其表现/环境/辅助类与部分战斗语义类。
@@ -29,7 +29,7 @@
 
 1. Ikemen headless oracle：固定输入注入，post-combat tick 输出 JSONL，C# 同 schema 比较。
 2. 状态机/控制器保真：梳理 `MStateMachine` 与 Ikemen `char.go action/stateChange` 的剩余差异，逐项 TDD。
-3. Controller 缺口：优先 `ReversalDef`、`AttackDist`、`HitOverride`、guard distance；表现类标为 presentation capability，不能伪装完整。
+3. Controller 缺口：`HitOverride`、`AttackDist/inguarddist`、`ReversalDef`、target hit id ownership 已有基础 TDD 接入；仍需用 Ikemen trace 精确化 ForceGuard/guardflag/slot/playerNo/hitpause/trade 等细节。表现类标为 presentation capability，不能伪装完整。
 4. AIR/SFF/localcoord/palette：Copy Action、palette/ACT、sprite owner、localcoord 缩放、动画偏移。
 5. 展馆表现层：helper/projectile/explod、碰撞框、声音、palfx、失败 trace/首次差异面板。
 6. HitDef/受击/投技：target ownership、juggle、guard/reversal、GetHitVar reset policy。

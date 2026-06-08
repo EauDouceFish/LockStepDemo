@@ -43,8 +43,8 @@
 - [ ] `MHitDefSpec` 保存表达式，控制器运行时求值并执行 Ikemen reset/finalize。
 - [ ] 补齐模拟相关 HitDef 字段、state/attack attr mask、persist 生命周期。
 - [ ] guard 输入、guard distance、guard state 与 hit result 闭环。
-- [ ] HitOverride/ReversalDef 接入接触结算；AttackDist 接入 guard distance。
-- [x] HitOverride 槽位 `time` 在非 hitpause 帧递减，`-1` 常驻，hitstop 冻结；命中系统读取 HitOverride 仍未完成。（2026-06-07 续18）
+- [~] HitOverride/ReversalDef 接入接触结算；AttackDist 接入 guard distance。2026-06-08：HitOverride 命中读取、AttackDist→inguarddist、ReversalDef 普通命中/projectile 基础反击、target HitDef id ownership 已有 TDD；仍非完整 Ikemen 等价。
+- [x] HitOverride 槽位 `time` 在非 hitpause 帧递减，`-1` 常驻，hitstop 冻结；命中系统已读取基础 HitOverride。（2026-06-08）
 - [ ] 统一 collision query，支持 localcoord、scale、深度和 HitDef clsn 规则。
 - [ ] 每 defender 帧内 hit accumulator，正确累计 GHV、kill clamp、KO 路由和 life commit。
 - [ ] GetHitVar 完整字段与 reset policy。
@@ -57,6 +57,7 @@
 ## P0-E Trace、Hash 与回滚
 
 - [ ] Trace schema `mugen-oracle-trace/v1`：版本头、资源 hash、输入、全局态、稳定实体 key、状态/动画 owner、实体、事件。
+- [x] C# 函数清单与 Ikemen Go 函数清单生成工具：`Tools/BattleAudit`，输出在 `Docs/Generated`。（2026-06-08）
 - [ ] comparer 比较所有已记录字段；实体按稳定 key，不按列表下标；字段级容差。
 - [x] native hash 使用规范 FNV 初值（`Hash64.Create()`），并有回归测试防止退回零初值。
 - [ ] native hash 覆盖所有影响未来模拟的状态，加入 frame/resource manifest，并建立字段级 mutation guard。

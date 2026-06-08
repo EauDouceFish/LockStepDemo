@@ -97,6 +97,7 @@ namespace Lockstep.Mugen.Hit
 
         // attr 攻击类别（HitBy/NotHitBy 过滤 + 守招判定用）
         public int Attr = (int)MAttackType.NA;
+        public int Id;              // HitDef id: target(id) / Target* id filters select by this hit relationship id.
 
         // hitflag：哪些受击姿态能被命中（H 站立/L 蹲/A 空中/D 倒地）
         public bool HitHigh = true;
@@ -178,7 +179,7 @@ namespace Lockstep.Mugen.Hit
 
         public void WriteHash(ref Hash64 hash)
         {
-            hash.AddBool(Active); hash.AddInt32(Attr);
+            hash.AddBool(Active); hash.AddInt32(Attr); hash.AddInt32(Id);
             hash.AddBool(HitHigh); hash.AddBool(HitLow); hash.AddBool(HitAir); hash.AddBool(HitDown);
             hash.AddBool(GuardHigh); hash.AddBool(GuardLow); hash.AddBool(GuardAir);
             hash.AddInt32(GuardHitTime); hash.AddInt32(GuardCtrlTime); hash.AddFixed(GuardVelX);

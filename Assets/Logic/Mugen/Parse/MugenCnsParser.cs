@@ -554,6 +554,7 @@ namespace Lockstep.Mugen.Parse
         static MHitDef BuildHitDef(MugenExprCompiler comp, Dictionary<string, string> p)
         {
             MHitDef hd = new MHitDef();
+            if (p.TryGetValue("id", out string hitId)) { hd.Id = EvalI(comp, hitId); }
             if (p.TryGetValue("attr", out string attr)) { hd.Attr = MugenCodes.Attr(attr); }
             if (p.TryGetValue("guardflag", out string gf))
             {

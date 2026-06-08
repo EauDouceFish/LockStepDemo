@@ -41,6 +41,21 @@ namespace Lockstep.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void TargetState_FiltersByHitDefIdNotRuntimeEntityId()
+        {
+            MChar first = new MChar { Id = 20, PendingStateNo = -1, Ctrl = true };
+            MChar second = new MChar { Id = 30, PendingStateNo = -1, Ctrl = true };
+            MChar attacker = new MChar();
+            attacker.AddTarget(first, 7);
+            attacker.AddTarget(second, 9);
+
+            new TargetStateController { Id = Expression("9"), Value = Expression("5050") }.Run(attacker);
+
+            Assert.That(first.PendingStateNo, Is.EqualTo(-1));
+            Assert.That(second.PendingStateNo, Is.EqualTo(5050));
+        }
+
+        [Test]
         public void TargetLifeAdd_ClampsAndHonorsKillFlag()
         {
             MChar target = new MChar { Id = 3, Life = 20, LifeMax = 100 };
@@ -192,6 +207,25 @@ excludeID = 7
             Assert.That(controllers[4], Is.TypeOf<TargetVelAddController>());
             Assert.That(controllers[5], Is.TypeOf<TargetFacingController>());
             Assert.That(controllers[6], Is.TypeOf<TargetDropController>());
+        }
+
+        [Test]
+        public void HitDef_ParsesIdForTargetOwnership()
+        {
+            string text = @"
+[Statedef 200]
+[State 200, hit]
+type = HitDef
+trigger1 = 1
+id = 77
+attr = S, NA
+damage = 10
+";
+
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(text);
+            HitDefController controller = (HitDefController)states[200].Controllers[0];
+
+            Assert.That(controller.Template.Id, Is.EqualTo(77));
         }
     }
 }

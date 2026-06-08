@@ -18,13 +18,14 @@ namespace Lockstep.Mugen.StateCtrl
             CopyInto(Template, c.HitDef);
             c.HitDef.Active = true;
             c.MoveType = 4;          // A 攻击中
-            c.Targets.Clear();       // 新 HitDef：清空已命中目标，使本招可重新命中
+            c.ClearTargets();        // 新 HitDef：清空已命中目标，使本招可重新命中
             return false;
         }
 
         static void CopyInto(MHitDef src, MHitDef dst)
         {
             dst.Attr = src.Attr;
+            dst.Id = src.Id;
             dst.HitHigh = src.HitHigh; dst.HitLow = src.HitLow; dst.HitAir = src.HitAir; dst.HitDown = src.HitDown;
             dst.GuardHigh = src.GuardHigh; dst.GuardLow = src.GuardLow; dst.GuardAir = src.GuardAir;
             dst.GuardHitTime = src.GuardHitTime; dst.GuardCtrlTime = src.GuardCtrlTime; dst.GuardVelX = src.GuardVelX;

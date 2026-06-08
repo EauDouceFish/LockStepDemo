@@ -113,6 +113,135 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void HitOverride_MatchingAttr_RoutesDefenderToOverrideState()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Attr = (int)MAttackType.SA;
+            def.HitOverrides[0] = new MHitOverride
+            {
+                Attr = (int)MAttackType.SA,
+                StateNo = 1300,
+                Time = 3,
+            };
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.PendingStateNo, Is.EqualTo(1300),
+                "HitOverride must replace the default gethit state when attr matches.");
+            Assert.That(def.Life, Is.EqualTo(920), "HitOverride still applies hit damage.");
+            Assert.That(atk.MoveHit, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void HitOverride_NonMatchingAttr_FallsBackToDefaultGetHitState()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Attr = (int)MAttackType.NA;
+            def.HitOverrides[0] = new MHitOverride
+            {
+                Attr = (int)MAttackType.SA,
+                StateNo = 1300,
+                Time = 3,
+            };
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.PendingStateNo, Is.EqualTo(5000));
+        }
+
+        [Test]
+        public void Hit_RegistersTargetWithHitDefId()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Id = 77;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(atk.TargetRefs.Count, Is.EqualTo(1));
+            Assert.That(atk.TargetRefs[0].Target, Is.SameAs(def));
+            Assert.That(atk.TargetRefs[0].HitDefId, Is.EqualTo(77));
+        }
+
+        [Test]
+        public void ReversalDef_MatchingAttr_ReversesIncomingHit()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Attr = (int)MAttackType.SA;
+            def.ReversalDef.Active = true;
+            def.ReversalDef.Attr = (int)MAttackType.SA;
+            def.ReversalDef.Template = BasicHitDef();
+            def.ReversalDef.Template.Active = true;
+            def.ReversalDef.Template.HitDamage = 30;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.Life, Is.EqualTo(1000), "ReversalDef should prevent the original hit damage.");
+            Assert.That(atk.Life, Is.EqualTo(970), "ReversalDef template should hit the incoming attacker.");
+            Assert.That(def.MoveReversed, Is.EqualTo(1));
+            Assert.That(def.MoveHit, Is.EqualTo(1));
+            Assert.That(def.Targets.Contains(atk), Is.True);
+        }
+
+        [Test]
+        public void ReversalDef_NonMatchingAttr_AllowsIncomingHit()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Attr = (int)MAttackType.NA;
+            def.ReversalDef.Active = true;
+            def.ReversalDef.Attr = (int)MAttackType.SA;
+            def.ReversalDef.Template = BasicHitDef();
+            def.ReversalDef.Template.Active = true;
+            def.ReversalDef.Template.HitDamage = 30;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.Life, Is.EqualTo(920));
+            Assert.That(atk.Life, Is.EqualTo(1000));
+            Assert.That(def.MoveReversed, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ReversalDef_MatchingProjectileAttr_ReversesOwner()
+        {
+            (MChar owner, MChar def) = Pair();
+            MProjectile projectile = new MProjectile
+            {
+                Owner = owner,
+                OwnerId = owner.Id,
+                ProjId = 7,
+                Pos = owner.Pos,
+                Facing = owner.Facing,
+                Clsn1 = owner.Clsn1,
+                HitDef = BasicHitDef(),
+            };
+            projectile.HitDef.Active = true;
+            projectile.HitDef.Attr = (int)MAttackType.SP;
+            def.ReversalDef.Active = true;
+            def.ReversalDef.Attr = (int)MAttackType.SP;
+            def.ReversalDef.Template = BasicHitDef();
+            def.ReversalDef.Template.Active = true;
+            def.ReversalDef.Template.HitDamage = 30;
+
+            Assert.IsTrue(MHitSystem.TryProjectileHit(projectile, def));
+
+            Assert.That(def.Life, Is.EqualTo(1000), "ReversalDef should prevent projectile damage.");
+            Assert.That(owner.Life, Is.EqualTo(970), "ReversalDef should route its template hit to projectile owner.");
+            Assert.That(def.MoveReversed, Is.EqualTo(1));
+            Assert.That(projectile.ContactCount, Is.EqualTo(1));
+            Assert.That(owner.ProjectileContactTime, Is.EqualTo(0));
+        }
+
+        [Test]
         public void HitDefController_ActivatesAndSetsMoveType()
         {
             MChar c = new MChar { StateType = 1, MoveType = 1 };

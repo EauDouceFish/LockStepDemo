@@ -240,10 +240,8 @@ namespace Lockstep.View
                 MChar p1 = _engine.Chars[0];
                 MChar p2 = _engine.Chars[1];
                 DrawLine(x, ref y, "帧", _frame.ToString());
-                DrawLine(x, ref y, "P1", "state " + p1.StateNo + " anim " + p1.AnimNo +
-                    " life " + p1.Life + " ctrl " + p1.Ctrl);
-                DrawLine(x, ref y, "P2", "state " + p2.StateNo + " anim " + p2.AnimNo +
-                    " life " + p2.Life + " movetype " + p2.MoveType);
+                DrawLiveDebugLine(x, ref y, "P1", p1);
+                DrawLiveDebugLine(x, ref y, "P2", p2);
                 DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
                 DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
                 DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.StatusText : _previewStatus);
@@ -274,6 +272,23 @@ namespace Lockstep.View
         {
             GUI.Label(new Rect(x + 18f, y, 150f, 24f), label);
             GUI.Label(new Rect(x + 170f, y, Screen.width - x - 190f, 24f), value ?? "");
+            y += 28f;
+        }
+
+        static void DrawLiveDebugLine(float x, ref float y, string label, MChar c)
+        {
+            string firstLine = string.Format(
+                "StateNo {0}   AnimNo {1}   Elem {2}   Physics {3}   Type {4}   Ctrl {5}",
+                c.StateNo, c.AnimNo, c.AnimElem, c.Physics, c.StateType, c.Ctrl);
+            string secondLine = string.Format(
+                "Pos ({0:0.0},{1:0.0})   Vel ({2:0.00},{3:0.00})   Facing {4}   Life {5}",
+                c.Pos.X.ToFloat(), c.Pos.Y.ToFloat(), c.Vel.X.ToFloat(), c.Vel.Y.ToFloat(),
+                c.Facing.Raw < 0 ? -1 : 1, c.Life);
+
+            GUI.Label(new Rect(x + 18f, y, 150f, 24f), label);
+            GUI.Label(new Rect(x + 170f, y, Screen.width - x - 190f, 24f), firstLine);
+            y += 22f;
+            GUI.Label(new Rect(x + 170f, y, Screen.width - x - 190f, 24f), secondLine);
             y += 28f;
         }
 
