@@ -18,6 +18,7 @@
 
 ## P0-B 状态机与资源所有权
 
+- [x] CNS 状态号解析取 `Statedef` 后第一个整数，支持 `[Statedef 5150, 0]` 这类合法头；防止 5150/5188 倒地/死亡控制器误并入 state 0。（2026-06-07 续18）
 - [ ] 建立稳定 `PlayerResourceRegistry`；运行实体保存 state/anim/sprite owner ID。
 - [ ] 删除通过永久替换 `MChar.AnimTable` 实现 `ChangeAnim2` 的方案。
 - [x] 注册资源路径下，`ChangeAnim`、`ChangeAnim2`、`animexist`、`selfanimexist`、custom state 按 owner 解析；`animexist` 查当前动画 owner，`selfanimexist` 查自身 owner。
@@ -43,6 +44,7 @@
 - [ ] 补齐模拟相关 HitDef 字段、state/attack attr mask、persist 生命周期。
 - [ ] guard 输入、guard distance、guard state 与 hit result 闭环。
 - [ ] HitOverride/ReversalDef 接入接触结算；AttackDist 接入 guard distance。
+- [x] HitOverride 槽位 `time` 在非 hitpause 帧递减，`-1` 常驻，hitstop 冻结；命中系统读取 HitOverride 仍未完成。（2026-06-07 续18）
 - [ ] 统一 collision query，支持 localcoord、scale、深度和 HitDef clsn 规则。
 - [ ] 每 defender 帧内 hit accumulator，正确累计 GHV、kill clamp、KO 路由和 life commit。
 - [ ] GetHitVar 完整字段与 reset policy。
@@ -85,8 +87,8 @@
 ## Unity 展馆验收
 
 - [x] 一个数据驱动场景，每角色一页，不复制角色专用场景。（2026-06-07：新增 `Assets/Scenes/MugenCharacterMuseum.unity` + `MugenMuseumDashboard`，运行时扫描 12 个合法 DEF 角色并分页选择。）
-- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。（2026-06-07：最小面板已显示 DEF/localcoord/状态/动画/命令激活/兼容统计/native hash；并接入 playable session 的 live frame、P1/P2 state/anim/life、raw input 与 active command。命令图、招式矩阵结果和 trace 差异仍待接 UI。）
-- [ ] 自动模式使用固定逻辑 tick；交互模式独立。（2026-06-07：展馆交互模式已用 60Hz 定步累加驱动 `MBattleEngine.Tick`；自动招式矩阵仍在 dotnet runner，不在 Unity 面板内运行。）
+- [ ] 页面显示资源/兼容报告/命令图/招式结果/trace 差异。（2026-06-07：最小面板已显示 DEF/localcoord/状态/动画/命令激活/兼容统计/native hash；并接入 playable session 的 live frame、P1/P2 state/anim/life、中文输入面板、中文招式说明和 active command。命令图、招式矩阵结果和 trace 差异仍待接 UI。）
+- [ ] 自动模式使用固定逻辑 tick；交互模式独立。（2026-06-07：展馆交互模式已用 60Hz 定步累加驱动 `MBattleEngine.Tick`；招式按钮改为逐帧 one-shot preview，不再点击瞬间同步跑完整技能；自动招式矩阵仍在 dotnet runner，不在 Unity 面板内运行。）
 - [ ] 角色与木桩、全部实体、碰撞框和当前 state/anim/owner 可视化。（2026-06-07：已显示 P1/P2 两个 SpriteRenderer、当前 state/anim/life；helper/projectile/explod、碰撞框、owner 可视化仍未接。）
 - [ ] 12 个现有角色全部招式执行完毕；新增任意 DEF 可自动出现新页面并运行同一验证流程。
 

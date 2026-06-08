@@ -177,6 +177,12 @@ namespace Lockstep.Mugen.Command
             Array.Clear(_stepTimers, 0, _stepTimers.Length);
         }
 
+        internal void Reset()
+        {
+            ClearProgress();
+            _bufferTime = 0;
+        }
+
         internal void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(_currentTime);

@@ -13,6 +13,17 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
     {
         static MBattleEngine LoadKfm()
         {
+            MCharData data = LoadKfmData();
+            MChar kfm = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
+            MBattleEngine engine = new MBattleEngine();
+            engine.Add(kfm, data);
+            engine.LinkPair();
+            engine.StartRound();
+            return engine;
+        }
+
+        static MCharData LoadKfmData()
+        {
             string kfmDir = TestAssets.KfmDir();
             string common = TestAssets.Common1Cns();
             string cns = Path.Combine(kfmDir, "kfm.cns");
@@ -30,12 +41,7 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
                 File.ReadAllText(air),
                 File.ReadAllText(cmd),
                 "kfm");
-            MChar kfm = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
-            MBattleEngine engine = new MBattleEngine();
-            engine.Add(kfm, data);
-            engine.LinkPair();
-            engine.StartRound();
-            return engine;
+            return data;
         }
 
         [Test]
@@ -104,6 +110,46 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             Assert.That(result.CommandMatched, Is.True, commandName + " should become active");
             Assert.That(result.Status, Is.EqualTo(MMoveTestStatus.Passed),
                 commandName + " should enter state " + targetState + ", final=" + result.FinalStateNo);
+        }
+
+        [Test]
+        public void MovePreviewSession_PlaysButtonMoveOnceThenReturnsToDefault()
+        {
+            MCharData data = LoadKfmData();
+            MBattleEngine engine = new MBattleEngine();
+            MChar p1 = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
+            MChar p2 = MCharLoader.SpawnChar(data, 1, startStateNo: 0, startAnimNo: 0);
+            p2.Facing = -Lockstep.Math.FFloat.One;
+            engine.Add(p1, data);
+            engine.Add(p2, data);
+            engine.LinkPair();
+            engine.StartRound();
+
+            MMovePreviewSession preview = new MMovePreviewSession(
+                new[] { FirstCommand(data, "x") },
+                facingRight: true,
+                targetStateNo: 200,
+                label: "轻拳");
+
+            int entries = 0;
+            int previous = p1.StateNo;
+            for (int frame = 0; frame < 180 && !preview.Done; frame++)
+            {
+                MInput input = preview.NextInput();
+                engine.Tick(new[] { input, MInput.None });
+                preview.AfterTick(engine);
+                if (p1.StateNo == 200 && previous != 200)
+                {
+                    entries++;
+                }
+                previous = p1.StateNo;
+            }
+
+            Assert.That(preview.EnteredTarget, Is.True, "预览脚本应进入轻拳 state 200。");
+            Assert.That(entries, Is.EqualTo(1), "同一次展馆按钮脚本不能在返回 state0 后重复触发 state 200。");
+            Assert.That(preview.Done, Is.True, "招式播放结束后预览 session 应结束。");
+            Assert.That(p1.StateNo, Is.EqualTo(0), "KFM 轻拳状态自然结束后应回默认 state 0。");
+            Assert.That(p1.Ctrl, Is.True);
         }
 
         static MCommandDef FirstCommand(MCharData data, string name)

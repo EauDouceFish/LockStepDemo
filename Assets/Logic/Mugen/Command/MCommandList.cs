@@ -88,6 +88,19 @@ namespace Lockstep.Mugen.Command
             return names;
         }
 
+        public void ResetRuntime()
+        {
+            Buffer = new MCommandBuffer(60);
+            _input = new MInputBuffer();
+            EnsureRuntimes();
+            Array.Clear(_completedThisFrame, 0, _completedThisFrame.Length);
+            _completedNames.Clear();
+            for (int i = 0; i < _runtimes.Count; i++)
+            {
+                _runtimes[i].Reset();
+            }
+        }
+
         public MCommandList Clone()
         {
             EnsureRuntimes();

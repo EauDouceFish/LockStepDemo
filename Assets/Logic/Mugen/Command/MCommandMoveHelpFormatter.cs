@@ -33,7 +33,22 @@ namespace Lockstep.Mugen.Command
             }
 
             string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
-            return "招式 " + move.CommandText + "：搓法 " + FormatMotion(move.MotionText) + "，进入状态 " + target;
+            return "招式 " + move.CommandText + "：搓法 " + FormatMoveInput(move) + "，进入状态 " + target;
+        }
+
+        public static string FormatMoveInput(MCommandMoveInfo move)
+        {
+            if (move == null || move.Motions.Count == 0)
+            {
+                return "无输入";
+            }
+
+            List<string> motions = new List<string>();
+            for (int i = 0; i < move.Motions.Count; i++)
+            {
+                motions.Add(FormatMotion(move.Motions[i]));
+            }
+            return string.Join("；", motions.ToArray());
         }
 
         public static string KeyboardLegend()

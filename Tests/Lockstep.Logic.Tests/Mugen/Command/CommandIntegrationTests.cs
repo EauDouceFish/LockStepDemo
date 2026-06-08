@@ -97,6 +97,21 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void CommandList_ResetRuntimeClearsActiveCommandAndInputHistory()
+        {
+            MCommandList list = new MCommandList();
+            list.Commands.Add(MCommandParser.Parse("x", "x", bufferTime: 8));
+
+            list.Update(MInput.X, true);
+            Assert.That(list.IsActive("x"), Is.True);
+
+            list.ResetRuntime();
+
+            Assert.That(list.IsActive("x"), Is.False, "展馆脚本播放完后必须清掉 active，避免返回 state0 后重复触发同一招。");
+            Assert.That(list.ActiveNames(), Is.Empty);
+        }
+
+        [Test]
         public void ReleaseCharge_RequiresEnoughChargeAndReleaseEdge()
         {
             MCommandList list = new MCommandList();

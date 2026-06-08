@@ -41,6 +41,10 @@ namespace Lockstep.Mugen.State
             {
                 c.HitByTime--;
             }
+            if (!hitpause)
+            {
+                UpdateHitOverrides(c);
+            }
 
             // 外部强制切换（命中系统等）优先
             if (c.PendingStateNo >= 0)
@@ -110,6 +114,19 @@ namespace Lockstep.Mugen.State
                 if (ghv.DownRecoverTime <= 0)
                 {
                     c.QueueTransition(5120, c.PlayerNo);
+                }
+            }
+        }
+
+        static void UpdateHitOverrides(MChar c)
+        {
+            for (int i = 0; i < c.HitOverrides.Length; i++)
+            {
+                if (c.HitOverrides[i].Time > 0)
+                {
+                    MHitOverride value = c.HitOverrides[i];
+                    value.Time--;
+                    c.HitOverrides[i] = value;
                 }
             }
         }

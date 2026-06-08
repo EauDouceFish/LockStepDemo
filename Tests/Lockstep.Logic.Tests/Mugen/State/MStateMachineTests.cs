@@ -83,6 +83,38 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void HitOverrideTime_DecrementsOnNonHitpauseFrames()
+        {
+            MStateMachine sm = new MStateMachine();
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = new MStateDef { No = 0 } };
+            MChar c = new MChar { StateNo = 0 };
+            c.HitOverrides[0] = new MHitOverride { Attr = 0x12, StateNo = 1300, Time = 2 };
+            c.HitOverrides[1] = new MHitOverride { Attr = 0x12, StateNo = 1310, Time = -1 };
+
+            sm.RunFrame(c, states);
+            Assert.That(c.HitOverrides[0].Time, Is.EqualTo(1));
+            Assert.That(c.HitOverrides[1].Time, Is.EqualTo(-1), "Time=-1 常驻槽不递减。");
+
+            sm.RunFrame(c, states);
+            Assert.That(c.HitOverrides[0].Time, Is.EqualTo(0));
+            Assert.That(c.HitOverrides[0].Active, Is.False);
+        }
+
+        [Test]
+        public void HitOverrideTime_DoesNotDecrementDuringHitstop()
+        {
+            MStateMachine sm = new MStateMachine();
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef> { [0] = new MStateDef { No = 0 } };
+            MChar c = new MChar { StateNo = 0, Hitstop = 1 };
+            c.HitOverrides[0] = new MHitOverride { Attr = 0x12, StateNo = 1300, Time = 2 };
+
+            sm.RunFrame(c, states);
+
+            Assert.That(c.HitOverrides[0].Time, Is.EqualTo(2), "hitstop 冻结期间 HitOverride 生命周期不递减。");
+            Assert.That(c.Hitstop, Is.EqualTo(0));
+        }
+
+        [Test]
         public void NullTrigger_AlwaysRuns()
         {
             MStateMachine sm = new MStateMachine();

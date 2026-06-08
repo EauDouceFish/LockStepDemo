@@ -42,6 +42,7 @@ namespace Lockstep.View
         MBattleEngine _engine;
         MCharData _data;
         MugenSpriteLoader.Source _source;
+        MMovePreviewSession _movePreview;
         string _loadedFolder = "";
         MInput _lastInput;
         float _accumulator;
@@ -72,10 +73,18 @@ namespace Lockstep.View
             {
                 _accumulator -= 1f;
                 guard++;
-                _lastInput = SampleInput();
+                _lastInput = _movePreview != null && !_movePreview.Done ? _movePreview.NextInput() : SampleInput();
                 _inputs[0] = _lastInput;
                 _inputs[1] = MInput.None;
                 _engine.Tick(_inputs);
+                if (_movePreview != null)
+                {
+                    _movePreview.AfterTick(_engine);
+                    if (_movePreview.Done)
+                    {
+                        _movePreview = null;
+                    }
+                }
                 _frame++;
             }
             RenderAll();
@@ -206,6 +215,7 @@ namespace Lockstep.View
                     " life " + p2.Life + " movetype " + p2.MoveType);
                 DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
                 DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
+                DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.Label : "无");
                 DrawLine(x, ref y, "按键说明", MCommandMoveHelpFormatter.KeyboardLegend());
                 if (GUI.Button(new Rect(x + 18f, y + 8f, 90f, 30f), "重置"))
                 {
@@ -538,9 +548,9 @@ namespace Lockstep.View
                 }
 
                 MCommandTransitionEntry entry = _moveEntries[index];
-                string target = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value.ToString() : entry.TargetValue;
-                string label = string.Join("+", entry.CommandNames.ToArray()) + " -> " + target;
-                if (GUI.Button(new Rect(x + 18f, y, 360f, 26f), label))
+                string label = MoveButtonLabel(entry);
+                float buttonWidth = Mathf.Max(360f, Screen.width - x - 58f);
+                if (GUI.Button(new Rect(x + 18f, y, buttonWidth, 26f), label))
                 {
                     StepMoveEntry(entry);
                 }
@@ -567,20 +577,51 @@ namespace Lockstep.View
             }
 
             bool facingRight = _engine.Chars[0].Facing.Raw >= 0;
-            List<MInput> sequence = MCommandInputSynthesizer.BuildCombinedSequence(commands, facingRight);
-            for (int i = 0; i < sequence.Count; i++)
+            int targetStateNo = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value : -1;
+            _engine.Chars[0].CommandList?.ResetRuntime();
+            _movePreview = new MMovePreviewSession(commands, facingRight, targetStateNo, MoveButtonLabel(entry));
+        }
+
+        string MoveButtonLabel(MCommandTransitionEntry entry)
+        {
+            MCommandMoveInfo move = FindMoveInfo(entry);
+            if (move != null)
             {
-                _lastInput = sequence[i];
-                _engine.Tick(new[] { sequence[i], MInput.None });
-                _frame++;
+                string target = move.TargetStateNo.HasValue ? move.TargetStateNo.Value.ToString() : move.TargetValue;
+                return "预览 " + move.CommandText + " -> " + target;
             }
-            for (int i = 0; i < 12; i++)
+            string fallbackTarget = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value.ToString() : entry.TargetValue;
+            return "预览 " + string.Join("+", entry.CommandNames.ToArray()) + " -> " + fallbackTarget;
+        }
+
+        MCommandMoveInfo FindMoveInfo(MCommandTransitionEntry entry)
+        {
+            for (int i = 0; i < _moveCatalog.Count; i++)
             {
-                _lastInput = MInput.None;
-                _engine.Tick(new[] { MInput.None, MInput.None });
-                _frame++;
+                MCommandMoveInfo move = _moveCatalog[i];
+                if (move.TargetStateNo != entry.TargetStateNo || move.TargetValue != entry.TargetValue)
+                {
+                    continue;
+                }
+                if (move.CommandNames.Count != entry.CommandNames.Count)
+                {
+                    continue;
+                }
+                bool same = true;
+                for (int c = 0; c < entry.CommandNames.Count; c++)
+                {
+                    if (move.CommandNames[c] != entry.CommandNames[c])
+                    {
+                        same = false;
+                        break;
+                    }
+                }
+                if (same)
+                {
+                    return move;
+                }
             }
-            RenderAll();
+            return null;
         }
 
         List<MCommandDef> FirstDefinitions(List<string> names)
