@@ -20,7 +20,13 @@ namespace Lockstep.Mugen.Battle
 
         public bool EnteredTarget { get; private set; }
         public bool Done { get; private set; }
+        public bool TimedOutSearching { get; private set; }
+        public bool TimedOutInMoveState { get; private set; }
+        public int TimeoutStateNo { get; private set; } = -1;
+        public int TimeoutAnimNo { get; private set; } = -1;
+        public int TimeoutTime { get; private set; } = -1;
         public string Label { get; private set; }
+        public string StatusText { get; private set; }
 
         public MMovePreviewSession(IReadOnlyList<MCommandDef> commands, bool facingRight, int targetStateNo,
             string label = "", int maxSearchFrames = 90, int maxMoveFrames = 180)
@@ -29,6 +35,7 @@ namespace Lockstep.Mugen.Battle
             _maxSearchFrames = maxSearchFrames <= 0 ? 90 : maxSearchFrames;
             _maxMoveFrames = maxMoveFrames <= 0 ? 180 : maxMoveFrames;
             Label = label ?? "";
+            StatusText = Label.Length == 0 ? "Ready" : Label;
 
             List<MInput> sequence = MCommandInputSynthesizer.BuildCombinedSequence(commands, facingRight);
             for (int i = 0; i < sequence.Count; i++)
@@ -63,11 +70,14 @@ namespace Lockstep.Mugen.Battle
                     _moveFrames = 0;
                     _inputs.Clear();
                     actor.CommandList?.ResetRuntime();
+                    StatusText = FormatStatus("playing", actor);
                     return;
                 }
                 if (_inputs.Count == 0 && _frames >= _maxSearchFrames)
                 {
+                    TimedOutSearching = true;
                     actor.CommandList?.ResetRuntime();
+                    StatusText = FormatStatus("timeout before target", actor);
                     Done = true;
                 }
                 return;
@@ -76,20 +86,39 @@ namespace Lockstep.Mugen.Battle
             _moveFrames++;
             if (actor.StateNo != _targetStateNo)
             {
-                Done = IsDefaultReady(actor);
+                StatusText = FormatStatus(IsDefaultReady(actor) ? "recovered" : "recovering", actor);
+                if (IsDefaultReady(actor))
+                {
+                    Done = true;
+                }
                 return;
             }
 
-            // Museum preview fallback only. Real battle semantics stay inside MBattleEngine/state data.
-            if (_moveFrames >= _maxMoveFrames && actor.Ctrl)
+            if (_moveFrames >= _maxMoveFrames && !TimedOutInMoveState)
             {
-                actor.QueueTransition(0, actor.PlayerNo);
+                TimedOutInMoveState = true;
+                TimeoutStateNo = actor.StateNo;
+                TimeoutAnimNo = actor.AnimNo;
+                TimeoutTime = actor.Time;
+                actor.CommandList?.ResetRuntime();
+                StatusText = FormatStatus("timeout in move", actor);
+                Done = true;
+                return;
             }
+
+            StatusText = FormatStatus("playing", actor);
         }
 
         static bool IsDefaultReady(MChar actor)
         {
             return actor.StateNo == 0 && actor.Ctrl;
+        }
+
+        string FormatStatus(string status, MChar actor)
+        {
+            string prefix = Label.Length == 0 ? "preview" : Label;
+            return prefix + " [" + status + "] state=" + actor.StateNo + " anim=" + actor.AnimNo +
+                   " time=" + actor.Time + " ctrl=" + actor.Ctrl;
         }
     }
 }

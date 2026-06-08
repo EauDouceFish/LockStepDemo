@@ -152,6 +152,155 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             Assert.That(p1.Ctrl, Is.True);
         }
 
+        [Test]
+        public void MovePreviewSession_ReportsTimeout_WhenMoveDoesNotNaturallyRecover()
+        {
+            MCharData data = LoadSyntheticStuckMoveData();
+            MBattleEngine engine = LoadTwoPlayerEngine(data);
+            MChar p1 = engine.Chars[0];
+
+            MMovePreviewSession preview = new MMovePreviewSession(
+                new[] { FirstCommand(data, "x") },
+                facingRight: true,
+                targetStateNo: 200,
+                label: "stuck",
+                maxMoveFrames: 3);
+
+            for (int frame = 0; frame < 30 && !preview.Done; frame++)
+            {
+                MInput input = preview.NextInput();
+                engine.Tick(new[] { input, MInput.None });
+                preview.AfterTick(engine);
+            }
+
+            Assert.That(preview.EnteredTarget, Is.True);
+            Assert.That(preview.TimedOutInMoveState, Is.True);
+            Assert.That(preview.Done, Is.True);
+            Assert.That(p1.StateNo, Is.EqualTo(200), "The synthetic state has no ChangeState back to 0.");
+        }
+
+        [Test]
+        public void MovePreviewSession_WaitsForNaturalRecoveryThroughIntermediateState()
+        {
+            MCharData data = LoadSyntheticRecoveryChainData();
+            MBattleEngine engine = LoadTwoPlayerEngine(data);
+            MChar p1 = engine.Chars[0];
+
+            MMovePreviewSession preview = new MMovePreviewSession(
+                new[] { FirstCommand(data, "x") },
+                facingRight: true,
+                targetStateNo: 200,
+                label: "chain",
+                maxMoveFrames: 20);
+
+            bool sawRecoveryState = false;
+            for (int frame = 0; frame < 30 && !preview.Done; frame++)
+            {
+                MInput input = preview.NextInput();
+                engine.Tick(new[] { input, MInput.None });
+                preview.AfterTick(engine);
+                if (p1.StateNo == 201)
+                {
+                    sawRecoveryState = true;
+                }
+            }
+
+            Assert.That(preview.EnteredTarget, Is.True);
+            Assert.That(preview.TimedOutInMoveState, Is.False);
+            Assert.That(sawRecoveryState, Is.True, "Preview must keep waiting after target state enters a recovery state.");
+            Assert.That(preview.Done, Is.True);
+            Assert.That(p1.StateNo, Is.EqualTo(0));
+            Assert.That(p1.Ctrl, Is.True);
+        }
+
+        static MCharData LoadSyntheticStuckMoveData()
+        {
+            const string cns = @"
+[Statedef 0]
+type = S
+movetype = I
+physics = S
+ctrl = 1
+
+[Statedef 200]
+type = S
+movetype = A
+physics = S
+ctrl = 0
+";
+            const string cmd = @"
+[Command]
+name = ""x""
+command = x
+time = 1
+
+[Statedef -1]
+[State -1, x]
+type = ChangeState
+trigger1 = command = ""x""
+value = 200
+";
+            return MCharLoader.Load(new[] { cns }, cns, null, null, cmd, "SyntheticStuck");
+        }
+
+        static MCharData LoadSyntheticRecoveryChainData()
+        {
+            const string cns = @"
+[Statedef 0]
+type = S
+movetype = I
+physics = S
+ctrl = 1
+
+[Statedef 200]
+type = S
+movetype = A
+physics = S
+ctrl = 0
+[State 200, recovery]
+type = ChangeState
+trigger1 = Time >= 2
+value = 201
+
+[Statedef 201]
+type = S
+movetype = A
+physics = S
+ctrl = 0
+[State 201, done]
+type = ChangeState
+trigger1 = Time >= 2
+value = 0
+ctrl = 1
+";
+            const string cmd = @"
+[Command]
+name = ""x""
+command = x
+time = 1
+
+[Statedef -1]
+[State -1, x]
+type = ChangeState
+trigger1 = command = ""x""
+value = 200
+";
+            return MCharLoader.Load(new[] { cns }, cns, null, null, cmd, "SyntheticChain");
+        }
+
+        static MBattleEngine LoadTwoPlayerEngine(MCharData data)
+        {
+            MBattleEngine engine = new MBattleEngine();
+            MChar p1 = MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0);
+            MChar p2 = MCharLoader.SpawnChar(data, 1, startStateNo: 0, startAnimNo: 0);
+            p2.Facing = -Lockstep.Math.FFloat.One;
+            engine.Add(p1, data);
+            engine.Add(p2, data);
+            engine.LinkPair();
+            engine.StartRound();
+            return engine;
+        }
+
         static MCommandDef FirstCommand(MCharData data, string name)
         {
             for (int i = 0; i < data.Commands.Count; i++)

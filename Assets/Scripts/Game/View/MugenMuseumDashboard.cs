@@ -33,6 +33,7 @@ namespace Lockstep.View
         readonly HashSet<int> _builtAnims = new HashSet<int>();
         readonly SpriteRenderer[] _renderers = new SpriteRenderer[2];
         readonly List<MInput> _inputs = new List<MInput> { MInput.None, MInput.None };
+        readonly Queue<MInput> _manualInputs = new Queue<MInput>();
         int _page;
         int _selected;
         int _movePage;
@@ -44,6 +45,7 @@ namespace Lockstep.View
         MugenSpriteLoader.Source _source;
         MMovePreviewSession _movePreview;
         string _loadedFolder = "";
+        string _previewStatus = "None";
         MInput _lastInput;
         float _accumulator;
         int _frame;
@@ -73,13 +75,18 @@ namespace Lockstep.View
             {
                 _accumulator -= 1f;
                 guard++;
-                _lastInput = _movePreview != null && !_movePreview.Done ? _movePreview.NextInput() : SampleInput();
+                _lastInput = NextMuseumInput();
                 _inputs[0] = _lastInput;
                 _inputs[1] = MInput.None;
                 _engine.Tick(_inputs);
                 if (_movePreview != null)
                 {
                     _movePreview.AfterTick(_engine);
+                    _previewStatus = _movePreview.StatusText;
+                    if (_movePreview.TimedOutInMoveState)
+                    {
+                        ApplyPresentationRecovery(_movePreview);
+                    }
                     if (_movePreview.Done)
                     {
                         _movePreview = null;
@@ -88,6 +95,30 @@ namespace Lockstep.View
                 _frame++;
             }
             RenderAll();
+        }
+
+        void ApplyPresentationRecovery(MMovePreviewSession preview)
+        {
+            if (preview == null || _engine == null || _engine.Chars.Count == 0)
+            {
+                return;
+            }
+            MChar actor = _engine.Chars[0];
+            actor.QueueTransition(0, actor.PlayerNo);
+            _previewStatus = preview.StatusText + " | presentation recovery queued";
+        }
+
+        MInput NextMuseumInput()
+        {
+            if (_movePreview != null && !_movePreview.Done)
+            {
+                return _movePreview.NextInput();
+            }
+            if (_manualInputs.Count > 0)
+            {
+                return _manualInputs.Dequeue();
+            }
+            return SampleInput();
         }
 
         void ScanCharacters()
@@ -215,7 +246,7 @@ namespace Lockstep.View
                     " life " + p2.Life + " movetype " + p2.MoveType);
                 DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
                 DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
-                DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.Label : "无");
+                DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.StatusText : _previewStatus);
                 DrawLine(x, ref y, "按键说明", MCommandMoveHelpFormatter.KeyboardLegend());
                 if (GUI.Button(new Rect(x + 18f, y + 8f, 90f, 30f), "重置"))
                 {
@@ -223,11 +254,11 @@ namespace Lockstep.View
                 }
                 if (GUI.Button(new Rect(x + 116f, y + 8f, 90f, 30f), "轻拳 x"))
                 {
-                    StepManualInput(MInput.X, 8);
+                    StepManualInput(MInput.X, 8, "x");
                 }
                 if (GUI.Button(new Rect(x + 214f, y + 8f, 90f, 30f), "轻脚 a"))
                 {
-                    StepManualInput(MInput.A, 8);
+                    StepManualInput(MInput.A, 8, "a");
                 }
                 if (GUI.Button(new Rect(x + 312f, y + 8f, 110f, 30f), _showMoveHelp ? "关闭说明" : "招式说明"))
                 {
@@ -323,6 +354,9 @@ namespace Lockstep.View
                 _frame = 0;
                 _accumulator = 0f;
                 _lastInput = MInput.None;
+                _manualInputs.Clear();
+                _movePreview = null;
+                _previewStatus = "None";
                 _loadedFolder = folder;
                 _movePage = 0;
                 _moveHelpPage = 0;
@@ -486,7 +520,7 @@ namespace Lockstep.View
             return input;
         }
 
-        void StepManualInput(MInput input, int totalFrames)
+        void StepManualInput(MInput input, int totalFrames, string commandName = null)
         {
             if (_engine == null)
             {
@@ -496,15 +530,75 @@ namespace Lockstep.View
             {
                 return;
             }
+            if (StartPreviewForCommand(commandName))
+            {
+                return;
+            }
+            _movePreview = null;
+            _previewStatus = "Manual button input";
+            _manualInputs.Clear();
+            _engine.Chars[0].CommandList?.ResetRuntime();
             _lastInput = input;
-            _engine.Tick(new[] { input, MInput.None });
-            _frame++;
+            _manualInputs.Enqueue(input);
             for (int i = 1; i < totalFrames; i++)
             {
-                _engine.Tick(new[] { MInput.None, MInput.None });
-                _frame++;
+                _manualInputs.Enqueue(MInput.None);
             }
-            RenderAll();
+        }
+
+        bool StartPreviewForCommand(string commandName)
+        {
+            if (string.IsNullOrEmpty(commandName) || _engine == null || _data == null)
+            {
+                return false;
+            }
+
+            MCommandDef command = FindCommandDefinition(commandName);
+            int targetStateNo = FindLiteralTargetState(commandName);
+            if (command == null || targetStateNo < 0)
+            {
+                return false;
+            }
+
+            _manualInputs.Clear();
+            bool facingRight = _engine.Chars[0].Facing.Raw >= 0;
+            _engine.Chars[0].CommandList?.ResetRuntime();
+            _movePreview = new MMovePreviewSession(new[] { command }, facingRight, targetStateNo,
+                "Preview " + commandName + " -> " + targetStateNo);
+            _previewStatus = _movePreview.StatusText;
+            return true;
+        }
+
+        MCommandDef FindCommandDefinition(string commandName)
+        {
+            for (int i = 0; i < _data.Commands.Count; i++)
+            {
+                if (_data.Commands[i].Name == commandName)
+                {
+                    return _data.Commands[i];
+                }
+            }
+            return null;
+        }
+
+        int FindLiteralTargetState(string commandName)
+        {
+            for (int i = 0; i < _moveEntries.Count; i++)
+            {
+                MCommandTransitionEntry entry = _moveEntries[i];
+                if (!entry.TargetStateNo.HasValue)
+                {
+                    continue;
+                }
+                for (int j = 0; j < entry.CommandNames.Count; j++)
+                {
+                    if (entry.CommandNames[j] == commandName)
+                    {
+                        return entry.TargetStateNo.Value;
+                    }
+                }
+            }
+            return -1;
         }
 
         bool ConsumeManualGuiThisFrame()
@@ -578,8 +672,10 @@ namespace Lockstep.View
 
             bool facingRight = _engine.Chars[0].Facing.Raw >= 0;
             int targetStateNo = entry.TargetStateNo.HasValue ? entry.TargetStateNo.Value : -1;
+            _manualInputs.Clear();
             _engine.Chars[0].CommandList?.ResetRuntime();
             _movePreview = new MMovePreviewSession(commands, facingRight, targetStateNo, MoveButtonLabel(entry));
+            _previewStatus = _movePreview.StatusText;
         }
 
         string MoveButtonLabel(MCommandTransitionEntry entry)

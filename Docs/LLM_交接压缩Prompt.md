@@ -16,6 +16,7 @@
 - 已有本地 TDD 覆盖表达式、命令、状态机、命中主干、helper/projectile/explod 记录、snapshot/hash、展馆可玩输入和招式说明。
 - 2026-06-07 修复：`[Statedef 5150, 0]` 之前被误解析成 state 0，导致展馆开局倒地；现在 `MugenCnsParser` 取 `Statedef` 后第一个整数。
 - 2026-06-07 修复：展馆招式按钮现在用 `MMovePreviewSession` 逐帧播放 one-shot 输入脚本，进入目标 state 后清 command runtime，避免返回 state0 后重复触发同一招。
+- 2026-06-08 修复：展馆没有独立状态机，和 `MugenLiveView` 共用 `MBattleEngine/MStateMachine`；卡动作主因在展馆外层按钮/preview 驱动。现在轻拳/轻脚按钮优先走 CMD 命令 preview，所有按钮输入由 `Update()` 定步消费；`MMovePreviewSession` 只报告自然恢复/timeout，不在 Logic 层强制切 state0。展馆层收到 timeout 后只做 presentation recovery，并在 UI 状态栏暴露 timeout。
 
 ## 不能再误报的边界
 
@@ -39,4 +40,5 @@
 - 每个模块先写 `Tests/Lockstep.Logic.Tests/...` 下的 TDD 用例，再实现。
 - 每次改 Unity 展馆必须用 Unity MCP refresh + PlayMode screenshot/execute_code 验收。
 - 修改表现层不要直接写 state/pos/power；只通过 `MBattleEngine.Tick`、命令输入、或明确标记的 debug preview session。
+- 展馆如果为了演示从 timeout state 回 state0，必须留在 View 层并显示诊断；不得把这类兜底写进 `MStateMachine` 或核心战斗语义。
 - 做不到的项写进 `Docs/MUGEN完整适配缺口总表.md`，不要用“完成”包装。
