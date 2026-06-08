@@ -32,6 +32,9 @@ namespace Lockstep.View
         readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
         readonly HashSet<int> _builtAnims = new HashSet<int>();
         readonly SpriteRenderer[] _renderers = new SpriteRenderer[2];
+        readonly List<SpriteRenderer> _helperRenderers = new List<SpriteRenderer>();
+        readonly List<SpriteRenderer> _projectileRenderers = new List<SpriteRenderer>();
+        readonly List<SpriteRenderer> _explodRenderers = new List<SpriteRenderer>();
         readonly List<MInput> _inputs = new List<MInput> { MInput.None, MInput.None };
         readonly Queue<MInput> _manualInputs = new Queue<MInput>();
         int _page;
@@ -245,6 +248,10 @@ namespace Lockstep.View
                 DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
                 DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
                 DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.StatusText : _previewStatus);
+                DrawLine(x, ref y, "实体", "helper " + _engine.Helpers.Count + " / projectile " +
+                    _engine.World.Projectiles.Count + " / explod " + _engine.World.Explods.Count);
+                DrawLine(x, ref y, "表现事件", "sound " + _engine.World.Events.Sounds.Count +
+                    " / visual " + _engine.World.Events.Visuals.Count + " " + LastVisualEventText());
                 DrawLine(x, ref y, "按键说明", MCommandMoveHelpFormatter.KeyboardLegend());
                 if (GUI.Button(new Rect(x + 18f, y + 8f, 90f, 30f), "重置"))
                 {
@@ -476,6 +483,9 @@ namespace Lockstep.View
             {
                 RenderChar(_engine.Chars[i], _renderers[i]);
             }
+            RenderHelpers();
+            RenderProjectiles();
+            RenderExplods();
         }
 
         void RenderChar(MChar character, SpriteRenderer renderer)
@@ -515,6 +525,98 @@ namespace Lockstep.View
                 MugenSpriteLoader.BuildForAnim(_source, anim);
             }
             _builtAnims.Add(animNo);
+        }
+
+        void RenderHelpers()
+        {
+            EnsureRendererCount(_helperRenderers, _engine.Helpers.Count, "Museum Helper ", 10);
+            for (int i = 0; i < _helperRenderers.Count; i++)
+            {
+                bool active = i < _engine.Helpers.Count;
+                _helperRenderers[i].gameObject.SetActive(active);
+                if (active)
+                {
+                    RenderChar(_engine.Helpers[i], _helperRenderers[i]);
+                }
+            }
+        }
+
+        void RenderProjectiles()
+        {
+            EnsureRendererCount(_projectileRenderers, _engine.World.Projectiles.Count, "Museum Projectile ", 30);
+            for (int i = 0; i < _projectileRenderers.Count; i++)
+            {
+                bool active = i < _engine.World.Projectiles.Count;
+                _projectileRenderers[i].gameObject.SetActive(active);
+                if (active)
+                {
+                    MProjectile projectile = _engine.World.Projectiles[i];
+                    RenderAnim(projectile.AnimNo, projectile.Pos, projectile.Facing, _projectileRenderers[i]);
+                }
+            }
+        }
+
+        void RenderExplods()
+        {
+            EnsureRendererCount(_explodRenderers, _engine.World.Explods.Count, "Museum Explod ", 20);
+            for (int i = 0; i < _explodRenderers.Count; i++)
+            {
+                bool active = i < _engine.World.Explods.Count;
+                _explodRenderers[i].gameObject.SetActive(active);
+                if (!active)
+                {
+                    continue;
+                }
+                MExplod explod = _engine.World.Explods[i];
+                RenderAnim(explod.AnimNo, explod.Pos, FFloat.FromInt(explod.Facing), _explodRenderers[i]);
+                _explodRenderers[i].transform.localScale = new Vector3(
+                    Mathf.Max(0.01f, explod.ScaleX.ToFloat()) * (explod.Facing < 0 ? -1f : 1f),
+                    Mathf.Max(0.01f, explod.ScaleY.ToFloat()) * (explod.VFacing < 0 ? -1f : 1f),
+                    1f);
+                _explodRenderers[i].sortingOrder = 20 + explod.SprPriority;
+            }
+        }
+
+        void RenderAnim(int animNo, FVector3 position, FFloat facing, SpriteRenderer renderer)
+        {
+            renderer.flipX = facing.Raw < 0;
+            renderer.transform.localPosition = new Vector3(
+                position.X.ToFloat() / PixelsPerUnit,
+                -position.Y.ToFloat() / PixelsPerUnit,
+                0f);
+
+            if (!_data.Anims.TryGetValue(animNo, out MAnimData anim) || anim.Frames.Length == 0)
+            {
+                renderer.sprite = null;
+                return;
+            }
+
+            MAnimFrame frame = anim.Frames[0];
+            EnsureBuilt(animNo);
+            long key = MugenSpriteAnimator.Key(frame.SpriteGroup, frame.SpriteImage);
+            renderer.sprite = _source.Cache.TryGetValue(key, out Sprite sprite) ? sprite : null;
+        }
+
+        void EnsureRendererCount(List<SpriteRenderer> renderers, int count, string prefix, int sortingBase)
+        {
+            while (renderers.Count < count)
+            {
+                GameObject obj = new GameObject(prefix + renderers.Count);
+                obj.transform.SetParent(transform, false);
+                SpriteRenderer renderer = obj.AddComponent<SpriteRenderer>();
+                renderer.sortingOrder = sortingBase + renderers.Count;
+                renderers.Add(renderer);
+            }
+        }
+
+        string LastVisualEventText()
+        {
+            if (_engine == null || _engine.World.Events.Visuals.Count == 0)
+            {
+                return "";
+            }
+            MVisualEvent visual = _engine.World.Events.Visuals[_engine.World.Events.Visuals.Count - 1];
+            return visual.Type + " owner " + visual.OwnerId + " t " + visual.Time;
         }
 
         static MInput SampleInput()

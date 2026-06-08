@@ -38,6 +38,7 @@ namespace Lockstep.Mugen.Battle
         readonly List<MCharData> _helperData = new List<MCharData>();
         public int FrameNo { get; private set; }
 
+        // Project-specific: registers C# runtime players/resources before Ikemen-style per-frame logic can run.
         public void Add(MChar c, MCharData data)
         {
             int playerNo = Resources.Register(data);
@@ -55,6 +56,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 找某实体对应的 MCharData（玩家在 Data、helper 在 _helperData）。helper 用 owner 的角色数据。
+        // Project-specific: maps C# runtime entities back to immutable character data; Ikemen stores this on Char.
         MCharData DataOf(MChar c)
         {
             for (int i = 0; i < Chars.Count; i++)
@@ -69,6 +71,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 排空 spawn 队列：据请求造 helper 实体（移植 Helper 控制器 + char.go newHelper）。新 helper 下一帧起跑。
+        // Ikemen reference: src/char.go newHelper plus projectile controller spawn paths; queued here for deterministic C# tick order.
         void DrainSpawns()
         {
             for (int q = 0; q < World.SpawnQueue.Count; q++)
@@ -126,6 +129,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 弹幕 projanim 首帧的攻击框 Clsn1（弹幕攻击框来源）。无表/无帧 → null。
+        // Project-specific: C# projectile hit checks need first-frame Clsn1 cached from projanim; Ikemen keeps this in Anim.
         static Hit.MClsnBox[] ProjAnimClsn1(MCharData data, int animNo)
         {
             if (data != null && data.Anims != null && data.Anims.TryGetValue(animNo, out Anim.MAnimData anim)
@@ -137,6 +141,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 推进所有弹幕实体（运动 + 命中敌队 + 生命周期移除）。
+        // Ikemen reference: src/char.go projectile update/contact handling; C# folds movement, contact, and lifetime into MProjectile.Step.
         void StepProjectiles()
         {
             for (int i = 0; i < World.Projectiles.Count; i++)
@@ -167,6 +172,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 移除 DestroySelf 标记的 helper（帧末）。
+        // Ikemen reference: src/char.go helper destroy/removal after DestroySelf; C# removes marked helper entities at frame end.
         void RemoveDestroyed()
         {
             for (int i = Helpers.Count - 1; i >= 0; i--)
@@ -180,6 +186,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         /// <summary>1v1：互设 P2/Root，便于 redirect(p2) 与命中。</summary>
+        // Project-specific: links 1v1 redirect references (P2/Root) for the C# harness; Ikemen builds these through CharList/system setup.
         public void LinkPair()
         {
             for (int i = 0; i < Chars.Count; i++)
@@ -194,6 +201,7 @@ namespace Lockstep.Mugen.Battle
         /// 完整回合状态机（intro/5900/fight/KO）后置；此处只把"该读键且有控制权"的初始态摆正，
         /// 否则直接 spawn 进 state 0 的角色 ctrl=false → 引擎硬编码基础动作（走/跳/蹲）全被挡。
         /// </summary>
+        // Project-specific shim: grants keyctrl/ctrl for live tests before the full Ikemen round flow is wired.
         public void StartRound()
         {
             for (int i = 0; i < Chars.Count; i++)
@@ -203,6 +211,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific rollback snapshot; Ikemen has no C# snapshot API, but captured fields mirror simulation state.
         public MBattleEngineSnapshot Snapshot()
         {
             MBattleEngineSnapshot snapshot = new MBattleEngineSnapshot
@@ -239,6 +248,7 @@ namespace Lockstep.Mugen.Battle
             return snapshot;
         }
 
+        // Project-specific rollback restore; relinks Ikemen-style redirect/target/helper ownership after cloning.
         public void Restore(MBattleEngineSnapshot snapshot)
         {
             Chars.Clear();
@@ -312,6 +322,7 @@ namespace Lockstep.Mugen.Battle
         /// 顺序对齐 Ikemen 每帧：输入缓冲 → actionPrepare(硬编码基础动作) → actionRun(状态机) → update(物理/动画) → 命中。
         /// Pause/SuperPause（移植 system.go super/pause 全局冻结）：暂停期间被冻结角色跳过本帧全部处理，
         /// 仅施暂停方在其 movetime 窗口内可动；SuperPause 优先于 Pause。命中在暂停期间不结算。</summary>
+        // Ikemen reference: src/char.go actionPrepare/actionRun/update + src/system.go pause progression; C# orders the same phases explicitly.
         public void Tick(IReadOnlyList<MInput> inputs)
         {
             World.Events.BeginFrame(FrameNo);
@@ -374,6 +385,7 @@ namespace Lockstep.Mugen.Battle
             // 5b) 排空 spawn 队列（本帧状态机里 Helper/Projectile 控制器请求的实体，下帧起跑）+ 推进现有弹幕。
             DrainSpawns();
             if (!anyPause) { StepProjectiles(); }
+            if (!anyPause) { World.StepExplods(); }
 
             // 6) 命中：全 MChar 实体（玩家 + helper）跨队两两尝试。暂停期间不结算。
             //    队伍 = Root.Id（helper 继承 owner 的 Root）；只在不同队之间判定，避免打自己人。
@@ -388,6 +400,7 @@ namespace Lockstep.Mugen.Battle
             FrameNo++;
         }
 
+        // Ikemen reference: src/char.go projectile contact trigger timers pcid/pctype/pctime.
         static void StepProjectileContactTime(MChar character)
         {
             if (character.ProjectileContactTime >= 0)
@@ -397,12 +410,14 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 队伍归属（移植 Ikemen teamside 简化）：Root 玩家的 id（0/1）。helper.Root=owner 玩家 → 与 owner 同队。
+        // Project-specific helper: approximates Ikemen team/teamside ownership for player/helper hit filtering.
         static int TeamOf(MChar c)
         {
             return c.Root != null ? c.Root.Id : c.Id;
         }
 
         // 本角色本帧用哪张状态表：StateOwner 非 null(投技自定义状态)→其角色数据；否则自身数据(fallback)。
+        // Ikemen reference: src/char.go custom state ownership; C# resolves StatePlayerNo/StateOwner to the right state table.
         MCharData StateDataFor(MChar c, MCharData own)
         {
             MCharData byOwnerId = Resources.Get(c.StatePlayerNo);
@@ -417,6 +432,7 @@ namespace Lockstep.Mugen.Battle
 
         // 全实体跨队命中：把玩家与 helper 合到一个列表，攻防两两尝试（TryHit 内部做 active/重叠/同招一次判定）。
         readonly List<MChar> _hitEntities = new List<MChar>();
+        // Ikemen reference: src/char.go HitDef contact resolution; C# enumerates all player/helper attacker-defender pairs.
         void RunHits()
         {
             _hitEntities.Clear();
@@ -437,6 +453,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific: defers damage until after pair iteration so C# hit order stays deterministic.
         void FlushPendingDamage()
         {
             for (int i = 0; i < Chars.Count; i++)
@@ -450,6 +467,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 单实体物理一相：PauseBool 冻结跳过；PosFreeze 跳积分；否则积分 + 落地检测。
+        // Ikemen reference: src/char.go pos/vel integration and actionRun land check; C# delegates to MPhysics then LandCheck.
         void StepPhysics(MChar c)
         {
             if (c.PauseBool) { return; }
@@ -463,6 +481,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         /// <summary>全角色哈希（确定性对账/黄金哈希用）。</summary>
+        // Project-specific rollback determinism hash; no Ikemen counterpart, but includes simulation state derived from Ikemen fields.
         public ulong ComputeHash()
         {
             Hash64 hash = Hash64.Create();
@@ -488,6 +507,7 @@ namespace Lockstep.Mugen.Battle
             return hash.Value;
         }
 
+        // Project-specific: resolves C# player resource registry for localcoord/state/anim ownership.
         MCharData ResourceForPlayer(int playerNo)
         {
             MCharData data = Resources.Get(playerNo);
@@ -495,6 +515,7 @@ namespace Lockstep.Mugen.Battle
             return playerNo >= 0 && playerNo < Data.Count ? Data[playerNo] : null;
         }
 
+        // Project-specific: reconnects shared engine services after clone/restore; does not change Ikemen simulation semantics.
         void AttachSharedState(MChar character, MCharData data)
         {
             character.Resources = Resources;
@@ -504,6 +525,7 @@ namespace Lockstep.Mugen.Battle
             character.World = World;
         }
 
+        // Project-specific snapshot helper for Ikemen global pause/superpause state.
         static void CopyPause(MPauseState source, MPauseState target)
         {
             target.PauseTime = source.PauseTime;
@@ -514,6 +536,7 @@ namespace Lockstep.Mugen.Battle
             target.SuperPlayerNo = source.SuperPlayerNo;
         }
 
+        // Project-specific snapshot helper: rebuilds Ikemen redirect, bind, target, and ownership references after clone.
         static void RelinkChar(MChar target, MChar source, Dictionary<int, MChar> map)
         {
             target.P2 = Remap(source.P2, map);
@@ -538,17 +561,20 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific snapshot helper: maps old runtime ids to cloned C# entities.
         static MChar Remap(MChar character, Dictionary<int, MChar> map)
         {
             if (character == null) { return null; }
             return map.TryGetValue(character.Id, out MChar remapped) ? remapped : null;
         }
 
+        // Project-specific snapshot helper for queued Helper controller requests.
         static MHelperRequest CloneRequest(MHelperRequest request)
         {
             return request;
         }
 
+        // Project-specific snapshot helper for queued Projectile controller requests; HitDef is cloned to avoid shared mutation.
         static MProjectileRequest CloneRequest(MProjectileRequest request)
         {
             request.HitDef = request.HitDef != null ? request.HitDef.Clone() : null;

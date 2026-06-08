@@ -32,6 +32,7 @@ namespace Lockstep.Mugen.Anim
         public int PreLoopTime;     // loopstart 之前的时长之和
 
         /// <summary>预算 TotalTime/LoopTime/PreLoopTime（移植 Ikemen anim.go 行 337-363）。加载后调用一次。</summary>
+        // Ikemen reference: src/anim.go:337-363 inside ReadAnimation, computes totaltime/looptime/prelooptime.
         public void ComputePacing()
         {
             TotalTime = 0;

@@ -154,6 +154,32 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void HitOverride_ForceGuard_RoutesToGuardResolution()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Attr = (int)MAttackType.SA;
+            atk.HitDef.GuardDamage = 7;
+            atk.HitDef.GuardHitTime = 11;
+            def.HitOverrides[0] = new MHitOverride
+            {
+                Attr = (int)MAttackType.SA,
+                StateNo = 1300,
+                Time = 3,
+                ForceGuard = true,
+            };
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.PendingStateNo, Is.EqualTo(-1), "ForceGuard must not enter gethit override state.");
+            Assert.That(def.Ghv.Guarded, Is.True);
+            Assert.That(def.Life, Is.EqualTo(993));
+            Assert.That(atk.MoveGuarded, Is.EqualTo(1));
+            Assert.That(atk.MoveHit, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Hit_RegistersTargetWithHitDefId()
         {
             (MChar atk, MChar def) = Pair();

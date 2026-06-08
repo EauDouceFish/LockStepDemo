@@ -241,7 +241,13 @@ namespace Lockstep.Mugen.Parse
                 case "velmul": return new VelMulController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
                 case "posset": return new PosSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
                 case "posadd": return new PosAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
-                case "changeanim": return new ChangeAnimController { Value = Expr(comp, p, "value") };
+                case "changeanim":
+                    return new ChangeAnimController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        Elem = Expr(comp, p, "elem"),
+                        ElemTime = Expr(comp, p, "elemtime"),
+                    };
                 case "changeanim2":
                     return new ChangeAnim2Controller { Value = Expr(comp, p, "value"), Elem = Expr(comp, p, "elem"), ElemTime = Expr(comp, p, "elemtime") };
                 case "ctrlset": return new CtrlSetController { Value = Expr(comp, p, "value") };

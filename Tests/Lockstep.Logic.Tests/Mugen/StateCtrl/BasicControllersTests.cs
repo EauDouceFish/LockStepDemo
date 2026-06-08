@@ -107,6 +107,37 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void ChangeAnim_Elem_JumpsToRequestedOneBasedElement()
+        {
+            MChar c = new MChar { AnimNo = 0 };
+            c.AnimTable = new System.Collections.Generic.Dictionary<int, Lockstep.Mugen.Anim.MAnimData>
+            {
+                [0] = new Lockstep.Mugen.Anim.MAnimData
+                {
+                    No = 0,
+                    Frames = new[] { new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 } },
+                },
+                [210] = new Lockstep.Mugen.Anim.MAnimData
+                {
+                    No = 210,
+                    Frames = new[]
+                    {
+                        new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 },
+                        new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 },
+                        new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 },
+                        new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 },
+                    },
+                },
+            };
+
+            new ChangeAnimController { Value = E("210"), Elem = E("4") }.Run(c);
+
+            Assert.That(c.AnimNo, Is.EqualTo(210));
+            Assert.That(c.AnimElem, Is.EqualTo(3), "ChangeAnim elem is 1-based in CNS and 0-based at runtime.");
+            Assert.That(c.AnimElemNo, Is.EqualTo(4));
+        }
+
+        [Test]
         public void VarSet_IntAndFloat()
         {
             MChar c = new MChar();

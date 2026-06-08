@@ -60,8 +60,10 @@ namespace Lockstep.Logic.Tests.Mugen.Expr
         {
             MBattleEngine engine = TwoKfm();
             MChar owner = engine.Chars[0];
+            MChar otherOwner = engine.Chars[1];
             owner.RequestHelper(0, helperType: 5, FFloat.Zero, FFloat.Zero, 1, false);
             owner.RequestHelper(0, helperType: 9, FFloat.Zero, FFloat.Zero, 1, false);
+            otherOwner.RequestHelper(0, helperType: 5, FFloat.Zero, FFloat.Zero, 1, false);
             engine.Tick(new List<MInput> { MInput.None, MInput.None });
 
             Assert.That(Eval("numhelper", owner), Is.EqualTo(2), "numhelper without id counts all helpers");
@@ -75,11 +77,14 @@ namespace Lockstep.Logic.Tests.Mugen.Expr
         {
             MBattleEngine engine = TwoKfm();
             MChar owner = engine.Chars[0];
+            MChar otherOwner = engine.Chars[1];
             owner.RequestProjectile(3, FFloat.Zero, FFloat.Zero, FFloat.Zero, FFloat.Zero,
                 FFloat.Zero, FFloat.Zero, 20, 0, null);
             owner.RequestProjectile(5, FFloat.Zero, FFloat.Zero, FFloat.Zero, FFloat.Zero,
                 FFloat.Zero, FFloat.Zero, 20, 0, null);
             owner.RequestProjectile(5, FFloat.Zero, FFloat.Zero, FFloat.Zero, FFloat.Zero,
+                FFloat.Zero, FFloat.Zero, 20, 0, null);
+            otherOwner.RequestProjectile(5, FFloat.Zero, FFloat.Zero, FFloat.Zero, FFloat.Zero,
                 FFloat.Zero, FFloat.Zero, 20, 0, null);
             engine.Tick(new List<MInput> { MInput.None, MInput.None });
 

@@ -454,6 +454,12 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
+            if (name == "stagevar" && IsOp("("))
+            {
+                EmitStageVarCompare(identifier);
+                return;
+            }
+
             // 函数调用：name(...)
             if (IsOp("("))
             {
@@ -862,6 +868,39 @@ namespace Lockstep.Mugen.Expr
             _out.Add((byte)OpCode.OC_run);
             AppendI32(sub.Count);
             _out.AddRange(sub);
+        }
+
+        // StageVar(info.name) = "x" / != "x": stage name string compare.
+        // Ikemen reference: src/bytecode.go StageVar trigger reads the active stage's info.name.
+        // Difference: this port exposes that value through MChar.StageInfoName; default empty stage name matches no named stage.
+        void EmitStageVarCompare(Tok identifier)
+        {
+            Next();
+            string field = ReadDottedName();
+            Expect(")");
+            bool negate = IsOp("!=");
+            if (negate || IsOp("=")) { Next(); }
+            else { EmitInt(0); return; }
+
+            string wanted = Cur.Kind == TokKind.Str ? Cur.Text : "";
+            if (Cur.Kind == TokKind.Str) { Next(); }
+
+            if (field != "info.name")
+            {
+                Error(MugenExprDiagnosticCode.UnknownField, identifier,
+                    "Unsupported StageVar field '" + field + "'.");
+                EmitInt(0);
+                return;
+            }
+
+            Emit(OpCode.OC_stagevar_info_name);
+            byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(wanted);
+            _out.Add((byte)(nameBytes.Length > 255 ? 255 : nameBytes.Length));
+            for (int k = 0; k < nameBytes.Length && k < 255; k++)
+            {
+                _out.Add(nameBytes[k]);
+            }
+            if (negate) { Emit(OpCode.OC_blnot); }
         }
 
         void EmitTypeCheck(OpCode op, bool isMove)

@@ -259,6 +259,7 @@ namespace Lockstep.Mugen.StateCtrl
                 StateNo = StateNo != null ? StateNo.Run(character).ToI() : -1,
                 Time = Time != null ? Time.Run(character).ToI() : 1,
                 ForceAir = ForceAir != null && ForceAir.Run(character).ToB(),
+                ForceGuard = ForceGuard != null && ForceGuard.Run(character).ToB(),
                 KeepState = KeepState != null && KeepState.Run(character).ToB(),
             };
             return false;
@@ -389,12 +390,137 @@ namespace Lockstep.Mugen.StateCtrl
     public sealed class AngleSetController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
     public sealed class AngleAddController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
     public sealed class AngleMulController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
-    public sealed class AfterImageController : ParameterOnlyController { public AfterImageParamSet AfterImage = new AfterImageParamSet(); }
-    public sealed class AfterImageTimeController : ParameterOnlyController { public BytecodeExp Time; }
-    public sealed class PalFXController : ParameterOnlyController { public PalFXParamSet PalFX = new PalFXParamSet(); }
-    public sealed class AllPalFXController : ParameterOnlyController { public PalFXParamSet PalFX = new PalFXParamSet(); }
-    public sealed class BGPalFXController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; public PalFXParamSet PalFX = new PalFXParamSet(); }
+    public sealed class AfterImageController : ParameterOnlyController
+    {
+        public AfterImageParamSet AfterImage = new AfterImageParamSet();
+
+        public override bool Run(MChar character)
+        {
+            PresentationEvents.EmitAfterImage(character, MVisualEventType.AfterImage, AfterImage);
+            return false;
+        }
+    }
+
+    public sealed class AfterImageTimeController : ParameterOnlyController
+    {
+        public BytecodeExp Time;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.AfterImageTime,
+                    OwnerId = character.Id,
+                    Time = Time != null ? Time.Run(character).ToI() : 1,
+                });
+            }
+            return false;
+        }
+    }
+
+    public sealed class PalFXController : ParameterOnlyController
+    {
+        public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            PresentationEvents.EmitPalFX(character, MVisualEventType.PalFX, PalFX, -1, -1);
+            return false;
+        }
+    }
+
+    public sealed class AllPalFXController : ParameterOnlyController
+    {
+        public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            PresentationEvents.EmitPalFX(character, MVisualEventType.AllPalFX, PalFX, -1, -1);
+            return false;
+        }
+    }
+
+    public sealed class BGPalFXController : ParameterOnlyController
+    {
+        public BytecodeExp Id;
+        public BytecodeExp Index;
+        public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            int id = Id != null ? Id.Run(character).ToI() : -1;
+            int index = Index != null ? Index.Run(character).ToI() : -1;
+            PresentationEvents.EmitPalFX(character, MVisualEventType.BGPalFX, PalFX, id, index);
+            return false;
+        }
+    }
     public sealed class EnvColorController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp Time; public BytecodeExp Under; }
+
+    static class PresentationEvents
+    {
+        public static void EmitPalFX(MChar character, MVisualEventType type, PalFXParamSet palFX, int id, int index)
+        {
+            if (character.World == null || palFX == null)
+            {
+                return;
+            }
+            character.World.Events.Visuals.Add(new MVisualEvent
+            {
+                Type = type,
+                OwnerId = character.Id,
+                Time = palFX.Time != null ? palFX.Time.Run(character).ToI() : 1,
+                Id = id,
+                Index = index,
+                Value0 = palFX.Color != null ? palFX.Color.Run(character).ToI() : 256,
+                Value1 = VectorInt(character, palFX.Add, 0),
+                Value2 = VectorInt(character, palFX.Add, 1),
+                Value3 = VectorInt(character, palFX.Add, 2),
+                ScaleX = VectorFixed(character, palFX.Mul, 0, FFloat.One),
+                ScaleY = VectorFixed(character, palFX.Mul, 1, FFloat.One),
+                X = palFX.Hue != null ? palFX.Hue.Run(character).ToF() : FFloat.Zero,
+            });
+        }
+
+        public static void EmitAfterImage(MChar character, MVisualEventType type, AfterImageParamSet afterImage)
+        {
+            if (character.World == null || afterImage == null)
+            {
+                return;
+            }
+            character.World.Events.Visuals.Add(new MVisualEvent
+            {
+                Type = type,
+                OwnerId = character.Id,
+                Time = afterImage.Time != null ? afterImage.Time.Run(character).ToI() : 1,
+                Value0 = afterImage.Length != null ? afterImage.Length.Run(character).ToI() : 20,
+                Value1 = afterImage.TimeGap != null ? afterImage.TimeGap.Run(character).ToI() : 1,
+                Value2 = afterImage.FrameGap != null ? afterImage.FrameGap.Run(character).ToI() : 4,
+                Value3 = afterImage.PalColor != null ? afterImage.PalColor.Run(character).ToI() : 256,
+                X = afterImage.PalHue != null ? afterImage.PalHue.Run(character).ToF() : FFloat.Zero,
+            });
+        }
+
+        public static FFloat VectorValue(MChar character, BytecodeExp[] values, int index)
+        {
+            return VectorFixed(character, values, index, FFloat.Zero);
+        }
+
+        static int VectorInt(MChar character, BytecodeExp[] values, int index)
+        {
+            return values != null && values.Length > index && values[index] != null
+                ? values[index].Run(character).ToI()
+                : 0;
+        }
+
+        static FFloat VectorFixed(MChar character, BytecodeExp[] values, int index, FFloat fallback)
+        {
+            return values != null && values.Length > index && values[index] != null
+                ? values[index].Run(character).ToF()
+                : fallback;
+        }
+    }
 
     /// <summary>PlaySnd emits a deterministic presentation event. The logic layer never owns an audio device.</summary>
     public sealed class PlaySndController : ParameterOnlyController
@@ -642,8 +768,54 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
     }
-    public sealed class MakeDustController : ParameterOnlyController { public BytecodeExp Spacing; public BytecodeExp[] Position; public BytecodeExp[] Position2; }
-    public sealed class GameMakeAnimController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp[] Position; public BytecodeExp Under; }
+    public sealed class MakeDustController : ParameterOnlyController
+    {
+        public BytecodeExp Spacing;
+        public BytecodeExp[] Position;
+        public BytecodeExp[] Position2;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.MakeDust,
+                    OwnerId = character.Id,
+                    Value0 = Spacing != null ? Spacing.Run(character).ToI() : 1,
+                    X = PresentationEvents.VectorValue(character, Position, 0),
+                    Y = PresentationEvents.VectorValue(character, Position, 1),
+                    Z = PresentationEvents.VectorValue(character, Position2, 0),
+                });
+            }
+            return false;
+        }
+    }
+
+    public sealed class GameMakeAnimController : ParameterOnlyController
+    {
+        public BytecodeExp[] Value;
+        public BytecodeExp[] Position;
+        public BytecodeExp Under;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.GameMakeAnim,
+                    OwnerId = character.Id,
+                    Value0 = Value != null && Value.Length > 0 ? Value[0].Run(character).ToI() : 0,
+                    Value1 = Value != null && Value.Length > 1 ? Value[1].Run(character).ToI() : 0,
+                    X = PresentationEvents.VectorValue(character, Position, 0),
+                    Y = PresentationEvents.VectorValue(character, Position, 1),
+                    Under = Under != null && Under.Run(character).ToB(),
+                });
+            }
+            return false;
+        }
+    }
     public sealed class EnvShakeController : ParameterOnlyController
     {
         public BytecodeExp Time;
@@ -652,8 +824,42 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Multiplier;
         public BytecodeExp Phase;
         public BytecodeExp Direction;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.EnvShake,
+                    OwnerId = character.Id,
+                    Time = Time != null ? Time.Run(character).ToI() : 0,
+                    Value0 = Amplitude != null ? Amplitude.Run(character).ToI() : 0,
+                    Value1 = Frequency != null ? Frequency.Run(character).ToI() : 0,
+                    Value2 = Multiplier != null ? Multiplier.Run(character).ToI() : 1,
+                    Value3 = Phase != null ? Phase.Run(character).ToI() : 0,
+                    X = Direction != null ? Direction.Run(character).ToF() : FFloat.Zero,
+                });
+            }
+            return false;
+        }
     }
-    public sealed class FallEnvShakeController : ParameterOnlyController { }
+    public sealed class FallEnvShakeController : ParameterOnlyController
+    {
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.FallEnvShake,
+                    OwnerId = character.Id,
+                    Time = character.Ghv != null ? character.Ghv.FallRecoverTime : 0,
+                });
+            }
+            return false;
+        }
+    }
     public sealed class ForceFeedbackController : ParameterOnlyController
     {
         public BytecodeExp Time;

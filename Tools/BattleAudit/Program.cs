@@ -143,6 +143,24 @@ internal static class Program
 
     private static string? ExtractReference(string leadingTrivia)
     {
+        Match ikemenReference = Regex.Match(leadingTrivia, @"Ikemen reference:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (ikemenReference.Success)
+        {
+            return ikemenReference.Groups["value"].Value.Trim();
+        }
+
+        Match projectSpecific = Regex.Match(leadingTrivia, @"Project-specific[^:]*:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
+        if (projectSpecific.Success)
+        {
+            return "Project-specific: " + projectSpecific.Groups["value"].Value.Trim();
+        }
+
+        Match projectSpecificLine = Regex.Match(leadingTrivia, @"Project-specific[^\r\n]+", RegexOptions.IgnoreCase);
+        if (projectSpecificLine.Success)
+        {
+            return projectSpecificLine.Value.Trim();
+        }
+
         Match source = Regex.Match(leadingTrivia, @"Source:\s*(?<value>[^\r\n]+)", RegexOptions.IgnoreCase);
         if (source.Success)
         {

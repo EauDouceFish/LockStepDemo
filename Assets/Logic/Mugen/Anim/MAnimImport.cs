@@ -11,6 +11,7 @@ namespace Lockstep.Mugen.Anim
     public static class MAnimImport
     {
         /// <summary>转换单段动画并预算节拍量。</summary>
+        // Project-specific: adapts Lockstep.Import.Air output to MAnimData; Ikemen parses AIR directly in src/anim.go:367 ReadAction.
         public static MAnimData FromAir(GameData.AnimData src)
         {
             MAnimData dst = new MAnimData
@@ -31,6 +32,7 @@ namespace Lockstep.Mugen.Anim
         }
 
         /// <summary>转换整张动画表（动画号→数据）。</summary>
+        // Project-specific: builds the C# animation table; Ikemen equivalent storage is src/anim.go:1075 NewAnimationTable.
         public static Dictionary<int, MAnimData> FromAirTable(IEnumerable<GameData.AnimData> anims)
         {
             Dictionary<int, MAnimData> table = new Dictionary<int, MAnimData>();
@@ -47,6 +49,7 @@ namespace Lockstep.Mugen.Anim
             return table;
         }
 
+        // Project-specific: converts imported AIR frame fields; Ikemen parses them in src/anim.go:45 ReadAnimFrame.
         static MAnimFrame FromAirFrame(GameData.AnimFrame f)
         {
             return new MAnimFrame
@@ -62,6 +65,7 @@ namespace Lockstep.Mugen.Anim
             };
         }
 
+        // Project-specific: converts imported Clsn boxes into hit-system boxes; Ikemen stores Clsn during src/anim.go:45 ReadAnimFrame.
         static MClsnBox[] ConvertClsn(GameData.ClsnBox[] src)
         {
             if (src == null)

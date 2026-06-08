@@ -17,6 +17,7 @@ namespace Lockstep.Mugen.Anim
     public static class MAnimSystem
     {
         /// <summary>推进一 tick。table 为角色动画表（动画号→MAnimData）。无当前动画则安全跳过。</summary>
+        // Ikemen reference: src/anim.go:706 Animation.Action, with trigger-facing derived fields from AnimTime/AnimElemNo.
         public static void Action(MChar c, IReadOnlyDictionary<int, MAnimData> table)
         {
             if (table == null || !table.TryGetValue(c.AnimNo, out MAnimData a) || a == null || a.Frames == null)
@@ -70,12 +71,14 @@ namespace Lockstep.Mugen.Anim
         }
 
         /// <summary>把角色切到指定动画并复位运行态（不推进）。供加载初始化或显式置帧用。</summary>
+        // Ikemen reference: src/anim.go:389 Animation.Reset plus src/bytecode.go changeAnimEx for value-only changes.
         public static void Play(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table)
         {
             PlayAt(c, animNo, table, 0, 0);
         }
 
         /// <summary>切到指定动画的指定元素/元素时间，并立即刷新 AnimTime/AnimElem/Clsn（不推进）。</summary>
+        // Ikemen reference: src/anim.go:511 Animation.SetAnimElem and src/bytecode.go ChangeAnim/ChangeAnim2 elem handling.
         public static void PlayAt(MChar c, int animNo, IReadOnlyDictionary<int, MAnimData> table, int elem, int elemTime)
         {
             c.PrevAnimNo = c.AnimNo;
@@ -95,6 +98,7 @@ namespace Lockstep.Mugen.Anim
             }
         }
 
+        // Project-specific helper: computes SetAnimElem curtime from precomputed frame times; derived from src/anim.go:511 SetAnimElem.
         static int SumTimeBefore(MAnimData anim, int elem)
         {
             int time = 0;
@@ -109,6 +113,7 @@ namespace Lockstep.Mugen.Anim
             return time;
         }
 
+        // Project-specific helper: bounds C# array indices before applying Ikemen elem semantics.
         static int Clamp(int value, int min, int max)
         {
             if (value < min)
@@ -119,6 +124,7 @@ namespace Lockstep.Mugen.Anim
         }
 
         // 元素前进（移植 Ikemen Action 内 next 闭包）：跳过 0 时长帧；永久动画停在末元素。
+        // Ikemen reference: src/anim.go:706 Animation.Action local next() block for zero-time and loop advance.
         static void Next(MChar c, MAnimData a)
         {
             if (a.TotalTime != -1 || c.AnimElem < a.Frames.Length - 1)
@@ -137,6 +143,7 @@ namespace Lockstep.Mugen.Anim
             }
         }
 
+        // Ikemen reference: src/anim.go:389 Animation.Reset; C# stores runtime fields on MChar instead of Animation.
         static void Reinit(MChar c, MAnimData a)
         {
             c.AnimRunningNo = c.AnimNo;
@@ -147,6 +154,7 @@ namespace Lockstep.Mugen.Anim
         }
 
         // 派生 trigger 量 + 填当前帧 Clsn（攻击框 Clsn1 / 受击框 Clsn2）。
+        // Ikemen reference: src/anim.go:409 AnimTime, 428 AnimElemNo, 493 curFrame; also populates Clsn for C# hit checks.
         static void DeriveAndPopulate(MChar c, MAnimData a)
         {
             int elem = c.AnimElem;

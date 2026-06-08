@@ -18,6 +18,7 @@ namespace Lockstep.Mugen.Char
     public sealed class MChar : IExprContext, IExprVariableContext, IExprTwoArgumentRedirectContext
     {
         public string Name;
+        public string StageInfoName = "";
 
         // StateState（状态机运行态）
         public int Time;
@@ -631,7 +632,7 @@ namespace Lockstep.Mugen.Char
         {
             MChar c = new MChar
             {
-                Name = Name, Id = Id,
+                Name = Name, StageInfoName = StageInfoName, Id = Id,
                 Time = Time, StateNo = StateNo, PrevStateNo = PrevStateNo,
                 StateType = StateType, PrevStateType = PrevStateType, MoveType = MoveType, Physics = Physics, Ctrl = Ctrl,
                 AnimNo = AnimNo, PrevAnimNo = PrevAnimNo,
@@ -692,6 +693,7 @@ namespace Lockstep.Mugen.Char
         public void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(Time); hash.AddInt32(StateNo); hash.AddInt32(PrevStateNo);
+            hash.AddString(StageInfoName ?? "");
             hash.AddInt32(StateType); hash.AddInt32(PrevStateType); hash.AddInt32(MoveType); hash.AddInt32(Physics);
             hash.AddBool(Ctrl);
             hash.AddInt32(AnimNo); hash.AddInt32(PrevAnimNo);
@@ -851,6 +853,14 @@ namespace Lockstep.Mugen.Char
                     return BytecodeValue.Bool(Name == wanted);
                 }
 
+                case OpCode.OC_stagevar_info_name:
+                {
+                    int len = code[i]; i++;
+                    string wanted = System.Text.Encoding.ASCII.GetString(code, i, len);
+                    i += len;
+                    return BytecodeValue.Bool((StageInfoName ?? "") == wanted);
+                }
+
                 // CharSystemVar 常用 trigger
                 case OpCode.OC_id: return BytecodeValue.Int(Id);
                 case OpCode.OC_palno: return BytecodeValue.Int(PalNo);
@@ -891,12 +901,12 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_numhelper:
                 {
                     int id = Pop(stack).ToI();
-                    return BytecodeValue.Int(World != null ? World.CountHelpers(id) : 0);
+                    return BytecodeValue.Int(World != null ? World.CountHelpers(id, Root != null ? Root.Id : Id) : 0);
                 }
                 case OpCode.OC_numproj:
                 {
                     int id = Pop(stack).ToI();
-                    return BytecodeValue.Int(World != null ? World.CountProjectiles(id) : 0);
+                    return BytecodeValue.Int(World != null ? World.CountProjectiles(id, Id) : 0);
                 }
                 case OpCode.OC_numexplod:
                 {

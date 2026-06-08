@@ -52,5 +52,6 @@ namespace Lockstep.Mugen.Expr
         OC_p2, OC_stateowner, OC_rdreset,
         // ── 子表跳转标记（其后跟子 opcode 字节）──
         OC_const_, OC_st_, OC_ex_, OC_ex2_, OC_ex3_,
+        OC_stagevar_info_name,
     }
 }

@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Parse;
 using Lockstep.Mugen.State;
+using Lockstep.Mugen.StateCtrl;
 
 namespace Lockstep.Tests.Mugen
 {
@@ -48,6 +49,24 @@ namespace Lockstep.Tests.Mugen
             Dictionary<int, MStateDef> states = MugenCnsParser.Parse("[Statedef -1]\n[State -1, cmd]\ntype = Null\ntrigger1 = 1\n");
 
             Assert.That(states.ContainsKey(-1), Is.True);
+        }
+
+        [Test]
+        public void ParsesChangeAnimElemAndElemTime()
+        {
+            string cns = "[Statedef 210]\n" +
+                         "[State 210, recover]\n" +
+                         "type = ChangeAnim\n" +
+                         "trigger1 = movecontact\n" +
+                         "value = 210\n" +
+                         "elem = 4\n" +
+                         "elemtime = 2\n";
+
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+            ChangeAnimController controller = (ChangeAnimController)states[210].Controllers[0];
+
+            Assert.That(controller.Elem, Is.Not.Null);
+            Assert.That(controller.ElemTime, Is.Not.Null);
         }
 
         [Test]

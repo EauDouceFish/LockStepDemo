@@ -60,6 +60,26 @@ namespace Lockstep.Mugen.Char
         public bool RemoveOnGetHit;
         public bool RemoveOnChangeState;
 
+        public void Step()
+        {
+            Vel = new FVector3(Vel.X + Accel.X, Vel.Y + Accel.Y, Vel.Z + Accel.Z);
+            Pos = new FVector3(Pos.X + Vel.X, Pos.Y + Vel.Y, Pos.Z + Vel.Z);
+            if (BindTime > 0)
+            {
+                BindTime--;
+            }
+            if (RemoveTime >= 0)
+            {
+                RemoveTime--;
+                if (RemoveTime < 0)
+                {
+                    RemoveTime = -3;
+                }
+            }
+        }
+
+        public bool Expired => RemoveTime == -3;
+
         public MExplod Clone()
         {
             return new MExplod
@@ -147,6 +167,25 @@ namespace Lockstep.Mugen.Char
             return count;
         }
 
+        public int CountHelpers(int helperType, int ownerId)
+        {
+            int count = 0;
+            for (int index = 0; index < Helpers.Count; index++)
+            {
+                MChar helper = Helpers[index];
+                if (helper == null)
+                {
+                    continue;
+                }
+                int helperOwnerId = helper.Root != null ? helper.Root.Id : (helper.Parent != null ? helper.Parent.Id : -1);
+                if (helperOwnerId == ownerId && (helperType < 0 || helper.HelperType == helperType))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
         public int CountProjectiles(int projId)
         {
             if (projId < 0) { return Projectiles.Count; }
@@ -156,6 +195,35 @@ namespace Lockstep.Mugen.Char
                 if (Projectiles[index].ProjId == projId) { count++; }
             }
             return count;
+        }
+
+        public int CountProjectiles(int projId, int ownerId)
+        {
+            int count = 0;
+            for (int index = 0; index < Projectiles.Count; index++)
+            {
+                MProjectile projectile = Projectiles[index];
+                if (projectile.OwnerId == ownerId && (projId < 0 || projectile.ProjId == projId))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        public void StepExplods()
+        {
+            for (int index = 0; index < Explods.Count; index++)
+            {
+                Explods[index].Step();
+            }
+            for (int index = Explods.Count - 1; index >= 0; index--)
+            {
+                if (Explods[index].Expired)
+                {
+                    Explods.RemoveAt(index);
+                }
+            }
         }
 
         public void AddExplod(MExplod explod)

@@ -148,6 +148,73 @@ namespace Lockstep.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void VisualControllers_EmitPresentationEvents()
+        {
+            MEntityWorld world = new MEntityWorld();
+            MChar character = new MChar { Id = 11, World = world };
+
+            new PalFXController
+            {
+                PalFX = new PalFXParamSet
+                {
+                    Time = Expression("6"),
+                    Color = Expression("128"),
+                    Add = new[] { Expression("1"), Expression("2"), Expression("3") },
+                },
+            }.Run(character);
+            new AfterImageController
+            {
+                AfterImage = new AfterImageParamSet
+                {
+                    Time = Expression("8"),
+                    Length = Expression("12"),
+                },
+            }.Run(character);
+            new EnvShakeController
+            {
+                Time = Expression("10"),
+                Amplitude = Expression("4"),
+            }.Run(character);
+
+            Assert.That(world.Events.Visuals.Count, Is.EqualTo(3));
+            Assert.That(world.Events.Visuals[0].Type, Is.EqualTo(MVisualEventType.PalFX));
+            Assert.That(world.Events.Visuals[0].Time, Is.EqualTo(6));
+            Assert.That(world.Events.Visuals[0].Value0, Is.EqualTo(128));
+            Assert.That(world.Events.Visuals[1].Type, Is.EqualTo(MVisualEventType.AfterImage));
+            Assert.That(world.Events.Visuals[1].Value0, Is.EqualTo(12));
+            Assert.That(world.Events.Visuals[2].Type, Is.EqualTo(MVisualEventType.EnvShake));
+            Assert.That(world.Events.Visuals[2].Value0, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void Explod_StepsAndExpiresByRemoveTime()
+        {
+            MEntityWorld world = new MEntityWorld();
+            MExplod explod = new MExplod
+            {
+                Pos = new FVector3(Fixed(1), Fixed(2), FFloat.Zero),
+                Vel = new FVector3(Fixed(3), FFloat.Zero, FFloat.Zero),
+                Accel = new FVector3(Fixed(1), FFloat.Zero, FFloat.Zero),
+                RemoveTime = 2,
+            };
+            world.AddExplod(explod);
+
+            world.StepExplods();
+
+            Assert.That(world.Explods.Count, Is.EqualTo(1));
+            Assert.That(world.Explods[0].Pos.X.Raw, Is.EqualTo(Fixed(5).Raw));
+            Assert.That(world.Explods[0].RemoveTime, Is.EqualTo(1));
+
+            world.StepExplods();
+
+            Assert.That(world.Explods.Count, Is.EqualTo(1));
+
+            world.StepExplods();
+
+            Assert.That(world.Explods.Count, Is.EqualTo(0));
+        }
+
+        [Test]
         public void CnsParser_BuildsEveryTierBNonEntityControllerName()
         {
             string text = @"

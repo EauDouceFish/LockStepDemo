@@ -387,6 +387,7 @@ namespace Lockstep.Mugen.Battle
         readonly Dictionary<string, int> _nextOrdinal = new Dictionary<string, int>(StringComparer.Ordinal);
         readonly Dictionary<int, string> _runtimeIdKeys = new Dictionary<int, string>();
 
+        // Project-specific: emits C# oracle-trace metadata; Ikemen counterpart is the external headless trace producer.
         public static MBattleTraceHeader CreateHeader(MTraceScenario scenario, string commit = "")
         {
             return new MBattleTraceHeader
@@ -396,6 +397,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: captures post-tick C# state for Ikemen diffing; fields mirror src/char.go Char/System runtime state.
         public MBattleTraceFrame CapturePostTick(
             MBattleEngine engine,
             int step,
@@ -446,6 +448,7 @@ namespace Lockstep.Mugen.Battle
             return frame;
         }
 
+        // Project-specific: records global System-like state (pause/superpause/rng/roundstate) for Ikemen trace comparison.
         MTraceGlobal CaptureGlobal(MBattleEngine engine)
         {
             MPauseState pause = engine.PauseState;
@@ -464,6 +467,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: assigns stable trace keys for players/helpers/projectiles/explods independent of raw runtime ids.
         void PrepareEntityKeys(MBattleEngine engine)
         {
             _runtimeIdKeys.Clear();
@@ -507,6 +511,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific: per-owner creation ordinal used by the trace schema to compare against Ikemen entity ordering.
         int AllocateOrdinal(string counterKey)
         {
             int value;
@@ -515,6 +520,7 @@ namespace Lockstep.Mugen.Battle
             return value;
         }
 
+        // Project-specific: reduces helper/custom-state ownership to the root player key used by the trace schema.
         string RootPlayerKey(MChar character)
         {
             if (character == null) { return "unowned"; }
@@ -528,6 +534,7 @@ namespace Lockstep.Mugen.Battle
             return RootPlayerKeyById(root.Id);
         }
 
+        // Project-specific: runtime-id to root-player-key lookup for events that only store owner ids.
         string RootPlayerKeyById(int runtimeId)
         {
             string key;
@@ -805,6 +812,33 @@ namespace Lockstep.Mugen.Battle
                     LowPriority = value.LowPriority,
                     StopOnGetHit = value.StopOnGetHit,
                     StopOnChangeState = value.StopOnChangeState,
+                });
+            }
+            for (int i = 0; i < engine.World.Events.Visuals.Count; i++)
+            {
+                MVisualEvent value = engine.World.Events.Visuals[i];
+                string owner = KeyByRuntimeId(value.OwnerId) ?? RootPlayerKeyById(value.OwnerId);
+                string prefix = "visual/" + owner + "/" + value.Type.ToString().ToLowerInvariant();
+                int ordinal;
+                occurrences.TryGetValue(prefix, out ordinal);
+                occurrences[prefix] = ordinal + 1;
+                destination.Add(new MEventTrace
+                {
+                    Key = prefix + "/" + ordinal.ToString(CultureInfo.InvariantCulture),
+                    Kind = "visual",
+                    Owner = owner,
+                    Action = value.Type.ToString().ToLowerInvariant(),
+                    Group = value.Id,
+                    Number = value.Index,
+                    Channel = value.Value0,
+                    VolumeScale = value.Time,
+                    Priority = value.Value1,
+                    LoopStart = value.Value2,
+                    LoopEnd = value.Value3,
+                    PanQ20 = ToQ20(value.X),
+                    FrequencyQ20 = ToQ20(value.Y),
+                    StartPosition = ToQ20(value.Z) > int.MaxValue ? int.MaxValue : (int)ToQ20(value.Z),
+                    CommonBank = value.Under,
                 });
             }
         }

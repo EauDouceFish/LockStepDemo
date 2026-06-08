@@ -35,6 +35,7 @@ namespace Lockstep.Mugen.Battle
         const int StRunJumpLand = 105;
 
         /// <summary>对受控角色执行引擎内置基础动作判定（移植 actionPrepare 硬编码键块）。</summary>
+        // Ikemen reference: src/char.go:11435-11481 Char.actionPrepare hardcoded jump/crouch/walk/brake decisions.
         public static void Prepare(MChar c)
         {
             if (c == null || c.Input == null)
@@ -113,6 +114,7 @@ namespace Lockstep.Mugen.Battle
         /// 在物理积分之后调用：空中物理 + 下落(vel.y>0) + 触地(pos.y>=地面) + 非跑跳落地特例(105) → 强制落地态 52。
         /// 缺此则跳起后无限下落（地面夹取在 MUGEN 由此引擎硬编码转移负责，不在 .cns 数据里）。
         /// </summary>
+        // Ikemen reference: src/char.go:11717-11723 Char.actionRun aerial-physics land transition to state 52.
         public static void LandCheck(MChar c)
         {
             if (c == null)
@@ -125,16 +127,19 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Ikemen reference: src/char.go actionPrepare AssertSpecial gates such as NoHardcodedKeys/NoBrake.
         static bool Asf(MChar c, MAssertFlag flag)
         {
             return (c.AssertFlags & (int)flag) != 0;
         }
 
+        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump height check using movement.airjump.height.
         static FFloat AirjumpHeight(MChar c)
         {
             return c.Constants != null ? c.Constants.AirjumpHeight : FFloat.FromInt(35);
         }
 
+        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump count check using movement.airjump.num.
         static int AirjumpNum(MChar c)
         {
             return c.Constants != null ? c.Constants.AirjumpNum : 0;

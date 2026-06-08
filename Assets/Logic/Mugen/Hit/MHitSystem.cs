@@ -48,7 +48,9 @@ namespace Lockstep.Mugen.Hit
             {
                 return true;
             }
-            bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
+            MHitOverride hitOverride = FindHitOverride(defender, hd.Attr);
+            bool guarded = hitOverride.Active && hitOverride.ForceGuard;
+            guarded = guarded || (defender.Guarding && GuardFlagAllows(hd, defender.StateType));
             if (!guarded && !CanJuggle(attacker, defender, hd, false))
             {
                 return false;
@@ -118,7 +120,9 @@ namespace Lockstep.Mugen.Hit
                 proj.Owner.RecordProjectileContact(proj.ProjId, false);
                 return true;
             }
-            bool guarded = defender.Guarding && GuardFlagAllows(hd, defender.StateType);
+            MHitOverride hitOverride = FindHitOverride(defender, hd.Attr);
+            bool guarded = hitOverride.Active && hitOverride.ForceGuard;
+            guarded = guarded || (defender.Guarding && GuardFlagAllows(hd, defender.StateType));
             if (!guarded && !CanJuggle(proj.Owner, defender, hd, true))
             {
                 return false;
