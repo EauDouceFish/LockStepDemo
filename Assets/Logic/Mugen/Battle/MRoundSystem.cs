@@ -34,6 +34,12 @@ namespace Lockstep.Mugen.Battle
         public int WinPoseTime = 90;     // 胜利姿态时长
         public int RoundTime = 99 * 60;  // 回合计时（tick）；<0 = 不计时（无限）
         public int RoundsToWin = 2;      // 几胜制（2 = 三局两胜）
+        public const int TicksPerSecond = 60;
+
+        // 入场自动演出：回合 Intro 期把角色送入其入场态（MUGEN 约定 190；KFM 用 191=鞠躬，anim 190）。
+        // 胜利姿态：Over 期把胜者送入 win pose（MUGEN 约定 180；KFM 用 195）。按候选顺序取首个存在的态，缺则不动（不破坏无入场态的测试角色）。
+        public int[] IntroStateCandidates = { 190, 191 };
+        public int[] WinPoseStateCandidates = { 180, 181, 195 };
 
         // ── 运行态 ──
         public MRoundState State = MRoundState.Intro;
@@ -49,7 +55,11 @@ namespace Lockstep.Mugen.Battle
         {
             _engine = engine;
             Timer = RoundTime;
+            BeginRoundIntro();   // 开局把角色送入入场态（鞠躬）；无入场态的角色保持站立。
         }
+
+        /// <summary>回合倒计时（秒，向上取整）；RoundTime &lt; 0（无限）时返回 -1。供 HUD 显示。</summary>
+        public int TimerSeconds => RoundTime < 0 ? -1 : (Timer + TicksPerSecond - 1) / TicksPerSecond;
 
         /// <summary>推进一帧：先按回合状态编排（授/收 ctrl、判胜负），再推进底层引擎一帧。</summary>
         public void Tick(IReadOnlyList<MInput> inputs)
@@ -101,6 +111,15 @@ namespace Lockstep.Mugen.Battle
         void EnterFight()
         {
             _engine.StartRound();   // 授 ctrl/keyctrl（Ikemen RoundState 2 进入活动期）
+            // 离开入场态：仍停在入场态的角色回中立 0（鞠躬结束，"Fight!" 开打）。非入场态角色不动。
+            for (int i = 0; i < _engine.Chars.Count; i++)
+            {
+                MChar c = _engine.Chars[i];
+                if (IsInState(c, IntroStateCandidates))
+                {
+                    c.QueueTransition(0, c.PlayerNo);
+                }
+            }
             State = MRoundState.Fight;
             StateTimer = 0;
             Timer = RoundTime;      // 回合计时在进入战斗时起算（对齐 Ikemen fight 开始计时）
@@ -159,9 +178,57 @@ namespace Lockstep.Mugen.Battle
             if (Winner >= 0 && Winner < RoundsWon.Length)
             {
                 RoundsWon[Winner]++;
+                if (Winner < _engine.Chars.Count)
+                {
+                    SendToStateIfExists(_engine.Chars[Winner], WinPoseStateCandidates);   // 胜者摆 win pose
+                }
             }
             State = MRoundState.Over;
             StateTimer = 0;
+        }
+
+        // 把角色送入候选列表里首个存在的状态（缺则不动，保护无入场/胜利态的角色）。
+        void SendToStateIfExists(MChar c, int[] candidates)
+        {
+            if (c == null || c.OwnData == null || candidates == null)
+            {
+                return;
+            }
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (c.OwnData.States.ContainsKey(candidates[i]))
+                {
+                    c.QueueTransition(candidates[i], c.PlayerNo);
+                    c.Ctrl = false;
+                    c.KeyCtrl = false;
+                    return;
+                }
+            }
+        }
+
+        static bool IsInState(MChar c, int[] candidates)
+        {
+            if (c == null || candidates == null)
+            {
+                return false;
+            }
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (c.StateNo == candidates[i])
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 开局/回合开始：把双方送入入场态（鞠躬）。无入场态者保持当前态。
+        void BeginRoundIntro()
+        {
+            for (int i = 0; i < _engine.Chars.Count; i++)
+            {
+                SendToStateIfExists(_engine.Chars[i], IntroStateCandidates);
+            }
         }
 
         void AdvanceAfterRound()
@@ -182,6 +249,7 @@ namespace Lockstep.Mugen.Battle
             {
                 ResetCombatant(_engine.Chars[i]);
             }
+            BeginRoundIntro();   // 新回合也鞠躬入场
         }
 
         // 回合间复位：满血、回站立 0、清受击态、收 ctrl（入场期再授）。位置复位归 demo 场景（R-ARENA）。

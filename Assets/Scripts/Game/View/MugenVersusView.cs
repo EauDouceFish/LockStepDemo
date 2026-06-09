@@ -25,6 +25,7 @@ namespace Lockstep.View
 
         MBattleEngine _engine;
         MRoundSystem _round;
+        MugenBattleHud _hud;
         MCharData _data;
         MugenSpriteLoader.Source _source;
         readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
@@ -69,7 +70,7 @@ namespace Lockstep.View
             _engine.Add(p1, _data);
             _engine.Add(p2, _data);
             _engine.LinkPair();
-            _round = new MRoundSystem(_engine) { IntroTime = 30 };   // 短入场，便于演示
+            _round = new MRoundSystem(_engine);   // 默认三局两胜 + 入场鞠躬 + 99 秒倒计时
 
             _source = MugenSpriteLoader.Open(sffPath, PixelsPerUnit);
             List<GameData.AnimData> anims = AirParser.ParseFile(airPath);
@@ -86,9 +87,11 @@ namespace Lockstep.View
                 _renderers[i].sortingOrder = i;
             }
 
+            _hud = MugenBattleHud.Create(_round.RoundsToWin);
+
             Application.runInBackground = true;
             Debug.Log(string.Format(
-                "[MUGEN] Versus: 两个 {0} 同场。P1 方向键走位 + Z/X/C 出招命中 P2（木桩）。状态 {1}/公共 {2}。",
+                "[MUGEN] 1v1: 两个 {0} 同场。P1 方向键 + Z/X/C；P2 WASD + J/K/L。三局两胜 + 入场鞠躬 + HUD。状态 {1}/公共 {2}。",
                 CharacterFolder, _data.States.Count, _data.CommonStates.Count));
             RenderAll();
         }
@@ -105,24 +108,30 @@ namespace Lockstep.View
             {
                 _accumulator -= 1f;
                 guard++;
-                _inputs[0] = SampleInput();
-                _inputs[1] = MInput.None;   // P2 木桩
+                _inputs[0] = SampleInput(KeyCode.UpArrow, KeyCode.DownArrow, KeyCode.LeftArrow, KeyCode.RightArrow,
+                    KeyCode.Z, KeyCode.X, KeyCode.C);
+                _inputs[1] = SampleInput(KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D,
+                    KeyCode.J, KeyCode.K, KeyCode.L);
                 _round.Tick(_inputs);
                 _frame++;
             }
             RenderAll();
+            if (_hud != null)
+            {
+                _hud.UpdateHud(_round, _engine.Chars[0], _engine.Chars[1], Time.deltaTime);
+            }
         }
 
-        static MInput SampleInput()
+        static MInput SampleInput(KeyCode up, KeyCode down, KeyCode left, KeyCode right, KeyCode a, KeyCode b, KeyCode c)
         {
             MInput input = MInput.None;
-            if (UnityEngine.Input.GetKey(KeyCode.UpArrow)) { input |= MInput.Up; }
-            if (UnityEngine.Input.GetKey(KeyCode.DownArrow)) { input |= MInput.Down; }
-            if (UnityEngine.Input.GetKey(KeyCode.LeftArrow)) { input |= MInput.Left; }
-            if (UnityEngine.Input.GetKey(KeyCode.RightArrow)) { input |= MInput.Right; }
-            if (UnityEngine.Input.GetKey(KeyCode.Z)) { input |= MInput.A; }
-            if (UnityEngine.Input.GetKey(KeyCode.X)) { input |= MInput.B; }
-            if (UnityEngine.Input.GetKey(KeyCode.C)) { input |= MInput.C; }
+            if (UnityEngine.Input.GetKey(up)) { input |= MInput.Up; }
+            if (UnityEngine.Input.GetKey(down)) { input |= MInput.Down; }
+            if (UnityEngine.Input.GetKey(left)) { input |= MInput.Left; }
+            if (UnityEngine.Input.GetKey(right)) { input |= MInput.Right; }
+            if (UnityEngine.Input.GetKey(a)) { input |= MInput.A; }
+            if (UnityEngine.Input.GetKey(b)) { input |= MInput.B; }
+            if (UnityEngine.Input.GetKey(c)) { input |= MInput.C; }
             return input;
         }
 
