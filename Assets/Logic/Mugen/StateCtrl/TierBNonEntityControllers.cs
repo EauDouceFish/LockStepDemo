@@ -383,13 +383,128 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] Dest;
     }
 
-    public sealed class TransController : ParameterOnlyController { public BytecodeExp[] Trans; public string TransText; }
-    public sealed class SprPriorityController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp LayerNo; }
-    public sealed class OffsetController : ParameterOnlyController { public BytecodeExp XOffset; public BytecodeExp YOffset; }
-    public sealed class AngleDrawController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; public BytecodeExp[] Scale; }
-    public sealed class AngleSetController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
-    public sealed class AngleAddController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
-    public sealed class AngleMulController : ParameterOnlyController { public BytecodeExp Value; public BytecodeExp XAngle; public BytecodeExp YAngle; }
+    /// <summary>Trans: 写 MChar.Trans/AlphaSrc/AlphaDst（移植 bytecode.go:10255 trans.Run）。type 文本在解析期定型+默认 alpha，alpha 参数覆盖 src/dst（compiler.go:6380）。</summary>
+    public sealed class TransController : ParameterOnlyController
+    {
+        public MTransType TransType = MTransType.Default;
+        public int DefaultSrc = 255;
+        public int DefaultDst;
+        public BytecodeExp[] Alpha;   // 可选 alpha 覆盖 [src, dst]
+
+        public override bool Run(MChar character)
+        {
+            int src = Alpha != null && Alpha.Length > 0 && Alpha[0] != null ? Alpha[0].Run(character).ToI() : DefaultSrc;
+            int dst = Alpha != null && Alpha.Length > 1 && Alpha[1] != null ? Alpha[1].Run(character).ToI() : DefaultDst;
+            character.Trans = TransType;
+            character.AlphaSrc = Clamp255(src);
+            character.AlphaDst = Clamp255(dst);
+            return false;
+        }
+
+        static int Clamp255(int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+    }
+
+    /// <summary>SprPriority: 写绘制排序（移植 bytecode.go:9295）。无参也写 0（Mugen 即便不设也用 0）。跨帧保留。</summary>
+    public sealed class SprPriorityController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+        public BytecodeExp LayerNo;
+
+        public override bool Run(MChar character)
+        {
+            character.SprPriority = Value != null ? Value.Run(character).ToI() : 0;
+            character.LayerNo = LayerNo != null ? LayerNo.Run(character).ToI() : 0;
+            return false;
+        }
+    }
+
+    /// <summary>Offset: 写绘制偏移（移植 bytecode.go:11316）。只写提供的轴；localscl 本工程恒 1（运行换算待 R-LOCALCOORD）。每帧重置后重新断言。</summary>
+    public sealed class OffsetController : ParameterOnlyController
+    {
+        public BytecodeExp XOffset;
+        public BytecodeExp YOffset;
+
+        public override bool Run(MChar character)
+        {
+            if (XOffset != null) { character.OffsetX = XOffset.Run(character).ToF(); }
+            if (YOffset != null) { character.OffsetY = YOffset.Run(character).ToF(); }
+            return false;
+        }
+    }
+
+    /// <summary>AngleDraw: 置 anglerot + 乘 angleDrawScale 并打开 AngleDraw 绘制标志（移植 bytecode.go:10367）。每帧需重新断言。</summary>
+    public sealed class AngleDrawController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+        public BytecodeExp XAngle;
+        public BytecodeExp YAngle;
+        public BytecodeExp[] Scale;
+
+        public override bool Run(MChar character)
+        {
+            if (Value != null) { character.AngleSetValue(Value.Run(character).ToF()); }
+            if (XAngle != null) { character.XAngleSetValue(XAngle.Run(character).ToF()); }
+            if (YAngle != null) { character.YAngleSetValue(YAngle.Run(character).ToF()); }
+            if (Scale != null && Scale.Length > 0 && Scale[0] != null)
+            {
+                character.AngleDrawScaleX *= Scale[0].Run(character).ToF();
+                if (Scale.Length > 1 && Scale[1] != null)
+                {
+                    character.AngleDrawScaleY *= Scale[1].Run(character).ToF();
+                }
+            }
+            character.AngleDraw = true;
+            return false;
+        }
+    }
+
+    /// <summary>AngleSet: 三分量全设（无参分量取 0，移植 bytecode.go:10403）。anglerot 跨帧保留。</summary>
+    public sealed class AngleSetController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+        public BytecodeExp XAngle;
+        public BytecodeExp YAngle;
+
+        public override bool Run(MChar character)
+        {
+            character.AngleSetValue(Value != null ? Value.Run(character).ToF() : FFloat.Zero);
+            character.XAngleSetValue(XAngle != null ? XAngle.Run(character).ToF() : FFloat.Zero);
+            character.YAngleSetValue(YAngle != null ? YAngle.Run(character).ToF() : FFloat.Zero);
+            return false;
+        }
+    }
+
+    /// <summary>AngleAdd: 只对提供的分量做加法（移植 bytecode.go:10438）。</summary>
+    public sealed class AngleAddController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+        public BytecodeExp XAngle;
+        public BytecodeExp YAngle;
+
+        public override bool Run(MChar character)
+        {
+            if (Value != null) { character.AngleSetValue(character.AngleRot + Value.Run(character).ToF()); }
+            if (XAngle != null) { character.XAngleSetValue(character.AngleRotX + XAngle.Run(character).ToF()); }
+            if (YAngle != null) { character.YAngleSetValue(character.AngleRotY + YAngle.Run(character).ToF()); }
+            return false;
+        }
+    }
+
+    /// <summary>AngleMul: 三分量全乘（无参分量取 0 → 该轴归零，Mugen 行为，移植 bytecode.go:10467）。</summary>
+    public sealed class AngleMulController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+        public BytecodeExp XAngle;
+        public BytecodeExp YAngle;
+
+        public override bool Run(MChar character)
+        {
+            character.AngleSetValue(character.AngleRot * (Value != null ? Value.Run(character).ToF() : FFloat.Zero));
+            character.XAngleSetValue(character.AngleRotX * (XAngle != null ? XAngle.Run(character).ToF() : FFloat.Zero));
+            character.YAngleSetValue(character.AngleRotY * (YAngle != null ? YAngle.Run(character).ToF() : FFloat.Zero));
+            return false;
+        }
+    }
     public sealed class AfterImageController : ParameterOnlyController
     {
         public AfterImageParamSet AfterImage = new AfterImageParamSet();

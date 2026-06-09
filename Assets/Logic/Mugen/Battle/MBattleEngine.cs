@@ -347,13 +347,14 @@ namespace Lockstep.Mugen.Battle
             }
 
             // 2) actionPrepare（硬编码基础动作；helper keyctrl=false 内部自然不动作，仍统一调用）。
+            //    先每帧重置绘制态（移植 char.go:11542，在状态控制器运行前；anglerot/sprPriority/winquote 跨帧保留）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (!Chars[i].PauseBool) { MActionSystem.Prepare(Chars[i]); }
+                if (!Chars[i].PauseBool) { Chars[i].ResetFrameDrawState(); MActionSystem.Prepare(Chars[i]); }
             }
             for (int i = 0; i < Helpers.Count; i++)
             {
-                if (!Helpers[i].PauseBool) { MActionSystem.Prepare(Helpers[i]); }
+                if (!Helpers[i].PauseBool) { Helpers[i].ResetFrameDrawState(); MActionSystem.Prepare(Helpers[i]); }
             }
 
             // 3) 状态机（玩家 + helper）。自定义状态(投技)：StateOwner 非 null → 跑该角色的状态表。

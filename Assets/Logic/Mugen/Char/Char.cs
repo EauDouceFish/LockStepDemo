@@ -160,6 +160,48 @@ namespace Lockstep.Mugen.Char
         // 默认 2(Fight)：无回合系统驱动时多数 `roundstate=2` 门控即通过；MRoundSystem 驱动时每帧写入实际相位。
         public int RoundState = 2;
 
+        // ───────── 表现态：精灵绘制参数（移植 Ikemen char.go 绘制字段；现已接 Unity 渲染消费层）─────────
+        // 旋转角 anglerot[0..2]=value/x/y（char.go:1638）。anglerot 跨帧保留，仅当 AngleDraw 标志置位才用于绘制。
+        public FFloat AngleRot;
+        public FFloat AngleRotX;
+        public FFloat AngleRotY;
+        // AngleDraw 缩放 angleDrawScale[2]（char.go:3143，默认 1,1；每帧重置）。
+        public FFloat AngleDrawScaleX = FFloat.One;
+        public FFloat AngleDrawScaleY = FFloat.One;
+        // CSF_angledraw（char.go:34）：本帧是否按 anglerot 旋转绘制。每帧重置为 false，AngleDraw 控制器置位。
+        public bool AngleDraw;
+        // Trans 混合模式 + alpha[src,dst]（char.go trans/alpha；每帧重置为 Default/255,0）。
+        public MTransType Trans = MTransType.Default;
+        public int AlphaSrc = 255;
+        public int AlphaDst;
+        // SprPriority/LayerNo（char.go sprPriority/layerNo；绘制排序，跨帧保留——不在每帧重置块）。
+        public int SprPriority;
+        public int LayerNo;
+        // Offset 绘制偏移 offset[2]（char.go；每帧重置 0,0；Offset 控制器写入时已乘 localscl）。
+        public FFloat OffsetX;
+        public FFloat OffsetY;
+        // VictoryQuote winquote：选定胜利台词索引，默认 -1（跨帧保留）。
+        public int WinQuote = -1;
+
+        // Ikemen char.go:9051 angleSet/XangleSet/YangleSet：供 Angle* 控制器设置旋转分量。
+        public void AngleSetValue(FFloat a) { AngleRot = a; }
+        public void XAngleSetValue(FFloat xa) { AngleRotX = xa; }
+        public void YAngleSetValue(FFloat ya) { AngleRotY = ya; }
+
+        // 每帧绘制态重置（移植 char.go:11542，在状态控制器运行前调用）。
+        // 仅重置 AngleDraw 标志/angleDrawScale/trans/alpha/offset；anglerot、sprPriority、winquote 跨帧保留。
+        public void ResetFrameDrawState()
+        {
+            AngleDraw = false;
+            AngleDrawScaleX = FFloat.One;
+            AngleDrawScaleY = FFloat.One;
+            Trans = MTransType.Default;
+            AlphaSrc = 255;
+            AlphaDst = 0;
+            OffsetX = FFloat.Zero;
+            OffsetY = FFloat.Zero;
+        }
+
         // ───────── R-ENT 实体系统（helper/projectile/explod）─────────
         public MEntityWorld World;   // 共享实体世界引用（spawn 通道 + id 分配；同 Pause/Rng 浅拷+引擎重链）
         public bool IsHelper;        // 本实体是否为 helper（ishelper trigger）
@@ -674,6 +716,11 @@ namespace Lockstep.Mugen.Char
                 World = World, IsHelper = IsHelper, HelperType = HelperType, Destroyed = Destroyed,
                 ProjectileContactId = ProjectileContactId, ProjectileContactType = ProjectileContactType,
                 ProjectileContactTime = ProjectileContactTime, AttackDistX = AttackDistX,
+                AngleRot = AngleRot, AngleRotX = AngleRotX, AngleRotY = AngleRotY,
+                AngleDrawScaleX = AngleDrawScaleX, AngleDrawScaleY = AngleDrawScaleY, AngleDraw = AngleDraw,
+                Trans = Trans, AlphaSrc = AlphaSrc, AlphaDst = AlphaDst,
+                SprPriority = SprPriority, LayerNo = LayerNo,
+                OffsetX = OffsetX, OffsetY = OffsetY, WinQuote = WinQuote,
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 ReversalDef = ReversalDef != null ? ReversalDef.Clone() : null,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
@@ -731,6 +778,11 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(IsHelper); hash.AddInt32(HelperType); hash.AddBool(Destroyed);
             hash.AddInt32(ProjectileContactId); hash.AddInt32(ProjectileContactType); hash.AddInt32(ProjectileContactTime);
             hash.AddFixed(AttackDistX);
+            hash.AddFixed(AngleRot); hash.AddFixed(AngleRotX); hash.AddFixed(AngleRotY);
+            hash.AddFixed(AngleDrawScaleX); hash.AddFixed(AngleDrawScaleY); hash.AddBool(AngleDraw);
+            hash.AddInt32((int)Trans); hash.AddInt32(AlphaSrc); hash.AddInt32(AlphaDst);
+            hash.AddInt32(SprPriority); hash.AddInt32(LayerNo);
+            hash.AddFixed(OffsetX); hash.AddFixed(OffsetY); hash.AddInt32(WinQuote);
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             if (ReversalDef != null) { ReversalDef.WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);

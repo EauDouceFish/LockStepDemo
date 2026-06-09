@@ -381,7 +381,7 @@ namespace Lockstep.Mugen.Parse
                     };
                 case "remappal":
                     return WithParams(new RemapPalController { Source = ExprList(comp, p, "source"), Dest = ExprList(comp, p, "dest") }, p);
-                case "trans": return WithParams(new TransController { Trans = ExprList(comp, p, "trans"), TransText = Get(p, "trans") }, p);
+                case "trans": return WithParams(BuildTrans(comp, p), p);
                 case "sprpriority":
                     return WithParams(new SprPriorityController { Value = Expr(comp, p, "value"), LayerNo = Expr(comp, p, "layerno") }, p);
                 case "offset":
@@ -767,6 +767,28 @@ namespace Lockstep.Mugen.Parse
         static BytecodeExp Expr(MugenExprCompiler comp, Dictionary<string, string> p, string key)
         {
             return p.TryGetValue(key, out string v) ? comp.Compile(v) : null;
+        }
+
+        // Trans: trans 文本 → 混合类型 + 默认 alpha（移植 compiler.go:6380），alpha 参数（可选）覆盖 src/dst。
+        static TransController BuildTrans(MugenExprCompiler comp, Dictionary<string, string> p)
+        {
+            TransController ctrl = new TransController();
+            string text = Get(p, "trans");
+            if (!string.IsNullOrEmpty(text))
+            {
+                switch (text.Trim().ToLowerInvariant())
+                {
+                    case "default": ctrl.TransType = MTransType.Default; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 0; break;
+                    case "none": ctrl.TransType = MTransType.None; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 0; break;
+                    case "add": ctrl.TransType = MTransType.Add; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 255; break;
+                    case "add1": ctrl.TransType = MTransType.Add; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 128; break;
+                    case "addalpha": ctrl.TransType = MTransType.Add; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 0; break;
+                    case "sub": ctrl.TransType = MTransType.Sub; ctrl.DefaultSrc = 255; ctrl.DefaultDst = 255; break;
+                    default: break;   // Mugen 容错：无效 trans 类型忽略
+                }
+            }
+            ctrl.Alpha = ExprList(comp, p, "alpha");
+            return ctrl;
         }
 
         static BytecodeExp[] ExprList(MugenExprCompiler comp, Dictionary<string, string> p, string key)

@@ -21,13 +21,14 @@ namespace Lockstep.Tests.Mugen.Parse
         [Test]
         public void ParsedButUnimplementedController_IsReportedSeparately()
         {
+            // ModifyStageVar 仍是真正的 parse-only（无舞台子系统建模）；AngleDraw 等绘制控制器已实现，不再计入此表。
             MCompatibilityReport report = new MCompatibilityReport();
             MugenCnsParser.Parse(
-                "[Statedef 0]\ntype=S\n[State 0, render]\ntype = AngleDraw\ntrigger1 = 1\nvalue = 45\n",
+                "[Statedef 0]\ntype=S\n[State 0, stage]\ntype = ModifyStageVar\ntrigger1 = 1\n",
                 report);
 
             Assert.That(report.UnknownControllers, Is.Empty);
-            Assert.That(report.ParsedOnlyControllers["angledraw"], Is.EqualTo(1));
+            Assert.That(report.ParsedOnlyControllers["modifystagevar"], Is.EqualTo(1));
         }
     }
 }
