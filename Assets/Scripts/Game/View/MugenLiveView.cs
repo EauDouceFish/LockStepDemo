@@ -133,7 +133,10 @@ namespace Lockstep.View
             // 定点 → float 仅在此转换。MUGEN 坐标 Y 向下为正、地面 y=0 → Unity 取负；除 PPU 归一到精灵尺度。
             float unitX = c.Pos.X.ToFloat() / PixelsPerUnit;
             float unitY = -c.Pos.Y.ToFloat() / PixelsPerUnit;
-            transform.position = new Vector3(unitX, unitY, 0f);
+            transform.localPosition = new Vector3(unitX, unitY, 0f);
+
+            // 施加绘制态（旋转/缩放/透明度/绘制顺序/offset；Batch A 控制器写入，每帧重置后重新断言）。
+            MugenDrawStateApplier.Apply(c, _renderer, transform, PixelsPerUnit, 0);
 
             if (!_data.Anims.TryGetValue(c.AnimNo, out MAnimData anim) || anim.Frames.Length == 0)
             {

@@ -44,6 +44,15 @@ namespace Lockstep.Mugen.Char
         FallEnvShake,
         MakeDust,
         GameMakeAnim,
+        EnvColor,
+        RemapPal,
+        Text,
+        ModifyText,
+        RemoveText,
+        DisplayToClipboard,
+        AppendToClipboard,
+        ClearClipboard,
+        ForceFeedback,
     }
 
     /// <summary>Deterministic visual/presentation command emitted by simulation for the Unity adapter and trace.</summary>

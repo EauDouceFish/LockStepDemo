@@ -130,16 +130,19 @@ namespace Lockstep.View
         {
             for (int i = 0; i < 2; i++)
             {
-                RenderChar(_engine.Chars[i], _renderers[i]);
+                RenderChar(_engine.Chars[i], _renderers[i], i);
             }
         }
 
-        void RenderChar(MChar c, SpriteRenderer renderer)
+        void RenderChar(MChar c, SpriteRenderer renderer, int baseSortingOrder)
         {
             renderer.flipX = c.Facing.Raw < 0;
             float unitX = c.Pos.X.ToFloat() / PixelsPerUnit;
             float unitY = -c.Pos.Y.ToFloat() / PixelsPerUnit;
             renderer.transform.localPosition = new Vector3(unitX, unitY, 0f);
+
+            // 施加绘制态（同 MugenLiveView；baseSortingOrder 按玩家位拉开避免 z 冲突）。
+            MugenDrawStateApplier.Apply(c, renderer, renderer.transform, PixelsPerUnit, baseSortingOrder);
 
             if (!_data.Anims.TryGetValue(c.AnimNo, out MAnimData anim) || anim.Frames.Length == 0)
             {

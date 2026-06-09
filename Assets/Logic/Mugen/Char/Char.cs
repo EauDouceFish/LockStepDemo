@@ -182,6 +182,28 @@ namespace Lockstep.Mugen.Char
         public FFloat OffsetY;
         // VictoryQuote winquote：选定胜利台词索引，默认 -1（跨帧保留）。
         public int WinQuote = -1;
+        // RemapPal 调色板重映射表（移植 char.go remapSpr）：纯表现，跨帧保留，入 Clone/Hash。
+        public List<MRemapPalEntry> RemapPalTable = new List<MRemapPalEntry>();
+
+        // RemapPal：按源 (group,index) 就地更新/追加目标映射（移植 char.go:9290 同 src 覆盖语义）。
+        public void ApplyRemapPal(int srcGroup, int srcIndex, int dstGroup, int dstIndex)
+        {
+            for (int i = 0; i < RemapPalTable.Count; i++)
+            {
+                if (RemapPalTable[i].SrcGroup == srcGroup && RemapPalTable[i].SrcIndex == srcIndex)
+                {
+                    RemapPalTable[i] = new MRemapPalEntry
+                    {
+                        SrcGroup = srcGroup, SrcIndex = srcIndex, DstGroup = dstGroup, DstIndex = dstIndex,
+                    };
+                    return;
+                }
+            }
+            RemapPalTable.Add(new MRemapPalEntry
+            {
+                SrcGroup = srcGroup, SrcIndex = srcIndex, DstGroup = dstGroup, DstIndex = dstIndex,
+            });
+        }
 
         // Ikemen char.go:9051 angleSet/XangleSet/YangleSet：供 Angle* 控制器设置旋转分量。
         public void AngleSetValue(FFloat a) { AngleRot = a; }
@@ -721,6 +743,7 @@ namespace Lockstep.Mugen.Char
                 Trans = Trans, AlphaSrc = AlphaSrc, AlphaDst = AlphaDst,
                 SprPriority = SprPriority, LayerNo = LayerNo,
                 OffsetX = OffsetX, OffsetY = OffsetY, WinQuote = WinQuote,
+                RemapPalTable = new List<MRemapPalEntry>(RemapPalTable),
                 HitOverrides = (MHitOverride[])HitOverrides.Clone(),   // 值类型数组，浅拷贝即深拷
                 ReversalDef = ReversalDef != null ? ReversalDef.Clone() : null,
                 Pos = Pos, OldPos = OldPos, Vel = Vel, Facing = Facing,
@@ -783,6 +806,12 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32((int)Trans); hash.AddInt32(AlphaSrc); hash.AddInt32(AlphaDst);
             hash.AddInt32(SprPriority); hash.AddInt32(LayerNo);
             hash.AddFixed(OffsetX); hash.AddFixed(OffsetY); hash.AddInt32(WinQuote);
+            hash.AddInt32(RemapPalTable.Count);
+            for (int rp = 0; rp < RemapPalTable.Count; rp++)
+            {
+                hash.AddInt32(RemapPalTable[rp].SrcGroup); hash.AddInt32(RemapPalTable[rp].SrcIndex);
+                hash.AddInt32(RemapPalTable[rp].DstGroup); hash.AddInt32(RemapPalTable[rp].DstIndex);
+            }
             for (int ho = 0; ho < HitOverrides.Length; ho++) { HitOverrides[ho].WriteHash(ref hash); }
             if (ReversalDef != null) { ReversalDef.WriteHash(ref hash); }
             hash.AddFixed(Pos); hash.AddFixed(OldPos); hash.AddFixed(Vel); hash.AddFixed(Facing);

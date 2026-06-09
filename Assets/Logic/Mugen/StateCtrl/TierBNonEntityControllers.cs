@@ -376,11 +376,36 @@ namespace Lockstep.Mugen.StateCtrl
         }
     }
 
-    /// <summary>RemapPal: requires palette remap state. PalNo alone is not equivalent to Ikemen remapPal.</summary>
+    /// <summary>RemapPal: 写 MChar 调色板重映射表 + 发事件（移植 bytecode.go:10952，src/dst 默认 {-1,0}）。</summary>
     public sealed class RemapPalController : ParameterOnlyController
     {
         public BytecodeExp[] Source;
         public BytecodeExp[] Dest;
+
+        public override bool Run(MChar character)
+        {
+            int srcGroup = -1, srcIndex = 0, dstGroup = -1, dstIndex = 0;
+            if (Source != null && Source.Length > 0 && Source[0] != null)
+            {
+                srcGroup = Source[0].Run(character).ToI();
+                if (Source.Length > 1 && Source[1] != null) { srcIndex = Source[1].Run(character).ToI(); }
+            }
+            if (Dest != null && Dest.Length > 0 && Dest[0] != null)
+            {
+                dstGroup = Dest[0].Run(character).ToI();
+                if (Dest.Length > 1 && Dest[1] != null) { dstIndex = Dest[1].Run(character).ToI(); }
+            }
+            character.ApplyRemapPal(srcGroup, srcIndex, dstGroup, dstIndex);
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.RemapPal, OwnerId = character.Id,
+                    Value0 = srcGroup, Value1 = srcIndex, Value2 = dstGroup, Value3 = dstIndex,
+                });
+            }
+            return false;
+        }
     }
 
     /// <summary>Trans: 写 MChar.Trans/AlphaSrc/AlphaDst（移植 bytecode.go:10255 trans.Run）。type 文本在解析期定型+默认 alpha，alpha 参数覆盖 src/dst（compiler.go:6380）。</summary>
@@ -571,7 +596,33 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
     }
-    public sealed class EnvColorController : ParameterOnlyController { public BytecodeExp[] Value; public BytecodeExp Time; public BytecodeExp Under; }
+    /// <summary>EnvColor: 全屏色闪（系统级，移植 bytecode.go:10501 写 sys.envcol）。本架构发确定性事件给表现层；默认 rgb 255/time 1/under false。</summary>
+    public sealed class EnvColorController : ParameterOnlyController
+    {
+        public BytecodeExp[] Value;
+        public BytecodeExp Time;
+        public BytecodeExp Under;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World == null) { return false; }
+            MVisualEvent ev = new MVisualEvent
+            {
+                Type = MVisualEventType.EnvColor, OwnerId = character.Id,
+                Time = Time != null ? Time.Run(character).ToI() : 1,
+                Value0 = 255, Value1 = 255, Value2 = 255,
+                Under = Under != null && Under.Run(character).ToB(),
+            };
+            if (Value != null)
+            {
+                if (Value.Length > 0 && Value[0] != null) { ev.Value0 = Value[0].Run(character).ToI(); }
+                if (Value.Length > 1 && Value[1] != null) { ev.Value1 = Value[1].Run(character).ToI(); }
+                if (Value.Length > 2 && Value[2] != null) { ev.Value2 = Value[2].Run(character).ToI(); }
+            }
+            character.World.Events.Visuals.Add(ev);
+            return false;
+        }
+    }
 
     static class PresentationEvents
     {
@@ -975,18 +1026,83 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
     }
+    /// <summary>ForceFeedback: 手柄震动（移植 bytecode.go forceFeedback）。逻辑层发确定性事件给输入/表现层；不影响模拟。</summary>
     public sealed class ForceFeedbackController : ParameterOnlyController
     {
         public BytecodeExp Time;
         public BytecodeExp Waveform;
         public BytecodeExp Intensity;
-    }
-    public class DisplayToClipboardController : ParameterOnlyController { public BytecodeExp[] Params; public BytecodeExp Text; }
-    public sealed class AppendToClipboardController : DisplayToClipboardController { }
-    public sealed class ClearClipboardController : ParameterOnlyController { }
-    public sealed class VictoryQuoteController : ParameterOnlyController { public BytecodeExp Value; }
 
-    /// <summary>Text controller parameter capture. Logic-layer no-op until text entities exist.</summary>
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.ForceFeedback, OwnerId = character.Id,
+                    Time = Time != null ? Time.Run(character).ToI() : 60,
+                    Value0 = Intensity != null ? Intensity.Run(character).ToI() : 0,
+                });
+            }
+            return false;
+        }
+    }
+
+    /// <summary>DisplayToClipboard: 调试控制台输出（移植 bytecode.go displayToClipboard）。逻辑层发事件，文本格式化由表现/调试层处理。</summary>
+    public class DisplayToClipboardController : ParameterOnlyController
+    {
+        public BytecodeExp[] Params;
+        public BytecodeExp Text;
+
+        public override bool Run(MChar character)
+        {
+            EmitClipboard(character, MVisualEventType.DisplayToClipboard);
+            return false;
+        }
+
+        protected void EmitClipboard(MChar character, MVisualEventType type)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent { Type = type, OwnerId = character.Id });
+            }
+        }
+    }
+
+    public sealed class AppendToClipboardController : DisplayToClipboardController
+    {
+        public override bool Run(MChar character)
+        {
+            EmitClipboard(character, MVisualEventType.AppendToClipboard);
+            return false;
+        }
+    }
+
+    public sealed class ClearClipboardController : ParameterOnlyController
+    {
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent { Type = MVisualEventType.ClearClipboard, OwnerId = character.Id });
+            }
+            return false;
+        }
+    }
+
+    /// <summary>VictoryQuote: 选定胜利台词索引（移植 bytecode.go victoryQuote，写 crun.winquote；默认 -1）。</summary>
+    public sealed class VictoryQuoteController : ParameterOnlyController
+    {
+        public BytecodeExp Value;
+
+        public override bool Run(MChar character)
+        {
+            character.WinQuote = Value != null ? Value.Run(character).ToI() : -1;
+            return false;
+        }
+    }
+
+    /// <summary>Text: 文本实体（移植 bytecode.go text）。逻辑层发确定性事件（id/removetime/位置核心字段），字体/格式渲染由表现层。</summary>
     public class TextController : ParameterOnlyController
     {
         public BytecodeExp Removetime;
@@ -1015,11 +1131,60 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp HideWithBars;
         public BytecodeExp Id;
         public PalFXParamSet PalFX = new PalFXParamSet();
+
+        public override bool Run(MChar character)
+        {
+            EmitText(character, MVisualEventType.Text);
+            return false;
+        }
+
+        protected void EmitText(MChar character, MVisualEventType type)
+        {
+            if (character.World == null) { return; }
+            character.World.Events.Visuals.Add(new MVisualEvent
+            {
+                Type = type, OwnerId = character.Id,
+                Id = Id != null ? Id.Run(character).ToI() : -1,
+                Time = Removetime != null ? Removetime.Run(character).ToI() : -1,
+                X = Position != null && Position.Length > 0 && Position[0] != null ? Position[0].Run(character).ToF() : FFloat.Zero,
+                Y = Position != null && Position.Length > 1 && Position[1] != null ? Position[1].Run(character).ToF() : FFloat.Zero,
+            });
+        }
     }
 
-    public sealed class ModifyTextController : TextController { public BytecodeExp Index; }
-    public sealed class RemoveTextController : ParameterOnlyController { public BytecodeExp Id; public BytecodeExp Index; }
+    public sealed class ModifyTextController : TextController
+    {
+        public BytecodeExp Index;
 
+        public override bool Run(MChar character)
+        {
+            EmitText(character, MVisualEventType.ModifyText);
+            return false;
+        }
+    }
+
+    public sealed class RemoveTextController : ParameterOnlyController
+    {
+        public BytecodeExp Id;
+        public BytecodeExp Index;
+
+        public override bool Run(MChar character)
+        {
+            if (character.World != null)
+            {
+                character.World.Events.Visuals.Add(new MVisualEvent
+                {
+                    Type = MVisualEventType.RemoveText, OwnerId = character.Id,
+                    Id = Id != null ? Id.Run(character).ToI() : -1,
+                    Index = Index != null ? Index.Run(character).ToI() : -1,
+                });
+            }
+            return false;
+        }
+    }
+
+    // TagIn/TagOut：tag/simul 模式换人（移植 bytecode.go tagIn/tagOut）。本引擎是 1v1，无替补席/队伍成员系统，
+    // 故保持 parse-only 直到引入 R-TAG 队伍轮换子系统（参数已捕获）。1v1 对战不触发，不影响可玩性。
     public sealed class TagInController : ParameterOnlyController
     {
         public BytecodeExp StateNo;
@@ -1041,5 +1206,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp MemberNo;
     }
 
+    // ModifyStageVar：修改舞台变量（移植 bytecode.go modifyStageVar）。本引擎未建模舞台/stage var，
+    // 无可写目标，保持 parse-only 直到引入 R-STAGE 舞台子系统。属表现/关卡范畴，不影响角色战斗模拟。
     public sealed class ModifyStageVarController : ParameterOnlyController { }
 }
