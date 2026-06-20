@@ -10,6 +10,7 @@ namespace Lockstep.Mugen.StateCtrl
 {
     public sealed class NullController : MStateController
     {
+        // Ikemen reference: src/bytecode.go Null StateControllerBase no-op controller.
         public override bool Run(MChar c)
         {
             return false;
@@ -20,12 +21,15 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp X;
         public BytecodeExp Y;
+        public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go VelSet StateController sets velocity components.
         public override bool Run(MChar c)
         {
             FFloat vx = X != null ? X.Run(c).ToF() : c.Vel.X;
             FFloat vy = Y != null ? Y.Run(c).ToF() : c.Vel.Y;
-            c.Vel = new FVector3(vx, vy, c.Vel.Z);
+            FFloat vz = Z != null ? Z.Run(c).ToF() : c.Vel.Z;
+            c.Vel = new FVector3(vx, vy, vz);
             return false;
         }
     }
@@ -34,12 +38,15 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp X;
         public BytecodeExp Y;
+        public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go VelAdd StateController adds velocity components.
         public override bool Run(MChar c)
         {
             FFloat vx = c.Vel.X + (X != null ? X.Run(c).ToF() : FFloat.Zero);
             FFloat vy = c.Vel.Y + (Y != null ? Y.Run(c).ToF() : FFloat.Zero);
-            c.Vel = new FVector3(vx, vy, c.Vel.Z);
+            FFloat vz = c.Vel.Z + (Z != null ? Z.Run(c).ToF() : FFloat.Zero);
+            c.Vel = new FVector3(vx, vy, vz);
             return false;
         }
     }
@@ -48,12 +55,15 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp X;
         public BytecodeExp Y;
+        public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go PosSet StateController sets position components.
         public override bool Run(MChar c)
         {
             FFloat px = X != null ? X.Run(c).ToF() : c.Pos.X;
             FFloat py = Y != null ? Y.Run(c).ToF() : c.Pos.Y;
-            c.Pos = new FVector3(px, py, c.Pos.Z);
+            FFloat pz = Z != null ? Z.Run(c).ToF() : c.Pos.Z;
+            c.Pos = new FVector3(px, py, pz);
             return false;
         }
     }
@@ -62,12 +72,15 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp X;
         public BytecodeExp Y;
+        public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go PosAdd StateController adds position offsets using facing.
         public override bool Run(MChar c)
         {
             FFloat px = c.Pos.X + (X != null ? X.Run(c).ToF() * c.Facing : FFloat.Zero);
             FFloat py = c.Pos.Y + (Y != null ? Y.Run(c).ToF() : FFloat.Zero);
-            c.Pos = new FVector3(px, py, c.Pos.Z);
+            FFloat pz = c.Pos.Z + (Z != null ? Z.Run(c).ToF() : FFloat.Zero);
+            c.Pos = new FVector3(px, py, pz);
             return false;
         }
     }
@@ -78,6 +91,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Elem;
         public BytecodeExp ElemTime;
 
+        // Ikemen reference: src/bytecode.go ChangeAnim calls changeAnimEx(value, elem, elemtime).
         public override bool Run(MChar c)
         {
             if (Value == null)
@@ -88,7 +102,6 @@ namespace Lockstep.Mugen.StateCtrl
             int animNo = Value.Run(c).ToI();
             int elem = Elem != null ? Elem.Run(c).ToI() - 1 : 0;
             int elemTime = ElemTime != null ? ElemTime.Run(c).ToI() : 0;
-            // Ikemen reference: src/bytecode.go ChangeAnim calls changeAnimEx(value, elem, elemtime).
             c.PlayAnimation(animNo, c.PlayerNo, c.PlayerNo, elem, elemTime);
             return false;
         }
@@ -98,6 +111,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go CtrlSet StateController writes ctrl flag.
         public override bool Run(MChar c)
         {
             if (Value != null)
@@ -114,6 +128,7 @@ namespace Lockstep.Mugen.StateCtrl
         public bool IsFloat;
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go VarSet/FVarSet StateController writes var or fvar slots.
         public override bool Run(MChar c)
         {
             if (Value == null)
@@ -138,6 +153,7 @@ namespace Lockstep.Mugen.StateCtrl
         public bool IsFloat;
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go VarAdd/FVarAdd StateController adds to var or fvar slots.
         public override bool Run(MChar c)
         {
             if (Value == null)
@@ -164,6 +180,7 @@ namespace Lockstep.Mugen.StateCtrl
         public int Time;
         public bool IsNot;
 
+        // Ikemen reference: src/bytecode.go HitBy/NotHitBy StateController updates hit filter state.
         public override bool Run(MChar c)
         {
             c.HitByAttr = Attr;
@@ -180,6 +197,7 @@ namespace Lockstep.Mugen.StateCtrl
         public int Physics = -1;
         public BytecodeExp CtrlExpr;
 
+        // Ikemen reference: src/bytecode.go StateTypeSet StateController writes statetype/movetype/physics.
         public override bool Run(MChar c)
         {
             if (StateType >= 0) { c.StateType = StateType; }

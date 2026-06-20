@@ -163,9 +163,13 @@ namespace Lockstep.Mugen.State
         public int Ctrl = -1;         // 可选：切换时设 ctrl
         public int Anim = -1;         // 可选：切换时设 anim（-1 不改）
 
+        public BytecodeExp CtrlExpr;
+        public BytecodeExp AnimExpr;
         public override bool Run(MChar c)
         {
-            c.QueueTransition(Value.Run(c).ToI(), c.StatePlayerNo, Anim, Ctrl);
+            int anim = AnimExpr != null ? AnimExpr.Run(c).ToI() : Anim;
+            int ctrl = CtrlExpr != null ? CtrlExpr.Run(c).ToI() : Ctrl;
+            c.QueueTransition(Value.Run(c).ToI(), c.StatePlayerNo, anim, ctrl);
             return true;
         }
     }
@@ -179,10 +183,14 @@ namespace Lockstep.Mugen.State
         public BytecodeExp Value;
         public int Ctrl = -1;
         public int Anim = -1;
+        public BytecodeExp CtrlExpr;
+        public BytecodeExp AnimExpr;
 
         public override bool Run(MChar c)
         {
-            c.QueueTransition(Value.Run(c).ToI(), c.PlayerNo, Anim, Ctrl);
+            int anim = AnimExpr != null ? AnimExpr.Run(c).ToI() : Anim;
+            int ctrl = CtrlExpr != null ? CtrlExpr.Run(c).ToI() : Ctrl;
+            c.QueueTransition(Value.Run(c).ToI(), c.PlayerNo, anim, ctrl);
             return true;
         }
     }

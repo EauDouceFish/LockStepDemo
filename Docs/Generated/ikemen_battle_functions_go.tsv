@@ -1,4 +1,4 @@
-﻿file	line	receiver	name	signature
+file	line	receiver	name	signature
 anim.go	30		newAnimFrame	func newAnimFrame()
 anim.go	45		ReadAnimFrame	func ReadAnimFrame(line string)
 anim.go	203		newAnimation	func newAnimation(sff *Sff, pal *PaletteList)

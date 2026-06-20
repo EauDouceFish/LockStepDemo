@@ -74,6 +74,9 @@ namespace Lockstep.Mugen.Char
         public int AnimCurTime;     // 动画累计已播 tick 数（curtime）
         public bool AnimLoopEnd;    // 本 tick 是否到达动画终点（curtime>=totaltime）
         public int AnimRunningNo = -1;   // MAnimSystem 跟踪的"当前正在播放的动画号"，与 AnimNo 不同则触发重置
+        public int TriggerAnimNo = -1;
+        public int TriggerAnimElemNo;
+        public int TriggerAnimElemTime;
 
         // AssertSpecial 标志位（每帧清空，须每帧重断言才保持）。见 MAssertFlag。
         public int AssertFlags;
@@ -140,6 +143,10 @@ namespace Lockstep.Mugen.Char
         public FFloat WidthPlayerBack;
         public FFloat WidthEdgeFront;
         public FFloat WidthEdgeBack;
+        public bool WidthPlayerFrontSet;
+        public bool WidthPlayerBackSet;
+        public bool WidthEdgeFrontSet;
+        public bool WidthEdgeBackSet;
         // PlayerPush：是否参与角色间推挤（默认 true）+ 优先级 + 影响队伍。每帧重新断言。
         public bool PlayerPushEnabled = true;
         public int PushPriority;
@@ -186,6 +193,7 @@ namespace Lockstep.Mugen.Char
         public List<MRemapPalEntry> RemapPalTable = new List<MRemapPalEntry>();
 
         // RemapPal：按源 (group,index) 就地更新/追加目标映射（移植 char.go:9290 同 src 覆盖语义）。
+        // Ikemen reference: src/char.go remapPal and RemapPal controller palette remap table.
         public void ApplyRemapPal(int srcGroup, int srcIndex, int dstGroup, int dstIndex)
         {
             for (int i = 0; i < RemapPalTable.Count; i++)
@@ -206,12 +214,16 @@ namespace Lockstep.Mugen.Char
         }
 
         // Ikemen char.go:9051 angleSet/XangleSet/YangleSet：供 Angle* 控制器设置旋转分量。
+        // Ikemen reference: src/char.go angleSet sets the Z draw-angle component.
         public void AngleSetValue(FFloat a) { AngleRot = a; }
+        // Ikemen reference: src/char.go XangleSet sets the X draw-angle component.
         public void XAngleSetValue(FFloat xa) { AngleRotX = xa; }
+        // Ikemen reference: src/char.go YangleSet sets the Y draw-angle component.
         public void YAngleSetValue(FFloat ya) { AngleRotY = ya; }
 
         // 每帧绘制态重置（移植 char.go:11542，在状态控制器运行前调用）。
         // 仅重置 AngleDraw 标志/angleDrawScale/trans/alpha/offset；anglerot、sprPriority、winquote 跨帧保留。
+        // Ikemen reference: src/char.go actionPrepare resets per-frame draw flags, trans, alpha and offsets.
         public void ResetFrameDrawState()
         {
             AngleDraw = false;
@@ -222,6 +234,15 @@ namespace Lockstep.Mugen.Char
             AlphaDst = 0;
             OffsetX = FFloat.Zero;
             OffsetY = FFloat.Zero;
+        }
+
+        // Captures animation trigger values at the start of one state-controller block. This keeps
+        // `animelem = n` stable for later controllers even if an earlier ChangeAnim jumps element.
+        public void CaptureStateControllerTriggerSnapshot()
+        {
+            TriggerAnimNo = AnimNo;
+            TriggerAnimElemNo = AnimElemNo;
+            TriggerAnimElemTime = AnimElemTime;
         }
 
         // ───────── R-ENT 实体系统（helper/projectile/explod）─────────
@@ -236,6 +257,7 @@ namespace Lockstep.Mugen.Char
         public FFloat AttackDistX = FFloat.FromInt(160);
 
         /// <summary>请求创建一个 helper（移植 Helper 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
+        // Ikemen reference: src/char.go Helper controller queues helper entity spawn state.
         public void RequestHelper(int stateNo, int helperType, FFloat posX, FFloat posY, int facing, bool keyCtrl)
         {
             if (World == null) { return; }
@@ -247,6 +269,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>请求发射一个弹幕（移植 Projectile 控制器：入队，引擎 DrainSpawns 时造实体）。</summary>
+        // Ikemen reference: src/char.go Projectile controller queues projectile spawn state.
         public void RequestProjectile(int projId, FFloat velX, FFloat velY, FFloat accelX, FFloat accelY,
             FFloat posX, FFloat posY, int removeTime, int animNo, Hit.MHitDef hitDef)
         {
@@ -259,6 +282,7 @@ namespace Lockstep.Mugen.Char
             });
         }
 
+        // Ikemen reference: src/char.go projectile pcid/pctype/pctime contact trigger state.
         public void RecordProjectileContact(int projId, bool guarded)
         {
             ProjectileContactId = projId;
@@ -266,8 +290,13 @@ namespace Lockstep.Mugen.Char
             ProjectileContactTime = 0;
         }
 
+        // Ikemen reference: src/char.go projcontacttime/projhittime/projguardedtime/projcanceltime triggers.
         public BytecodeValue ProjectileContactTimeValue(int projId, int wantedType)
         {
+            if (IsHelper)
+            {
+                return BytecodeValue.Int(-1);
+            }
             if (ProjectileContactTime < 0)
             {
                 return BytecodeValue.Int(-1);
@@ -340,6 +369,7 @@ namespace Lockstep.Mugen.Char
         /// 最终防御系数（移植 char.go:12081-12085）：(DefenceBase × customDef × superDef × fallDef) / 100。
         /// customDef 在 DefenseMulDelay 且非受击态(movetype≠H)时按 1 计（onHit 延迟生效）。
         /// </summary>
+        // Ikemen reference: src/char.go computeDamage finalDefense from defence/custom/super/fall multipliers.
         public FFloat ComputeFinalDefense()
         {
             FFloat customDef = (!DefenseMulDelay || MoveType == 2) ? CustomDefense : FFloat.One;
@@ -348,6 +378,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>伤害攻击系数（移植 char.go atkmul[0]×attackBase/100）：AttackMul × AttackBase / 100。</summary>
+        // Ikemen reference: src/char.go computeDamage applies attackMul and attack base scaling.
         public FFloat AttackDamageMul()
         {
             int attackBase = Constants != null ? Constants.Attack : 100;
@@ -355,6 +386,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>是否有控制权（移植 Ikemen ctrl()）。standby/dizzy/guardbreak 等状态机后置，暂仅 Ctrl 位。</summary>
+        // Ikemen reference: src/char.go ctrl trigger reads the character control flag.
         public bool Control()
         {
             return Ctrl;
@@ -364,6 +396,7 @@ namespace Lockstep.Mugen.Char
         // 注：省略 Ikemen 的 c.playerNo != c.ss.sb.playerNo 条件（自定义态归属，本范围恒等 → 该项恒 false），用 Id 当 playerNo。
 
         /// <summary>Pause 控制器调用：写共享 buffer（带 playerno 优先级）+ 本角色 movetime 钳制。</summary>
+        // Ikemen reference: src/char.go setPauseTime and Pause controller movetime handling.
         public void SetPause(int pausetime, int movetime)
         {
             if (Pause == null) { return; }
@@ -378,6 +411,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>SuperPause 控制器调用（unhittable 延 1 帧因暂停下一帧才生效）。</summary>
+        // Ikemen reference: src/char.go setSuperPauseTime and SuperPause movetime/unhittable handling.
         public void SetSuperPause(int pausetime, int movetime, bool unhittable)
         {
             if (Pause == null) { return; }
@@ -394,10 +428,11 @@ namespace Lockstep.Mugen.Char
 
         /// <summary>本帧暂停门控（移植 char.go:11421 actionPrepare 开头）：在跑各相之前由引擎调用。
         /// Acttmp = -2(暂停) / 1(活动)；hitpause 的 acttmp=-1 由既有 hitstop 逻辑处理，不在此覆盖。</summary>
+        // Ikemen reference: src/char.go actionPrepare computes pauseBool and acttmp gates.
         public void ComputePauseBool()
         {
             PauseBool = false;
-            if (CommandList != null && Pause != null)
+            if (Pause != null)
             {
                 if (Pause.SuperTime > 0) { PauseBool = SuperMovetime == 0; }
                 else if (Pause.PauseTime > 0 && PauseMovetime == 0) { PauseBool = true; }
@@ -419,6 +454,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>当前动画 owner 的动画表中是否存在该动画号（animexist trigger）。</summary>
+        // Ikemen reference: src/char.go animExist trigger checks the active animation owner.
         public bool AnimExists(int animNo)
         {
             int playerNo = AnimPlayerNo >= 0 ? AnimPlayerNo : PlayerNo;
@@ -426,17 +462,20 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>自身资源 owner 的动画表中是否存在该动画号（selfanimexist trigger）。</summary>
+        // Ikemen reference: src/char.go selfAnimExist trigger checks the owning character animations.
         public bool SelfAnimExists(int animNo)
         {
             return AnimExistsFor(PlayerNo, animNo);
         }
 
+        // Project-specific: resource-owner lookup backing Ikemen animexist/selfanimexist semantics.
         public bool AnimExistsFor(int playerNo, int animNo)
         {
             IReadOnlyDictionary<int, Anim.MAnimData> table = AnimationsFor(playerNo);
             return table != null && table.ContainsKey(animNo);
         }
 
+        // Project-specific: local resource registry indirection for Ikemen player-owned data.
         public MCharData DataFor(int playerNo)
         {
             MCharData data = Resources?.Get(playerNo);
@@ -446,6 +485,7 @@ namespace Lockstep.Mugen.Char
             return null;
         }
 
+        // Project-specific: animation table lookup for Ikemen owner-switched animation commands.
         public IReadOnlyDictionary<int, Anim.MAnimData> AnimationsFor(int playerNo)
         {
             MCharData data = DataFor(playerNo);
@@ -453,11 +493,13 @@ namespace Lockstep.Mugen.Char
             return playerNo < 0 || playerNo == PlayerNo ? AnimTable : null;
         }
 
+        // Project-specific: selects the current owner animation table for trigger evaluation.
         public IReadOnlyDictionary<int, Anim.MAnimData> CurrentAnimTable()
         {
             return AnimationsFor(AnimPlayerNo >= 0 ? AnimPlayerNo : PlayerNo);
         }
 
+        // Ikemen reference: src/char.go localcoord owner scaling used by ChangeAnim/Width style behavior.
         public int LocalCoordWidthFor(int playerNo)
         {
             if (Resources != null) { return Resources.LocalCoordWidth(playerNo); }
@@ -466,6 +508,70 @@ namespace Lockstep.Mugen.Char
             return width > 0 ? width : 320;
         }
 
+        public FFloat ConstLocalCoordScale()
+        {
+            int ownWidth = LocalCoordWidthFor(PlayerNo);
+            int stateOwner = StatePlayerNo >= 0 ? StatePlayerNo : PlayerNo;
+            int stateWidth = LocalCoordWidthFor(stateOwner);
+            if (ownWidth == stateWidth)
+            {
+                return FFloat.One;
+            }
+            return FFloat.FromInt(stateWidth) / FFloat.FromInt(ownWidth);
+        }
+
+        public BytecodeValue ReadConst(MConstId id)
+        {
+            if (Constants == null)
+            {
+                return BytecodeValue.Int(0);
+            }
+
+            BytecodeValue value = Constants.Read(id);
+            return IsLocalCoordScaledConst(id)
+                ? BytecodeValue.Float(value.ToF() * ConstLocalCoordScale())
+                : value;
+        }
+
+        static bool IsLocalCoordScaledConst(MConstId id)
+        {
+            switch (id)
+            {
+                case MConstId.SizeGroundBack:
+                case MConstId.SizeGroundFront:
+                case MConstId.SizeAirBack:
+                case MConstId.SizeAirFront:
+                case MConstId.SizeHeight:
+                case MConstId.SizeHeadPosX:
+                case MConstId.SizeHeadPosY:
+                case MConstId.SizeMidPosX:
+                case MConstId.SizeMidPosY:
+                case MConstId.VelWalkFwd:
+                case MConstId.VelWalkBack:
+                case MConstId.VelRunFwdX:
+                case MConstId.VelRunFwdY:
+                case MConstId.VelRunBackX:
+                case MConstId.VelRunBackY:
+                case MConstId.VelJumpNeuX:
+                case MConstId.VelJumpY:
+                case MConstId.VelJumpBack:
+                case MConstId.VelJumpFwd:
+                case MConstId.VelRunjumpFwdX:
+                case MConstId.VelRunjumpBackX:
+                case MConstId.VelRunjumpBackY:
+                case MConstId.VelAirjumpNeuX:
+                case MConstId.VelAirjumpY:
+                case MConstId.VelAirjumpBack:
+                case MConstId.VelAirjumpFwd:
+                case MConstId.MoveYaccel:
+                case MConstId.MoveAirjumpHeight:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // Ikemen reference: src/char.go changeAnim/changeAnim2 owner animation selection.
         public bool PlayAnimation(int animNo, int animPlayerNo, int spritePlayerNo, int elem = 0, int elemTime = 0)
         {
             if (animPlayerNo < 0) { animPlayerNo = PlayerNo; }
@@ -478,6 +584,7 @@ namespace Lockstep.Mugen.Char
             return true;
         }
 
+        // Ikemen reference: src/char.go ChangeState/SelfState queues state owner, animation and ctrl changes.
         public void QueueTransition(int stateNo, int ownerPlayerNo, int animNo = -1, int ctrl = -1)
         {
             PendingTransition = new MStateTransition
@@ -487,19 +594,31 @@ namespace Lockstep.Mugen.Char
                 OwnerPlayerNo = ownerPlayerNo >= 0 ? ownerPlayerNo : StatePlayerNo,
                 AnimNo = animNo,
                 Ctrl = ctrl,
+                InitPending = false,
+                ReturningToSelf = false,
             };
         }
 
+        Anim.MAnimData CurrentAnimationData()
+        {
+            IReadOnlyDictionary<int, Anim.MAnimData> table = CurrentAnimTable();
+            if (table == null || !table.TryGetValue(AnimRunningNo, out Anim.MAnimData anim))
+            {
+                return null;
+            }
+            return anim;
+        }
+
         /// <summary>animelemtime(n)：自元素 n（1-based）起已播 tick。当前元素精确；其余按累积起始时间推算。</summary>
+        // Ikemen reference: src/char.go animElemTime trigger and src/anim.go Animation.AnimElemTime.
         int ComputeAnimElemTime(int elemNo1Based)
         {
             if (elemNo1Based == AnimElemNo)
             {
                 return AnimElemTime;   // 当前元素：精确（与 animelem= 首帧语义一致）
             }
-            IReadOnlyDictionary<int, Anim.MAnimData> table = CurrentAnimTable();
-            if (table == null || !table.TryGetValue(AnimRunningNo, out Anim.MAnimData anim)
-                || anim.Frames == null)
+            Anim.MAnimData anim = CurrentAnimationData();
+            if (anim == null || anim.Frames == null)
             {
                 return 0;
             }
@@ -522,12 +641,14 @@ namespace Lockstep.Mugen.Char
 
         /// <summary>到对手的朝向相对水平距离（前为正）= facing*(opp.x - self.x)。
         /// 对齐 char.go:8859 rdDistX；定点精确，省略 float 版的 |·|&lt;0.0001 噪声夹取。</summary>
+        // Ikemen reference: src/char.go distX/rdDistX backs p2dist X facing-relative distance.
         FFloat DistX(MChar opp)
         {
             return Facing * (opp.Pos.X - Pos.X);
         }
 
         /// <summary>到对手的边到边水平距离 = p2dist X 减双方前缘半宽（MUGEN 形，char.go:8787 注释「不随 Width 变化」）。</summary>
+        // Ikemen reference: src/char.go bodyDistX/p2BodyDistX computes edge-to-edge body distance.
         FFloat BodyDistX(MChar opp)
         {
             FFloat selfFront = Constants != null ? Constants.SizeGroundFront : FFloat.Zero;
@@ -536,6 +657,7 @@ namespace Lockstep.Mugen.Char
         }
 
         /// <summary>到对手的水平距离绝对值（inguarddist 判定用，不分前后）。</summary>
+        // Ikemen reference: src/char.go distX logic backs inguarddist absolute horizontal range.
         FFloat AbsDistX(MChar opp)
         {
             FFloat d = opp.Pos.X - Pos.X;
@@ -545,18 +667,21 @@ namespace Lockstep.Mugen.Char
         // ───────── 受击触发器（移植 Ikemen char.go hitOver/hitShakeOver/canRecover；HitFall=ghv.fallflag）─────────
 
         /// <summary>HitShakeOver：受击抖动结束（char.go:5342，ghv.hitshaketime &lt;= 0）。</summary>
+        // Ikemen reference: src/char.go hitShakeOver trigger reads gethit shake timeout.
         public bool HitShakeOver()
         {
             return Ghv.HitShakeTime <= 0;
         }
 
         /// <summary>HitOver：受击硬直结束（char.go:5338，ghv.hittime &lt; 0）。</summary>
+        // Ikemen reference: src/char.go hitOver trigger reads gethit hittime expiry.
         public bool HitOver()
         {
             return Ghv.HitTime < 0;
         }
 
         /// <summary>CanRecover：浮空可起身（char.go:5165，fall.recover 且浮空时长达 recovertime）。</summary>
+        // Ikemen reference: src/char.go canRecover trigger checks fall recovery timing.
         public bool CanRecover()
         {
             return Ghv.FallRecover && FallTime >= Ghv.FallRecoverTime;
@@ -567,6 +692,7 @@ namespace Lockstep.Mugen.Char
         /// fall 用 fall.animtype；空中用 air.animtype；地面用 ground.animtype，
         /// 但若 ground.animtype 为 Back 及以上且 yvel=0 则降级为 Hard（MUGEN 行为）。
         /// </summary>
+        // Ikemen reference: src/char.go gethitAnimtype chooses ground/air/fall reaction animation type.
         public int GetHitAnimType()
         {
             if (Ghv.Fall)
@@ -588,23 +714,44 @@ namespace Lockstep.Mugen.Char
         /// 是否允许把当前动画切到该号（对齐 Ikemen changeAnimEx：目标动画不存在则不切、保留当前动画，避免冻结）。
         /// 无表（裸构造的单测）时放行，以保持既有行为。
         /// </summary>
+        // Ikemen reference: src/char.go changeAnim/changeAnimEx rejects missing destination animations.
         public bool CanChangeAnimTo(int animNo)
         {
             IReadOnlyDictionary<int, Anim.MAnimData> table = AnimationsFor(PlayerNo);
             return table == null || table.ContainsKey(animNo);
         }
 
+        // Ikemen reference: src/char.go bindToTarget/setBindToId stores target bind state.
         public void BindTo(MChar target, int time, FVector3 offset, int bindFacing)
         {
+            if (target == null || time == 0)
+            {
+                ClearBind();
+                return;
+            }
+
             BindTarget = target;
             BindTime = time;
             BindPos = offset;
             BindFacing = bindFacing;
+            if (target.BindTarget == this)
+            {
+                target.ClearBind();
+            }
         }
 
+        public void ClearBind()
+        {
+            BindTarget = null;
+            BindTime = 0;
+            BindPos = FVector3.Zero;
+            BindFacing = 0;
+        }
+
+        // Ikemen reference: src/char.go bind applies target-relative position and facing each tick.
         public void ApplyBind()
         {
-            if (BindTarget == null || BindTime <= 0)
+            if (BindTarget == null || BindTime == 0)
             {
                 return;
             }
@@ -613,25 +760,31 @@ namespace Lockstep.Mugen.Char
                 BindTarget.Pos.X + BindPos.X * targetFacing,
                 BindTarget.Pos.Y + BindPos.Y,
                 BindTarget.Pos.Z + BindPos.Z);
+            Vel = BindTarget.Vel;
             if (BindFacing != 0)
             {
                 Facing = targetFacing * FFloat.FromInt(BindFacing);
             }
-            BindTime--;
-            if (BindTime <= 0)
+            if (BindTime > 0)
             {
-                BindTarget = null;
+                BindTime--;
+                if (BindTime == 0)
+                {
+                    ClearBind();
+                }
             }
         }
 
         // ───────── 回滚支持 ─────────
 
+        // Ikemen reference: src/char.go target bookkeeping clears hit target lists.
         public void ClearTargets()
         {
             Targets.Clear();
             TargetRefs.Clear();
         }
 
+        // Ikemen reference: src/char.go addTarget records hit targets and hitdef ids.
         public void AddTarget(MChar target, int hitDefId)
         {
             if (target == null)
@@ -642,6 +795,7 @@ namespace Lockstep.Mugen.Char
             TargetRefs.Add(new MTargetRef { Target = target, HitDefId = hitDefId });
         }
 
+        // Ikemen reference: src/char.go hasTarget/hasTargetOfHitdef checks active target records.
         public bool HasTarget(MChar target)
         {
             for (int index = 0; index < TargetRefs.Count; index++)
@@ -654,6 +808,7 @@ namespace Lockstep.Mugen.Char
             return Targets.Contains(target);
         }
 
+        // Ikemen reference: src/bytecode.go target redirect filters src/char.go target hitdef records.
         public List<MChar> SelectTargetsByHitId(int hitDefId, int matchIndex)
         {
             List<MChar> selected = new List<MChar>();
@@ -692,6 +847,7 @@ namespace Lockstep.Mugen.Char
             return selected;
         }
 
+        // Project-specific: lockstep rollback snapshot clone of Ikemen Char runtime state.
         public MChar Clone()
         {
             MChar c = new MChar
@@ -711,6 +867,8 @@ namespace Lockstep.Mugen.Char
                 PalNo = PalNo, AnimTime = AnimTime, AnimElemNo = AnimElemNo, AssertFlags = AssertFlags,
                 AnimElem = AnimElem, AnimElemTime = AnimElemTime, AnimCurTime = AnimCurTime,
                 AnimLoopEnd = AnimLoopEnd, AnimRunningNo = AnimRunningNo,
+                TriggerAnimNo = TriggerAnimNo, TriggerAnimElemNo = TriggerAnimElemNo,
+                TriggerAnimElemTime = TriggerAnimElemTime,
                 Ghv = Ghv.Clone(), FallTime = FallTime,
                 CommandList = CommandList != null ? CommandList.Clone() : null,
                 Input = Input != null ? Input.Clone() : null,
@@ -731,6 +889,8 @@ namespace Lockstep.Mugen.Char
                 PosFreeze = PosFreeze,
                 WidthPlayerFront = WidthPlayerFront, WidthPlayerBack = WidthPlayerBack,
                 WidthEdgeFront = WidthEdgeFront, WidthEdgeBack = WidthEdgeBack,
+                WidthPlayerFrontSet = WidthPlayerFrontSet, WidthPlayerBackSet = WidthPlayerBackSet,
+                WidthEdgeFrontSet = WidthEdgeFrontSet, WidthEdgeBackSet = WidthEdgeBackSet,
                 PlayerPushEnabled = PlayerPushEnabled, PushPriority = PushPriority, PushAffectTeam = PushAffectTeam,
                 ScreenBoundEnabled = ScreenBoundEnabled, ScreenBoundMoveCameraX = ScreenBoundMoveCameraX,
                 ScreenBoundMoveCameraY = ScreenBoundMoveCameraY, ScreenBoundStageBound = ScreenBoundStageBound,
@@ -760,6 +920,7 @@ namespace Lockstep.Mugen.Char
             return c;
         }
 
+        // Project-specific: deterministic rollback hash over Ikemen Char runtime state.
         public void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(Time); hash.AddInt32(StateNo); hash.AddInt32(PrevStateNo);
@@ -776,6 +937,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(PendingTransition.Active); hash.AddInt32(PendingTransition.StateNo);
             hash.AddInt32(PendingTransition.OwnerPlayerNo); hash.AddInt32(PendingTransition.AnimNo);
             hash.AddInt32(PendingTransition.Ctrl);
+            hash.AddBool(PendingTransition.InitPending); hash.AddBool(PendingTransition.ReturningToSelf);
             HashVars(ref hash, PersistCounters);
             hash.AddInt32(BindTarget != null ? BindTarget.Id : -1); hash.AddInt32(BindTime); hash.AddFixed(BindPos); hash.AddInt32(BindFacing);
             hash.AddInt32(HitCount); hash.AddInt32(UniqHitCount); hash.AddInt32(GuardCount); hash.AddInt32(ReceivedHits);
@@ -783,6 +945,7 @@ namespace Lockstep.Mugen.Char
             hash.AddInt32(PalNo); hash.AddInt32(AnimTime); hash.AddInt32(AnimElemNo); hash.AddInt32(AssertFlags);
             hash.AddInt32(AnimElem); hash.AddInt32(AnimElemTime); hash.AddInt32(AnimCurTime);
             hash.AddBool(AnimLoopEnd); hash.AddInt32(AnimRunningNo);
+            hash.AddInt32(TriggerAnimNo); hash.AddInt32(TriggerAnimElemNo); hash.AddInt32(TriggerAnimElemTime);
             Ghv.WriteHash(ref hash); hash.AddInt32(FallTime);
             if (CommandList != null) { CommandList.WriteHash(ref hash); }
             if (Input != null) { Input.WriteHash(ref hash); }
@@ -794,6 +957,8 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(PosFreeze);
             hash.AddFixed(WidthPlayerFront); hash.AddFixed(WidthPlayerBack);
             hash.AddFixed(WidthEdgeFront); hash.AddFixed(WidthEdgeBack);
+            hash.AddBool(WidthPlayerFrontSet); hash.AddBool(WidthPlayerBackSet);
+            hash.AddBool(WidthEdgeFrontSet); hash.AddBool(WidthEdgeBackSet);
             hash.AddBool(PlayerPushEnabled); hash.AddInt32(PushPriority); hash.AddInt32(PushAffectTeam);
             hash.AddBool(ScreenBoundEnabled); hash.AddBool(ScreenBoundMoveCameraX);
             hash.AddBool(ScreenBoundMoveCameraY); hash.AddBool(ScreenBoundStageBound);
@@ -840,6 +1005,7 @@ namespace Lockstep.Mugen.Char
         }
 
         // 字典哈希按 key 升序，保证两端顺序无关的确定性
+        // Project-specific: deterministic rollback hash helper for Ikemen CNS integer vars.
         static void HashVars(ref Hash64 hash, Dictionary<int, int> vars)
         {
             hash.AddInt32(vars.Count);
@@ -852,6 +1018,7 @@ namespace Lockstep.Mugen.Char
             }
         }
 
+        // Project-specific: deterministic rollback hash helper for Ikemen CNS fixed-point vars.
         static void HashFloatVars(ref Hash64 hash, Dictionary<int, FFloat> vars)
         {
             hash.AddInt32(vars.Count);
@@ -866,6 +1033,7 @@ namespace Lockstep.Mugen.Char
 
         // ───────── IExprContext：trigger/redirect opcode → 本 Char 取值 ─────────
 
+        // Ikemen reference: src/bytecode.go trigger opcodes dispatch to src/char.go Char trigger values.
         public BytecodeValue ReadTrigger(OpCode op, byte[] code, ref int i, List<BytecodeValue> stack)
         {
             switch (op)
@@ -884,6 +1052,11 @@ namespace Lockstep.Mugen.Char
                 {
                     int mtype = code[i]; i++;
                     return BytecodeValue.Bool(MoveType == mtype);   // 我方 MoveType 存小码 I=1/H=2/A=4
+                }
+                case OpCode.OC_physics:
+                {
+                    int physics = code[i]; i++;
+                    return BytecodeValue.Bool(Physics == physics);
                 }
                 case OpCode.OC_ctrl: return BytecodeValue.Bool(Ctrl);
                 case OpCode.OC_anim: return BytecodeValue.Int(AnimNo);
@@ -954,6 +1127,12 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_movereversed: return BytecodeValue.Int(MoveReversed);
                 case OpCode.OC_animtime: return BytecodeValue.Int(AnimTime);
                 case OpCode.OC_animelemno: return BytecodeValue.Int(AnimElemNo);
+                case OpCode.OC_animelemno_time:
+                {
+                    int time = Pop(stack).ToI();
+                    Anim.MAnimData anim = CurrentAnimationData();
+                    return BytecodeValue.Int(Anim.MAnimSystem.AnimElemNoAtTime(this, anim, time));
+                }
                 case OpCode.OC_animelemtime:
                 {
                     // animelemtime(n)：自元素 n（1-based）起已播 tick。当前元素精确返 AnimElemTime；
@@ -965,7 +1144,11 @@ namespace Lockstep.Mugen.Char
                 {
                     // animelem = n：到达元素 n 的首帧（当前元素号 == n 且本元素已播 0 tick）。
                     int n = Pop(stack).ToI();
-                    return BytecodeValue.Bool(AnimElemNo == n && AnimElemTime == 0);
+                    bool current = AnimElemNo == n && AnimElemTime == 0;
+                    bool blockStart = TriggerAnimNo == AnimNo &&
+                        TriggerAnimElemNo == n &&
+                        TriggerAnimElemTime == 0;
+                    return BytecodeValue.Bool(current || blockStart);
                 }
                 case OpCode.OC_numtarget: return BytecodeValue.Int(Targets.Count);
                 case OpCode.OC_jugglepoints:
@@ -987,7 +1170,8 @@ namespace Lockstep.Mugen.Char
                 case OpCode.OC_numproj:
                 {
                     int id = Pop(stack).ToI();
-                    return BytecodeValue.Int(World != null ? World.CountProjectiles(id, Id) : 0);
+                    int ownerId = Root != null ? Root.Id : Id;
+                    return BytecodeValue.Int(World != null ? World.CountProjectiles(id, ownerId) : 0);
                 }
                 case OpCode.OC_numexplod:
                 {
@@ -1051,7 +1235,7 @@ namespace Lockstep.Mugen.Char
                 {
                     // const(field)：OC_const_ + 字段id 字节，从不可变常量集读取
                     MConstId constId = (MConstId)code[i]; i++;
-                    return Constants != null ? Constants.Read(constId) : BytecodeValue.Int(0);
+                    return ReadConst(constId);
                 }
                 case OpCode.OC_ex_:
                 {
@@ -1071,6 +1255,7 @@ namespace Lockstep.Mugen.Char
             }
         }
 
+        // Ikemen reference: src/char.go jugglePoints trigger queries target gethit juggle state.
         int JugglePoints(int targetId)
         {
             int max = Constants != null ? Constants.Airjuggle : 15;
@@ -1086,6 +1271,7 @@ namespace Lockstep.Mugen.Char
         }
 
         // gethitvar 字段 id → Ghv 值（id 见 MugenExprCompiler.GetHitVarFieldId）。
+        // Ikemen reference: src/char.go gethitvar trigger reads gethit variable fields.
         BytecodeValue ReadGetHitVar(int fieldId)
         {
             switch (fieldId)
@@ -1111,11 +1297,13 @@ namespace Lockstep.Mugen.Char
                 case 18: return BytecodeValue.Float(Ghv.FallXVel);
                 case 19: return BytecodeValue.Int(Ghv.FallRecoverTime);
                 case 20: return BytecodeValue.Bool(Ghv.FallRecover);
+                case 21: return BytecodeValue.Bool(BindTarget != null && BindTime != 0);
                 default: return BytecodeValue.Int(0);
             }
         }
 
         // redirect opcode → 返回被重定向到的 Char（不存在则 null，VM 压 Undefined 并跳过整块）。
+        // Ikemen reference: src/bytecode.go getRedirectedChar handles root/parent/p2/enemy/target/helper redirects.
         public IExprContext Redirect(OpCode op, List<BytecodeValue> stack)
         {
             switch (op)
@@ -1155,6 +1343,7 @@ namespace Lockstep.Mugen.Char
             }
         }
 
+        // Ikemen reference: src/bytecode.go var/sysvar/fvar/sysfvar trigger variable reads.
         public BytecodeValue ReadVariable(OpCode op, int index)
         {
             switch (op)
@@ -1172,6 +1361,7 @@ namespace Lockstep.Mugen.Char
             }
         }
 
+        // Ikemen reference: src/bytecode.go getRedirectedChar two-argument target/helper redirects.
         public IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument)
         {
             switch (op)
@@ -1185,6 +1375,7 @@ namespace Lockstep.Mugen.Char
             }
         }
 
+        // Ikemen reference: src/bytecode.go target redirect selects from src/char.go target lists.
         IExprContext FindTargetRedirect(int targetId, int matchIndex)
         {
             if (matchIndex < 0)

@@ -23,6 +23,12 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             "[Statedef 1100]\ntype = S\nphysics = N\nanim = 0\n\n" +
             "[State 1100, mark]\ntype = VarSet\ntrigger1 = 1\nv = 3\nvalue = 77\n\n" +
             "[State 1100, recover]\ntype = SelfState\ntrigger1 = time >= 3\nvalue = 0\n";
+        const string AirReleaseOwnerCns =
+            "[Statedef 0]\ntype = S\nphysics = N\nanim = 0\n\n" +
+            "[State 0, throw]\ntype = HitDef\ntrigger1 = time = 0\nattr = S, NT\ndamage = 30\n" +
+            "hitflag = MAF\np2stateno = 1100\nground.type = High\nground.velocity = 0\n\n" +
+            "[Statedef 1100]\ntype = S\nphysics = N\nanim = 0\n\n" +
+            "[State 1100, recover]\ntype = SelfState\ntrigger1 = time >= 3\nvalue = 0\n";
         // P2：站立，无 state 1100。
         const string DefCns = "[Statedef 0]\ntype = S\nphysics = N\nanim = 0\n";
         const string Air =
@@ -30,7 +36,12 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
 
         static MBattleEngine Engine()
         {
-            MCharData owner = MCharLoader.Load(new[] { OwnerCns }, OwnerCns, null, Air, null, "Thrower");
+            return Engine(OwnerCns);
+        }
+
+        static MBattleEngine Engine(string ownerCns)
+        {
+            MCharData owner = MCharLoader.Load(new[] { ownerCns }, ownerCns, null, Air, null, "Thrower");
             MCharData def = MCharLoader.Load(new[] { DefCns }, DefCns, null, Air, null, "Victim");
             MBattleEngine engine = new MBattleEngine();
             MChar p1 = MCharLoader.SpawnChar(owner, 0, startStateNo: 0, startAnimNo: 0);
@@ -78,6 +89,42 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             MChar p2 = engine.Chars[1];
             for (int f = 0; f < 12; f++) { engine.Tick(NoInput()); }
             Assert.That(p2.StateOwner, Is.Null, "SelfState 后 P2 退出自定义状态归属（回自身状态表）");
+        }
+
+        [Test]
+        public void Throw_SelfStateToStandDoesNotLeaveVictimStandingInAir()
+        {
+            MBattleEngine engine = Engine(AirReleaseOwnerCns);
+            MChar p2 = engine.Chars[1];
+
+            for (int f = 0; f < 2; f++) { engine.Tick(NoInput()); }
+            p2.Pos = new FVector3(p2.Pos.X, FFloat.FromInt(-80), p2.Pos.Z);
+            p2.Vel = new FVector3(p2.Vel.X, FFloat.FromInt(-3), p2.Vel.Z);
+            for (int f = 0; f < 10; f++) { engine.Tick(NoInput()); }
+
+            Assert.That(p2.StateOwner, Is.Null);
+            Assert.That(p2.StateNo, Is.EqualTo(0));
+            Assert.That(p2.StateType, Is.EqualTo(1));
+            Assert.That(p2.Pos.Y.Raw, Is.EqualTo(FFloat.Zero.Raw), "state 0/standing must be grounded after throw release");
+            Assert.That(p2.Vel.Y.Raw, Is.EqualTo(FFloat.Zero.Raw));
+            Assert.That(p2.BindTarget, Is.Null);
+            Assert.That(p2.BindTime, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void GetHitVarIsBound_ReflectsTargetBindRuntime()
+        {
+            MChar binder = new MChar { Facing = FFloat.One };
+            MChar target = new MChar();
+            target.BindTo(binder, 1, new FVector3(FFloat.Zero, FFloat.FromInt(-40), FFloat.Zero), 0);
+            var isBound = new Lockstep.Mugen.Expr.MugenExprCompiler().Compile("gethitvar(isbound)");
+            Assert.That(isBound.Run(target).ToB(), Is.True, "gethitvar(isbound) should be true while TargetBind is active");
+
+            target.ApplyBind();
+
+            Assert.That(isBound.Run(target).ToB(), Is.False, "gethitvar(isbound) should become false after bind time expires");
+            Assert.That(target.BindTarget, Is.Null);
+            Assert.That(target.BindTime, Is.EqualTo(0));
         }
 
         [Test]

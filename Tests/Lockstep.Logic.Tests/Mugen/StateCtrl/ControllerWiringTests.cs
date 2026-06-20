@@ -69,12 +69,44 @@ namespace Lockstep.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void Width_SingleValueAddsBaseFrontAndDoesNotCopyBack()
+        {
+            MChar c = new MChar
+            {
+                StateType = 1,
+                Constants = new MConstants
+                {
+                    SizeGroundFront = FFloat.FromInt(10),
+                    SizeGroundBack = FFloat.FromInt(12),
+                },
+            };
+
+            new WidthController { Value = new[] { E("5") } }.Run(c);
+
+            Assert.That(c.WidthPlayerFront.ToFloat(), Is.EqualTo(15f).Within(0.01f));
+            Assert.That(c.WidthEdgeFront.ToFloat(), Is.EqualTo(5f).Within(0.01f));
+            Assert.That(c.WidthPlayerFrontSet, Is.True);
+            Assert.That(c.WidthEdgeFrontSet, Is.True);
+            Assert.That(c.WidthPlayerBackSet, Is.False);
+            Assert.That(c.WidthEdgeBackSet, Is.False);
+        }
+
+        [Test]
         public void PlayerPush_SetsFields()
         {
             MChar c = new MChar();
             new PlayerPushController { Value = E("0"), Priority = E("3") }.Run(c);
             Assert.That(c.PlayerPushEnabled, Is.False);
             Assert.That(c.PushPriority, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void PlayerPush_DefaultValueReenablesPush()
+        {
+            MChar c = new MChar { PlayerPushEnabled = false };
+            new PlayerPushController { Priority = E("2") }.Run(c);
+            Assert.That(c.PlayerPushEnabled, Is.True);
+            Assert.That(c.PushPriority, Is.EqualTo(2));
         }
 
         [Test]
@@ -85,6 +117,25 @@ namespace Lockstep.Tests.Mugen.StateCtrl
             Assert.That(c.ScreenBoundEnabled, Is.True);
             Assert.That(c.ScreenBoundMoveCameraX, Is.True);
             Assert.That(c.ScreenBoundMoveCameraY, Is.False);
+        }
+
+        [Test]
+        public void ScreenBound_DefaultsDisableScreenAndCameraButKeepStageBound()
+        {
+            MChar c = new MChar
+            {
+                ScreenBoundEnabled = true,
+                ScreenBoundMoveCameraX = true,
+                ScreenBoundMoveCameraY = true,
+                ScreenBoundStageBound = true,
+            };
+
+            new ScreenBoundController().Run(c);
+
+            Assert.That(c.ScreenBoundEnabled, Is.False);
+            Assert.That(c.ScreenBoundMoveCameraX, Is.False);
+            Assert.That(c.ScreenBoundMoveCameraY, Is.False);
+            Assert.That(c.ScreenBoundStageBound, Is.True);
         }
 
         [Test]

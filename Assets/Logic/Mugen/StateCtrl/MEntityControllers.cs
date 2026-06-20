@@ -80,6 +80,7 @@ namespace Lockstep.Mugen.StateCtrl
             if (character.IsHelper)
             {
                 character.Destroyed = true;
+                return true;
             }
             return false;
         }
@@ -115,6 +116,10 @@ namespace Lockstep.Mugen.StateCtrl
             int animNo = ProjAnim != null ? ProjAnim.Run(character).ToI() : 0;
             // 每发弹幕一份独立 HitDef（克隆模板，避免共享被改）。
             Lockstep.Mugen.Hit.MHitDef hd = HitDef != null ? HitDef.Clone() : null;
+            if (hd != null)
+            {
+                hd.ResolveDynamicValues(character);
+            }
             character.RequestProjectile(projId, vx, vy, ax, ay, px, py, removeTime, animNo, hd);
             return false;
         }

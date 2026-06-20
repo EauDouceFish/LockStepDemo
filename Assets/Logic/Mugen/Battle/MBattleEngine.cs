@@ -34,6 +34,18 @@ namespace Lockstep.Mugen.Battle
 
         // R-ENT 实体世界（共享 spawn 通道 + id 分配 + helper 列表）。_helperData 与 World.Helpers 平行（引擎侧配置）。
         public readonly MEntityWorld World = new MEntityWorld();
+
+        // R-STAGE-minimal：决斗场左右边界（默认关闭=虚空，决斗场表现层开启）。
+        public readonly MStage Stage = new MStage();
+
+        // 回合结算窗口禁伤（= Ikemen roundNoDamage）：命中仍登记（受击/硬直），但不扣血。
+        // 由 MRoundSystem 每帧据 intro 相位设置；无回合系统时恒 false（行为同旧）。
+        public bool NoDamage;
+
+        // Demo-only facing fallback. Full Ikemen/MUGEN fidelity should rely on common state 5 +
+        // Turn controllers; this switch lets strict tests or future competitive modes disable it.
+        public bool EnableDemoAutoTurnFallback = true;
+
         public List<MChar> Helpers => World.Helpers;
         readonly List<MCharData> _helperData = new List<MCharData>();
         public int FrameNo { get; private set; }
@@ -51,6 +63,7 @@ namespace Lockstep.Mugen.Battle
             c.Rng = Random;       // 接入共享随机源（对齐 Ikemen 全局种子）
             c.Pause = PauseState; // 接入共享暂停态（对齐 Ikemen 全局 sys.pause）
             c.World = World;      // 接入实体世界（helper spawn 通道）
+            ApplyPhysicsDefaults(c);
             Chars.Add(c);
             Data.Add(data);
         }
@@ -96,6 +109,7 @@ namespace Lockstep.Mugen.Battle
                 helper.Pause = PauseState;
                 helper.World = World;
                 helper.KeyCtrl = req.KeyCtrl;
+                ApplyPhysicsDefaults(helper);
                 // postype p1 相对：朝向继承 owner×req.Facing，位置 = owner.Pos + 朝向相对偏移（X 乘 owner 朝向）。
                 int facingSign = req.Owner.Facing.Raw >= 0 ? 1 : -1;
                 helper.Facing = FFloat.FromInt(facingSign * (req.Facing >= 0 ? 1 : -1));
@@ -110,19 +124,21 @@ namespace Lockstep.Mugen.Battle
             for (int q = 0; q < World.ProjSpawnQueue.Count; q++)
             {
                 MProjectileRequest req = World.ProjSpawnQueue[q];
+                if (req.Owner == null) { continue; }
                 int facingSign = req.Owner.Facing.Raw >= 0 ? 1 : -1;
                 MCharData ownerData = DataOf(req.Owner);
                 Hit.MClsnBox[] clsn1 = ProjAnimClsn1(ownerData, req.AnimNo);
+                MChar projectileOwner = req.Owner.Root ?? req.Owner.Parent ?? req.Owner;
                 World.Projectiles.Add(new MProjectile
                 {
-                    Id = World.AllocId(), OwnerId = req.Owner.Id, ProjId = req.ProjId,
+                    Id = World.AllocId(), OwnerId = projectileOwner.Id, ProjId = req.ProjId,
                     Facing = FFloat.FromInt(facingSign),
                     Vel = new FVector3(req.VelX, req.VelY, FFloat.Zero),
                     Accel = new FVector3(req.AccelX, req.AccelY, FFloat.Zero),
                     Pos = new FVector3(req.Owner.Pos.X + req.PosX * FFloat.FromInt(facingSign),
                         req.Owner.Pos.Y + req.PosY, FFloat.Zero),
                     RemoveTime = req.RemoveTime, AnimNo = req.AnimNo,
-                    HitDef = req.HitDef, Owner = req.Owner, Clsn1 = clsn1,
+                    HitDef = req.HitDef, Owner = projectileOwner, Clsn1 = clsn1,
                 });
             }
             World.ProjSpawnQueue.Clear();
@@ -220,6 +236,9 @@ namespace Lockstep.Mugen.Battle
                 RandomSeed = Random.Seed,
                 Pause = PauseState.Clone(),
                 NextEntityId = World.NextEntityId,
+                Stage = Stage.Clone(),
+                NoDamage = NoDamage,
+                EnableDemoAutoTurnFallback = EnableDemoAutoTurnFallback,
             };
             for (int i = 0; i < Chars.Count; i++)
             {
@@ -263,6 +282,9 @@ namespace Lockstep.Mugen.Battle
             Random.Seed = snapshot.RandomSeed;
             CopyPause(snapshot.Pause, PauseState);
             World.NextEntityId = snapshot.NextEntityId;
+            Stage.CopyFrom(snapshot.Stage);
+            NoDamage = snapshot.NoDamage;
+            EnableDemoAutoTurnFallback = snapshot.EnableDemoAutoTurnFallback;
 
             Dictionary<int, MChar> map = new Dictionary<int, MChar>();
             for (int i = 0; i < snapshot.Chars.Count; i++)
@@ -331,6 +353,10 @@ namespace Lockstep.Mugen.Battle
             PauseState.Step();
             for (int i = 0; i < Chars.Count; i++) { Chars[i].ComputePauseBool(); }
             for (int i = 0; i < Helpers.Count; i++) { Helpers[i].ComputePauseBool(); }
+            bool[] charHitpause = SnapshotHitpause(Chars);
+            bool[] helperHitpause = SnapshotHitpause(Helpers);
+            ApplyHitpauseActtmp(Chars, charHitpause);
+            ApplyHitpauseActtmp(Helpers, helperHitpause);
             for (int i = 0; i < Chars.Count; i++) { StepProjectileContactTime(Chars[i]); }
             for (int i = 0; i < Helpers.Count; i++) { StepProjectileContactTime(Helpers[i]); }
             bool anyPause = PauseState.AnyActive;
@@ -350,11 +376,27 @@ namespace Lockstep.Mugen.Battle
             //    先每帧重置绘制态（移植 char.go:11542，在状态控制器运行前；anglerot/sprPriority/winquote 跨帧保留）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (!Chars[i].PauseBool) { Chars[i].ResetFrameDrawState(); MActionSystem.Prepare(Chars[i]); }
+                if (!Chars[i].PauseBool)
+                {
+                    ApplyPhysicsDefaults(Chars[i]);
+                    Chars[i].ResetFrameDrawState();
+                    if (!charHitpause[i])
+                    {
+                        MActionSystem.Prepare(Chars[i]);
+                    }
+                }
             }
             for (int i = 0; i < Helpers.Count; i++)
             {
-                if (!Helpers[i].PauseBool) { Helpers[i].ResetFrameDrawState(); MActionSystem.Prepare(Helpers[i]); }
+                if (!Helpers[i].PauseBool)
+                {
+                    ApplyPhysicsDefaults(Helpers[i]);
+                    Helpers[i].ResetFrameDrawState();
+                    if (!helperHitpause[i])
+                    {
+                        MActionSystem.Prepare(Helpers[i]);
+                    }
+                }
             }
 
             // 3) 状态机（玩家 + helper）。自定义状态(投技)：StateOwner 非 null → 跑该角色的状态表。
@@ -370,31 +412,41 @@ namespace Lockstep.Mugen.Battle
             }
 
             // 4) 物理 + 落地检测（玩家 + helper）。PosFreeze 跳积分后清零。
-            for (int i = 0; i < Chars.Count; i++) { StepPhysics(Chars[i]); }
-            for (int i = 0; i < Helpers.Count; i++) { StepPhysics(Helpers[i]); }
+            for (int i = 0; i < Chars.Count; i++) { StepPhysics(Chars[i], charHitpause[i]); }
+            for (int i = 0; i < Helpers.Count; i++) { StepPhysics(Helpers[i], helperHitpause[i]); }
+            ResolvePlayerPush(charHitpause, helperHitpause);
+            ClearPosFreeze();
+
+            // Demo fallback turn after physics. State logic computes local velocity against the
+            // facing sampled at input time, and MPhysics applies vel.x * facing. Flipping before
+            // physics reinterprets the same-frame walk direction and causes crossing jitter.
+            if (EnableDemoAutoTurnFallback)
+            {
+                for (int i = 0; i < Chars.Count; i++)
+                {
+                    if (!Chars[i].PauseBool && !charHitpause[i]) { MActionSystem.AutoTurn(Chars[i]); }
+                }
+            }
 
             // 5) 动画推进（玩家 + helper）。
             for (int i = 0; i < Chars.Count; i++)
             {
-                if (!Chars[i].PauseBool) { MAnimSystem.Action(Chars[i], Chars[i].CurrentAnimTable()); }
+                if (!Chars[i].PauseBool && !charHitpause[i]) { MAnimSystem.Action(Chars[i], Chars[i].CurrentAnimTable()); }
             }
             for (int i = 0; i < Helpers.Count; i++)
             {
-                if (!Helpers[i].PauseBool) { MAnimSystem.Action(Helpers[i], Helpers[i].CurrentAnimTable()); }
+                if (!Helpers[i].PauseBool && !helperHitpause[i]) { MAnimSystem.Action(Helpers[i], Helpers[i].CurrentAnimTable()); }
             }
 
             // 5b) 排空 spawn 队列（本帧状态机里 Helper/Projectile 控制器请求的实体，下帧起跑）+ 推进现有弹幕。
             DrainSpawns();
             if (!anyPause) { StepProjectiles(); }
-            if (!anyPause) { World.StepExplods(); }
+            if (!anyPause) { World.StepExplods(ownerId => IsEntityHitpause(ownerId, charHitpause, helperHitpause)); }
 
             // 6) 命中：全 MChar 实体（玩家 + helper）跨队两两尝试。暂停期间不结算。
             //    队伍 = Root.Id（helper 继承 owner 的 Root）；只在不同队之间判定，避免打自己人。
-            if (!anyPause)
-            {
-                RunHits();
-                FlushPendingDamage();
-            }
+            RunHits(charHitpause, helperHitpause);
+            FlushPendingDamage();
 
             // 7) 移除 DestroySelf 的 helper。
             RemoveDestroyed();
@@ -433,15 +485,29 @@ namespace Lockstep.Mugen.Battle
 
         // 全实体跨队命中：把玩家与 helper 合到一个列表，攻防两两尝试（TryHit 内部做 active/重叠/同招一次判定）。
         readonly List<MChar> _hitEntities = new List<MChar>();
+        readonly List<bool> _hitEntityHitpause = new List<bool>();
         // Ikemen reference: src/char.go HitDef contact resolution; C# enumerates all player/helper attacker-defender pairs.
-        void RunHits()
+        void RunHits(bool[] charHitpause, bool[] helperHitpause)
         {
             _hitEntities.Clear();
-            _hitEntities.AddRange(Chars);
-            _hitEntities.AddRange(Helpers);
+            _hitEntityHitpause.Clear();
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                _hitEntities.Add(Chars[i]);
+                _hitEntityHitpause.Add(charHitpause != null && i < charHitpause.Length && charHitpause[i]);
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                _hitEntities.Add(Helpers[i]);
+                _hitEntityHitpause.Add(helperHitpause != null && i < helperHitpause.Length && helperHitpause[i]);
+            }
             for (int a = 0; a < _hitEntities.Count; a++)
             {
                 MChar attacker = _hitEntities[a];
+                if (attacker.PauseBool || _hitEntityHitpause[a])
+                {
+                    continue;
+                }
                 for (int d = 0; d < _hitEntities.Count; d++)
                 {
                     if (a == d) { continue; }
@@ -457,6 +523,13 @@ namespace Lockstep.Mugen.Battle
         // Project-specific: defers damage until after pair iteration so C# hit order stays deterministic.
         void FlushPendingDamage()
         {
+            // 禁伤窗口（roundNoDamage）：丢弃本帧待结算伤害（命中已登记受击/硬直），不扣血。
+            if (NoDamage)
+            {
+                for (int i = 0; i < Chars.Count; i++) { Chars[i].PendingLifeDamage = 0; }
+                for (int i = 0; i < Helpers.Count; i++) { Helpers[i].PendingLifeDamage = 0; }
+                return;
+            }
             for (int i = 0; i < Chars.Count; i++)
             {
                 MHitSystem.ApplyPendingDamage(Chars[i]);
@@ -469,16 +542,113 @@ namespace Lockstep.Mugen.Battle
 
         // 单实体物理一相：PauseBool 冻结跳过；PosFreeze 跳积分；否则积分 + 落地检测。
         // Ikemen reference: src/char.go pos/vel integration and actionRun land check; C# delegates to MPhysics then LandCheck.
-        void StepPhysics(MChar c)
+        void StepPhysics(MChar c, bool hitpause)
         {
-            if (c.PauseBool) { return; }
+            if (c.PauseBool || hitpause) { return; }
             if (!c.PosFreeze)
             {
                 MPhysics.Step(c);
                 MActionSystem.LandCheck(c);
             }
             c.ApplyBind();
-            c.PosFreeze = false;
+
+            // R-STAGE-minimal：把角色夹回场内左右边界（撞墙则停下横向速度）。
+            if (Stage.BoundsEnabled && c.ScreenBoundStageBound)
+            {
+                FFloat clampedX = c.Pos.X;
+                if (Stage.ClampX(ref clampedX))
+                {
+                    c.Pos = new FVector3(clampedX, c.Pos.Y, c.Pos.Z);
+                    c.Vel = new FVector3(FFloat.Zero, c.Vel.Y, c.Vel.Z);
+                }
+            }
+        }
+
+        readonly List<MChar> _physicsEntities = new List<MChar>();
+
+        void ResolvePlayerPush(bool[] charHitpause, bool[] helperHitpause)
+        {
+            _physicsEntities.Clear();
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                if (!charHitpause[i])
+                {
+                    _physicsEntities.Add(Chars[i]);
+                }
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                if (!helperHitpause[i])
+                {
+                    _physicsEntities.Add(Helpers[i]);
+                }
+            }
+            MPhysics.ResolvePlayerPush(_physicsEntities, Stage);
+        }
+
+        static bool[] SnapshotHitpause(IReadOnlyList<MChar> chars)
+        {
+            bool[] result = new bool[chars.Count];
+            for (int i = 0; i < chars.Count; i++)
+            {
+                result[i] = chars[i].Hitstop > 0;
+            }
+            return result;
+        }
+
+        static void ApplyHitpauseActtmp(IReadOnlyList<MChar> chars, bool[] hitpause)
+        {
+            for (int i = 0; i < chars.Count; i++)
+            {
+                if (hitpause != null && i < hitpause.Length && hitpause[i])
+                {
+                    chars[i].Acttmp = chars[i].PauseBool ? -3 : -1;
+                }
+            }
+        }
+
+        bool IsEntityHitpause(int ownerId, bool[] charHitpause, bool[] helperHitpause)
+        {
+            for (int i = 0; i < Chars.Count; i++)
+            {
+                if (Chars[i].Id == ownerId)
+                {
+                    return i < charHitpause.Length && charHitpause[i];
+                }
+            }
+            for (int i = 0; i < Helpers.Count; i++)
+            {
+                if (Helpers[i].Id == ownerId)
+                {
+                    return i < helperHitpause.Length && helperHitpause[i];
+                }
+            }
+            return false;
+        }
+
+        void ClearPosFreeze()
+        {
+            for (int i = 0; i < Chars.Count; i++) { Chars[i].PosFreeze = false; }
+            for (int i = 0; i < Helpers.Count; i++) { Helpers[i].PosFreeze = false; }
+        }
+
+        static void ApplyPhysicsDefaults(MChar c)
+        {
+            c.WidthPlayerFront = FFloat.Zero;
+            c.WidthPlayerBack = FFloat.Zero;
+            c.WidthEdgeFront = FFloat.Zero;
+            c.WidthEdgeBack = FFloat.Zero;
+            c.WidthPlayerFrontSet = false;
+            c.WidthPlayerBackSet = false;
+            c.WidthEdgeFrontSet = false;
+            c.WidthEdgeBackSet = false;
+            c.PlayerPushEnabled = true;
+            c.PushPriority = 0;
+            c.PushAffectTeam = 1;
+            c.ScreenBoundEnabled = true;
+            c.ScreenBoundMoveCameraX = true;
+            c.ScreenBoundMoveCameraY = true;
+            c.ScreenBoundStageBound = true;
         }
 
         /// <summary>全角色哈希（确定性对账/黄金哈希用）。</summary>
@@ -504,6 +674,9 @@ namespace Lockstep.Mugen.Battle
             }
             hash.AddInt32(Random.Seed);   // 共享随机源种子：模拟状态，全场混入一次（不在 per-char 哈希以免重复计数）
             PauseState.WriteHash(ref hash);   // 共享全局暂停态：同理全场混入一次
+            Stage.WriteHash(ref hash);
+            hash.AddBool(NoDamage);
+            hash.AddBool(EnableDemoAutoTurnFallback);
             World.WriteHash(ref hash);    // 实体世界（id 计数）
             return hash.Value;
         }

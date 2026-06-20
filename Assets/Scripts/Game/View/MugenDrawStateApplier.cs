@@ -39,15 +39,23 @@ namespace Lockstep.View
             // AngleDraw 缩放（默认 1,1，每帧由逻辑层重置）。
             t.localScale = new Vector3(c.AngleDrawScaleX.ToFloat(), c.AngleDrawScaleY.ToFloat(), 1f);
 
-            // 透明度：Default/None 不透明；Add/Sub 暂用 alpha src 近似（真正混合模式需自定义材质，留待调试会话）。
-            Color col = renderer.color;
-            col.a = (c.Trans == MTransType.Default || c.Trans == MTransType.None)
-                ? 1f
-                : Mathf.Clamp01(c.AlphaSrc / 255f);
-            renderer.color = col;
+            renderer.color = AuthoritativeColor(c.Trans, c.AlphaSrc, renderer.color);
 
             // 绘制顺序：base + layerNo*1000 + sprPriority（高 sprPriority 靠前）。
             renderer.sortingOrder = baseSortingOrder + c.LayerNo * 1000 + c.SprPriority;
+        }
+
+        public static Color AuthoritativeColor(MTransType trans, int alphaSrc, Color current)
+        {
+            // RGB is owned by the authoritative draw pass. Presentation-only hit pulses may tint it later,
+            // but the next draw pass must wipe that tint so assist effects cannot leak across lifecycle states.
+            current.r = 1f;
+            current.g = 1f;
+            current.b = 1f;
+            current.a = (trans == MTransType.Default || trans == MTransType.None)
+                ? 1f
+                : Mathf.Clamp01(alphaSrc / 255f);
+            return current;
         }
     }
 }

@@ -1,9 +1,12 @@
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
 using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Parse;
+using Lockstep.Tests;
+using Lockstep.Tests.Mugen;
 
 namespace Lockstep.Logic.Tests.Mugen.Battle
 {
@@ -19,13 +22,34 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             "[Statedef 0]\ntype=S\nphysics=S\nanim=0\n" +
             "[Statedef 191]\ntype=S\nctrl=0\nanim=190\n" +
             "[Statedef 195]\ntype=S\nctrl=0\nanim=195\n";
+        const string LongIntroCns =
+            "[Statedef 0]\ntype=S\nphysics=S\nanim=0\n" +
+            "[Statedef 191]\ntype=S\nctrl=0\nanim=190\n" +
+            "[State 191, hold]\ntype=AssertSpecial\ntrigger1=time<5\nflag=Intro\n" +
+            "[State 191, done]\ntype=ChangeState\ntrigger1=time>=5\nvalue=0\n";
+        const string RoundStateIntroCns =
+            "[Statedef 0]\ntype=S\nphysics=S\nanim=0\n" +
+            "[Statedef 191]\ntype=S\nctrl=0\nanim=190\n" +
+            "[State 191, hold]\ntype=AssertSpecial\ntrigger1=roundstate = 1 && time < 5\nflag=Intro\n" +
+            "[State 191, done]\ntype=ChangeState\ntrigger1=time>=5\nvalue=0\n";
+        const string PermanentCustomIntroCns =
+            "[Statedef 0]\ntype=S\nphysics=S\nanim=0\n" +
+            "[Statedef 191]\ntype=S\nctrl=0\nanim=190\n" +
+            "[State 191, custom]\ntype=ChangeState\ntrigger1=1\nvalue=195\n" +
+            "[Statedef 195]\ntype=S\nctrl=0\nanim=195\n" +
+            "[State 195, hold]\ntype=AssertSpecial\ntrigger1=1\nflag=Intro\n";
         const string Air = "[Begin Action 0]\n0,0, 0,0, 4\n[Begin Action 190]\n190,0, 0,0, 4\n[Begin Action 195]\n195,0, 0,0, 4\n";
 
         static readonly List<MInput> NoInput = new List<MInput> { MInput.None, MInput.None };
 
         static MBattleEngine TwoCharEngine()
         {
-            MCharData data = MCharLoader.Load(new[] { Cns }, Cns, null, Air, null, "Bower");
+            return TwoCharEngine(Cns);
+        }
+
+        static MBattleEngine TwoCharEngine(string cns)
+        {
+            MCharData data = MCharLoader.Load(new[] { cns }, cns, null, Air, null, "Bower");
             MBattleEngine engine = new MBattleEngine();
             engine.Add(MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0), data);
             engine.Add(MCharLoader.SpawnChar(data, 0, startStateNo: 0, startAnimNo: 0), data);
@@ -55,6 +79,128 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             Assert.That(engine.Chars[0].StateNo, Is.EqualTo(0), "Fight 后离开鞠躬回中立");
             Assert.That(engine.Chars[1].StateNo, Is.EqualTo(0));
             Assert.IsTrue(engine.Chars[0].Ctrl);
+        }
+
+        [Test]
+        public void IntroAssert_DelaysFightUntilIntroStateFinishes()
+        {
+            MBattleEngine engine = TwoCharEngine(LongIntroCns);
+            MRoundSystem round = new MRoundSystem(engine) { IntroTime = 1 };
+
+            round.Tick(NoInput);   // apply queued intro state
+            Assert.That(engine.Chars[0].StateNo, Is.EqualTo(191));
+            Assert.That(round.State, Is.EqualTo(MRoundState.Intro));
+
+            for (int f = 0; f < 4; f++)
+            {
+                round.Tick(NoInput);
+                Assert.That(round.State, Is.EqualTo(MRoundState.Intro), "AssertSpecial Intro should keep the round out of Fight");
+                Assert.IsFalse(engine.Chars[0].Ctrl);
+                Assert.IsFalse(engine.Chars[0].KeyCtrl);
+            }
+
+            for (int f = 0; f < 4 && round.State != MRoundState.Fight; f++)
+            {
+                round.Tick(NoInput);
+            }
+
+            Assert.That(round.State, Is.EqualTo(MRoundState.Fight));
+            Assert.That(engine.Chars[0].StateNo, Is.EqualTo(0));
+            Assert.IsTrue(engine.Chars[0].Ctrl);
+            Assert.IsTrue(engine.Chars[0].KeyCtrl);
+        }
+
+        [Test]
+        public void RoundStateTriggerIntroAssert_DelaysFightUntilIntroStateFinishes()
+        {
+            MBattleEngine engine = TwoCharEngine(RoundStateIntroCns);
+            MRoundSystem round = new MRoundSystem(engine) { IntroTime = 1 };
+
+            Assert.That(engine.Chars[0].RoundState, Is.EqualTo(1));
+            round.Tick(NoInput);
+            Assert.That(engine.Chars[0].StateNo, Is.EqualTo(191));
+            Assert.That(engine.Chars[0].RoundState, Is.EqualTo(1));
+
+            for (int f = 0; f < 4; f++)
+            {
+                round.Tick(NoInput);
+                Assert.That(round.State, Is.EqualTo(MRoundState.Intro), "roundstate=1 intro assert should hold the round out of Fight");
+                Assert.That(engine.Chars[0].RoundState, Is.EqualTo(1));
+                Assert.IsFalse(engine.Chars[0].Ctrl);
+                Assert.IsFalse(engine.Chars[0].KeyCtrl);
+            }
+
+            for (int f = 0; f < 4 && round.State != MRoundState.Fight; f++)
+            {
+                round.Tick(NoInput);
+            }
+
+            Assert.That(round.State, Is.EqualTo(MRoundState.Fight));
+            Assert.That(engine.Chars[0].RoundState, Is.EqualTo(2));
+            Assert.That(engine.Chars[0].StateNo, Is.EqualTo(0));
+            Assert.IsTrue(engine.Chars[0].Ctrl);
+            Assert.IsTrue(engine.Chars[0].KeyCtrl);
+        }
+
+        [Test]
+        public void PermanentCustomIntroAssert_IsCappedAndReturnsToNeutral()
+        {
+            MBattleEngine engine = TwoCharEngine(PermanentCustomIntroCns);
+            MRoundSystem round = new MRoundSystem(engine)
+            {
+                IntroTime = 1,
+                MaxAssertIntroHoldTime = 3,
+            };
+
+            bool sawCustomIntro = false;
+            for (int f = 0; f < 20 && round.State != MRoundState.Fight; f++)
+            {
+                round.Tick(NoInput);
+                sawCustomIntro |= engine.Chars[0].StateNo == 195;
+            }
+
+            Assert.IsTrue(sawCustomIntro, "test must exercise a custom intro state outside the default 190/191 candidates");
+            Assert.That(round.State, Is.EqualTo(MRoundState.Fight), "permanent AssertSpecial Intro must not lock the round forever");
+            Assert.That(engine.Chars[0].StateNo, Is.EqualTo(0));
+            Assert.IsTrue(engine.Chars[0].Ctrl);
+            Assert.IsTrue(engine.Chars[0].KeyCtrl);
+        }
+
+        [Test]
+        public void JanosVersusKfm_IntroAssertDoesNotKeepMatchAtSixtySeconds()
+        {
+            string janosDir = TestAssets.CharDir("Janos");
+            string kfmDir = TestAssets.KfmDir();
+            if (!Directory.Exists(janosDir) || !Directory.Exists(kfmDir))
+            {
+                Assert.Ignore("MugenSource Janos/kfm assets are not available.");
+            }
+
+            MCharData janos = MugenCharacterPackageTestLoader.Load(janosDir);
+            MCharData kfm = MugenCharacterPackageTestLoader.Load(kfmDir);
+            MTeamMatch match = new MTeamMatch(
+                new List<MCharData> { janos },
+                new List<MCharData> { kfm },
+                r =>
+                {
+                    r.IntroTime = 1;
+                    r.MaxAssertIntroHoldTime = 10;
+                });
+
+            for (int f = 0; f < 60 && match.Round.State != MRoundState.Fight; f++)
+            {
+                match.Tick(NoInput);
+            }
+
+            Assert.That(match.Round.State, Is.EqualTo(MRoundState.Fight));
+            for (int f = 0; f < 60; f++)
+            {
+                match.Tick(NoInput);
+            }
+
+            Assert.That(match.Round.TimerSeconds, Is.LessThan(60));
+            Assert.IsTrue(match.Engine.Chars[0].Ctrl);
+            Assert.IsTrue(match.Engine.Chars[1].Ctrl);
         }
 
         [Test]

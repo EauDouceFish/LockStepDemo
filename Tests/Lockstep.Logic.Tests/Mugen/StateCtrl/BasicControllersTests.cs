@@ -1,7 +1,14 @@
 using NUnit.Framework;
+using System.Collections.Generic;
+using System.IO;
 using Lockstep.Math;
+using Lockstep.Mugen.Anim;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Expr;
+using Lockstep.Mugen.Parse;
+using Lockstep.Mugen.State;
 using Lockstep.Mugen.StateCtrl;
 
 namespace Lockstep.Tests.Mugen
@@ -19,18 +26,20 @@ namespace Lockstep.Tests.Mugen
         {
             // VelSet 存原始值，不乘 facing（facing 在物理积分时应用）
             MChar c = new MChar { Facing = -FFloat.One };
-            new VelSetController { X = E("2.5"), Y = E("0 - 3") }.Run(c);
+            new VelSetController { X = E("2.5"), Y = E("0 - 3"), Z = E("4") }.Run(c);
             Assert.That(c.Vel.X.Raw, Is.EqualTo(F(5, 2).Raw), "vel.x=2.5 原值(不乘 facing)");
             Assert.That(c.Vel.Y.Raw, Is.EqualTo(FFloat.FromInt(-3).Raw));
+            Assert.That(c.Vel.Z.Raw, Is.EqualTo(FFloat.FromInt(4).Raw));
         }
 
         [Test]
         public void VelAdd_Accumulates()
         {
-            MChar c = new MChar { Vel = new FVector3(FFloat.FromInt(1), FFloat.FromInt(2), FFloat.Zero) };
-            new VelAddController { X = E("3"), Y = E("0 - 5") }.Run(c);
+            MChar c = new MChar { Vel = new FVector3(FFloat.FromInt(1), FFloat.FromInt(2), FFloat.FromInt(7)) };
+            new VelAddController { X = E("3"), Y = E("0 - 5"), Z = E("2") }.Run(c);
             Assert.That(c.Vel.X.Raw, Is.EqualTo(FFloat.FromInt(4).Raw));
             Assert.That(c.Vel.Y.Raw, Is.EqualTo(FFloat.FromInt(-3).Raw));
+            Assert.That(c.Vel.Z.Raw, Is.EqualTo(FFloat.FromInt(9).Raw));
         }
 
         [Test]
@@ -38,9 +47,10 @@ namespace Lockstep.Tests.Mugen
         {
             // PosSet 绝对坐标（对齐 Ikemen setPosX，不乘 facing）
             MChar c = new MChar { Facing = -FFloat.One, Pos = new FVector3(FFloat.FromInt(99), FFloat.Zero, FFloat.Zero) };
-            new PosSetController { X = E("10"), Y = E("20") }.Run(c);
+            new PosSetController { X = E("10"), Y = E("20"), Z = E("30") }.Run(c);
             Assert.That(c.Pos.X.Raw, Is.EqualTo(FFloat.FromInt(10).Raw), "facing=-1 也设绝对 10");
             Assert.That(c.Pos.Y.Raw, Is.EqualTo(FFloat.FromInt(20).Raw));
+            Assert.That(c.Pos.Z.Raw, Is.EqualTo(FFloat.FromInt(30).Raw));
         }
 
         [Test]
@@ -48,12 +58,14 @@ namespace Lockstep.Tests.Mugen
         {
             // PosAdd：pos.x += x*facing（对齐 Ikemen addX），pos.y += y（绝对）
             MChar right = new MChar { Facing = FFloat.One, Pos = new FVector3(FFloat.FromInt(100), FFloat.FromInt(50), FFloat.Zero) };
-            new PosAddController { X = E("5"), Y = E("3") }.Run(right);
+            new PosAddController { X = E("5"), Y = E("3"), Z = E("4") }.Run(right);
             Assert.That(right.Pos.X.Raw, Is.EqualTo(FFloat.FromInt(105).Raw), "朝右 +5");
             Assert.That(right.Pos.Y.Raw, Is.EqualTo(FFloat.FromInt(53).Raw));
+            Assert.That(right.Pos.Z.Raw, Is.EqualTo(FFloat.FromInt(4).Raw));
 
-            MChar left = new MChar { Facing = -FFloat.One, Pos = new FVector3(FFloat.FromInt(100), FFloat.Zero, FFloat.Zero) };
-            new PosAddController { X = E("5") }.Run(left);
+            MChar left = new MChar { Facing = -FFloat.One, Pos = new FVector3(FFloat.FromInt(100), FFloat.Zero, FFloat.FromInt(10)) };
+            new PosAddController { X = E("5"), Z = E("2") }.Run(left);
+            Assert.That(left.Pos.Z.Raw, Is.EqualTo(FFloat.FromInt(12).Raw));
             Assert.That(left.Pos.X.Raw, Is.EqualTo(FFloat.FromInt(95).Raw), "朝左 +5*(-1) → 后退到 95");
         }
 
@@ -79,6 +91,47 @@ namespace Lockstep.Tests.Mugen
             return table;
         }
 
+        static MAnimData TimedAnim(int no, params int[] times)
+        {
+            MAnimFrame[] frames = new MAnimFrame[times.Length];
+            for (int i = 0; i < times.Length; i++)
+            {
+                frames[i] = new MAnimFrame { SpriteGroup = no, SpriteImage = i, Time = times[i] };
+            }
+            MAnimData anim = new MAnimData { No = no, Frames = frames };
+            anim.ComputePacing();
+            return anim;
+        }
+
+        static Dictionary<int, MAnimData> TimedAnimTable(params MAnimData[] anims)
+        {
+            Dictionary<int, MAnimData> table = new Dictionary<int, MAnimData>();
+            for (int i = 0; i < anims.Length; i++)
+            {
+                table[anims[i].No] = anims[i];
+            }
+            return table;
+        }
+
+        static MBattleEngine LoadKfmEngine(out MChar p1)
+        {
+            string directory = TestAssets.KfmDir();
+            if (!Directory.Exists(directory))
+            {
+                Assert.Ignore("KFM test character is missing.");
+            }
+
+            MCharData data = MugenCharacterPackageTestLoader.Load(directory);
+            MBattleEngine engine = new MBattleEngine { EnableDemoAutoTurnFallback = false };
+            p1 = MCharLoader.SpawnChar(data, 1, startStateNo: 0, startAnimNo: 0);
+            MChar p2 = MCharLoader.SpawnChar(data, 2, startStateNo: 0, startAnimNo: 0);
+            engine.Add(p1, data);
+            engine.Add(p2, data);
+            engine.LinkPair();
+            engine.StartRound();
+            return engine;
+        }
+
         [Test]
         public void ChangeAnim_ToMissingAnim_IsNoOp_WhenTablePresent()
         {
@@ -94,6 +147,77 @@ namespace Lockstep.Tests.Mugen
             new ChangeAnimController { Value = E("44") }.Run(c);
             Assert.That(c.AnimNo, Is.EqualTo(44), "存在则正常切换");
             Assert.That(c.PrevAnimNo, Is.EqualTo(41));
+        }
+
+        [Test]
+        public void StateDefCtrl_ExplicitZeroAndOneOverrideCurrentControl()
+        {
+            MChar c = new MChar { Ctrl = true };
+
+            new MStateDef { Ctrl = E("0") }.RunInit(c);
+            Assert.That(c.Ctrl, Is.False, "statedef ctrl=0 must explicitly clear control.");
+
+            new MStateDef { Ctrl = E("1") }.RunInit(c);
+            Assert.That(c.Ctrl, Is.True, "statedef ctrl=1 must explicitly grant control.");
+        }
+
+        [Test]
+        public void ChangeState_DefaultCtrlAndAnimMinusOne_DoNotOverride()
+        {
+            string cns =
+                "[Statedef 0]\n" +
+                "[State 0, change]\n" +
+                "type = ChangeState\n" +
+                "trigger1 = 1\n" +
+                "value = 20\n" +
+                "[Statedef 20]\n" +
+                "type = S\n";
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+            MChar c = new MChar
+            {
+                StateNo = 0,
+                Ctrl = false,
+                AnimNo = 123,
+                AnimRunningNo = 123,
+            };
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(20));
+            Assert.That(c.Ctrl, Is.False, "missing ChangeState ctrl keeps the previous ctrl value.");
+            Assert.That(c.AnimNo, Is.EqualTo(123), "missing ChangeState anim defaults to -1 and keeps current animation.");
+        }
+
+        [Test]
+        public void ChangeState_CtrlAndAnimExpressions_EvaluateAtRunTime()
+        {
+            string cns =
+                "[Statedef 0]\n" +
+                "[State 0, change]\n" +
+                "type = ChangeState\n" +
+                "trigger1 = 1\n" +
+                "value = 20\n" +
+                "ctrl = var(0)\n" +
+                "anim = 200 + var(1)\n" +
+                "[Statedef 20]\n" +
+                "type = S\n";
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+            MChar c = new MChar
+            {
+                StateNo = 0,
+                Ctrl = true,
+                AnimNo = 0,
+                AnimTable = TimedAnimTable(TimedAnim(0, 1), TimedAnim(201, 3, 4)),
+            };
+            c.IntVars[0] = 0;
+            c.IntVars[1] = 1;
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(20));
+            Assert.That(c.Ctrl, Is.False, "ctrl expression var(0)=0 should clear control.");
+            Assert.That(c.AnimNo, Is.EqualTo(201));
+            Assert.That(c.AnimTime, Is.EqualTo(-7), "ChangeState anim expression should refresh derived AnimTime immediately.");
         }
 
         [Test]
@@ -176,6 +300,66 @@ namespace Lockstep.Tests.Mugen
             Assert.IsFalse(c.Ctrl);
             // statetype = A 经编译应为真
             Assert.IsTrue(C.Compile("statetype = A").Run(c).ToB());
+        }
+
+        [TestCase(400, MInput.X, true, TestName = "RealKfm_CrouchingLightPunch400_RecoversCtrlAndAnimTime")]
+        [TestCase(410, MInput.Y, false, TestName = "RealKfm_CrouchingStrongPunch410_RecoversCtrlAndAnimTime")]
+        public void RealKfm_CrouchingPunchRecovery_RestoresCtrlAndAnimTime(int stateNo, MInput button, bool expectsCtrlBeforeRecovery)
+        {
+            MBattleEngine engine = LoadKfmEngine(out MChar p1);
+
+            p1.QueueTransition(11, p1.PlayerNo);
+            engine.Tick(new[] { MInput.None, MInput.None });
+            Assert.That(p1.StateNo, Is.EqualTo(11), "precondition: KFM should be crouching.");
+            Assert.That(p1.Ctrl, Is.True, "precondition: crouch idle should be controllable.");
+
+            engine.Tick(new[] { MInput.Down | button, MInput.None });
+            Assert.That(p1.StateNo, Is.EqualTo(stateNo));
+            Assert.That(p1.Ctrl, Is.False, "crouching attack statedef starts with ctrl=0.");
+            Assert.That(p1.AnimNo, Is.EqualTo(stateNo));
+            Assert.That(p1.AnimTime, Is.LessThan(0));
+
+            int framesInMove = 1;
+            int firstCtrlTime = -1;
+            bool animTimeAdvanced = false;
+            int previousAnimTime = p1.AnimTime;
+            bool returnedToCrouch = false;
+            for (int i = 0; i < 80; i++)
+            {
+                engine.Tick(new[] { MInput.Down | button, MInput.None });
+                if (p1.StateNo == stateNo)
+                {
+                    framesInMove++;
+                    animTimeAdvanced |= p1.AnimTime != previousAnimTime;
+                    previousAnimTime = p1.AnimTime;
+                    if (firstCtrlTime < 0 && p1.Ctrl)
+                    {
+                        firstCtrlTime = p1.Time;
+                    }
+                    continue;
+                }
+
+                Assert.That(p1.StateNo, Is.EqualTo(11), "KFM crouching punch should recover to crouch state 11.");
+                returnedToCrouch = true;
+                break;
+            }
+
+            Assert.That(returnedToCrouch, Is.True, "KFM crouching punch should finish within the test window.");
+            Assert.That(framesInMove, Is.GreaterThan(3), "move should keep authored recovery frames.");
+            Assert.That(animTimeAdvanced, Is.True, "attack animation should progress before AnimTime=0 recovery.");
+            if (expectsCtrlBeforeRecovery)
+            {
+                Assert.That(firstCtrlTime, Is.GreaterThanOrEqualTo(6), "state 400 authored CtrlSet is at Time=6.");
+            }
+            else
+            {
+                Assert.That(firstCtrlTime, Is.EqualTo(-1), "state 410 relies on ChangeState ctrl=1 at recovery.");
+            }
+            Assert.That(p1.Ctrl, Is.True, "recovered crouch should be controllable.");
+            Assert.That(p1.AnimNo, Is.EqualTo(11), "state 11 statedef anim should restore crouch animation.");
+            Assert.That(p1.AnimRunningNo, Is.EqualTo(11));
+            Assert.That(p1.AnimElemNo, Is.EqualTo(1));
+            Assert.That(p1.AnimTime, Is.EqualTo(0), "KFM action 11 is a one-frame crouch anim, so refreshed AnimTime is 0.");
         }
 
         [Test]

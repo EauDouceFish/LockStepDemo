@@ -124,6 +124,15 @@ namespace Lockstep.Tests.Mugen
             Assert.IsFalse(Eval("movetype = I", attacking).ToB());
         }
 
+        [Test]
+        public void Physics_LetterCompare()
+        {
+            MChar noPhysics = new MChar { Physics = 16 };   // N
+            Assert.IsTrue(Eval("physics = N", noPhysics).ToB());
+            Assert.IsFalse(Eval("physics = S", noPhysics).ToB());
+            Assert.IsTrue(Eval("physics != S", noPhysics).ToB());
+        }
+
         // ───────── M2 补全：=[a,b] 区间语法 ─────────
 
         [Test]

@@ -13,11 +13,33 @@ namespace Lockstep.Mugen.Hit
     {
         public const int GetHitStateNo = 5000;   // MUGEN 默认受击状态号
 
+        static int CurrentStateOwnerPlayerNo(MChar character)
+        {
+            return character.StatePlayerNo >= 0 ? character.StatePlayerNo : character.PlayerNo;
+        }
+
+        static MChar CurrentStateOwner(MChar character, int ownerPlayerNo)
+        {
+            if (ownerPlayerNo == character.PlayerNo)
+            {
+                return character;
+            }
+            if (character.StateOwner != null && character.StateOwner.PlayerNo == ownerPlayerNo)
+            {
+                return character.StateOwner;
+            }
+            return null;
+        }
+
         /// <summary>尝试让 attacker 命中 defender；命中返回 true 并完成结算。</summary>
         public static bool TryHit(MChar attacker, MChar defender, bool deferDamage = false)
         {
             MHitDef hd = attacker.HitDef;
             if (hd == null || !hd.Active || attacker == defender)
+            {
+                return false;
+            }
+            if (!CanAttack(attacker) || !CanBeHit(defender))
             {
                 return false;
             }
@@ -96,6 +118,10 @@ namespace Lockstep.Mugen.Hit
             {
                 return false;
             }
+            if (!CanBeHit(defender))
+            {
+                return false;
+            }
             if (!HitFlagMatches(hd, defender.StateType))
             {
                 return false;
@@ -143,6 +169,16 @@ namespace Lockstep.Mugen.Hit
             return true;
         }
 
+        static bool CanAttack(MChar attacker)
+        {
+            return attacker != null && !attacker.PauseBool && attacker.Acttmp >= 0;
+        }
+
+        static bool CanBeHit(MChar defender)
+        {
+            return defender != null && defender.UnhittableTime <= 0;
+        }
+
         static bool GuardFlagAllows(MHitDef hd, int defenderStateType)
         {
             switch (defenderStateType)
@@ -172,24 +208,41 @@ namespace Lockstep.Mugen.Hit
             defender.Vel = new FVector3(hd.GuardVelX, FFloat.Zero, FFloat.Zero);
 
             attacker.Hitstop = hd.P1PauseTime;
-            defender.Hitstop = hd.P2PauseTime;
+            defender.Hitstop = 0;
 
             MGetHitVar ghv = defender.Ghv;
             ghv.Damage = dealt;
-            ghv.HitTime = hd.GuardHitTime;
+            ghv.HitTime = hd.GuardHitTime < 0 ? 0 : hd.GuardHitTime;
             ghv.CtrlTime = hd.GuardCtrlTime;
-            ghv.HitShakeTime = hd.P2PauseTime;
+            ghv.GuardCtrlTimeLeft = hd.GuardCtrlTime < 0 ? 0 : hd.GuardCtrlTime;
+            ghv.HitShakeTime = hd.P2PauseTime < 0 ? 0 : hd.P2PauseTime;
             ghv.Guarded = true;
             ghv.Fall = false;
+            defender.MoveType = 2;
+            defender.Ctrl = false;
+            defender.StateOwner = null;
+            defender.QueueTransition(ResolveGuardState(defender), defender.PlayerNo, ctrl: 0);
 
             attacker.MoveContact = 1;
             attacker.MoveGuarded = 1;
             attacker.MoveHit = 0;
+            attacker.MoveReversed = 0;
+            attacker.MoveContactTime = 1;
             attacker.GuardCount += hd.NumHits;   // char.go:12191（被防按 numhits 计）
             attacker.AddTarget(defender, hd.Id);
             if (hd.HitOnce > 0)
             {
                 hd.Active = false;   // hitonce 在被防（接触）时同样停用（char.go:12171 hitdefContact）
+            }
+        }
+
+        static int ResolveGuardState(MChar defender)
+        {
+            switch (defender.StateType)
+            {
+                case 2: return 152;
+                case 4: return 154;
+                default: return 150;
             }
         }
 
@@ -313,7 +366,7 @@ namespace Lockstep.Mugen.Hit
             ghv.AirAnimType = (int)hd.AirAnimType;
             ghv.FallAnimType = (int)hd.FallAnimType;
             ghv.YAccel = hd.YAccel;
-            ghv.FallXVel = hd.FallXVel;
+            ghv.FallXVel = hd.FallXVelSet ? hd.FallXVel : vx;
             ghv.FallYVel = hd.FallYVel;
             // 倒地贴地命中且 down.bounce=0 且有 Y 速度 → 落地不反弹（fall.yvel 归零，char.go:10867-10870）。
             if (downedOnGround && !hd.DownBounce && vy != FFloat.Zero)
@@ -339,8 +392,11 @@ namespace Lockstep.Mugen.Hit
             // 自定义状态（投技）：p2stateno 且 p2getp1state → 守方跑攻方状态表（StateOwner=attacker）；否则用自身状态表。
             if (hd.P2StateNo >= 0 && hd.P2GetP1State)
             {
-                defender.StateOwner = attacker;
-                defender.QueueTransition(getHitState, attacker.StatePlayerNo);
+                int ownerPlayerNo = CurrentStateOwnerPlayerNo(attacker);
+                defender.StateOwner = ownerPlayerNo == defender.PlayerNo
+                    ? null
+                    : CurrentStateOwner(attacker, ownerPlayerNo);
+                defender.QueueTransition(getHitState, ownerPlayerNo);
             }
             else
             {
@@ -358,6 +414,9 @@ namespace Lockstep.Mugen.Hit
             // 攻方命中统计 + 目标登记 + 可选切状态
             attacker.MoveContact = 1;
             attacker.MoveHit = 1;
+            attacker.MoveGuarded = 0;
+            attacker.MoveReversed = 0;
+            attacker.MoveContactTime = 1;
             attacker.HitCount += hd.NumHits;   // char.go:12189（按 numhits 计，非 +1）
             attacker.UniqHitCount++;
             attacker.AddTarget(defender, hd.Id);

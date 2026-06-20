@@ -13,6 +13,7 @@ namespace Lockstep.Mugen.Expr
     public interface IExprContext
     {
         /// <summary>读取一个 trigger/redirect opcode 的值；不支持则返回 Undefined。stack 供需要弹参的 opcode 使用。</summary>
+        // Project-specific: adapter surface for Ikemen src/bytecode.go trigger opcode reads against this engine's character context.
         BytecodeValue ReadTrigger(OpCode op, byte[] code, ref int i, List<BytecodeValue> stack);
 
         /// <summary>
@@ -20,6 +21,7 @@ namespace Lockstep.Mugen.Expr
         /// 不存在/不支持则返回 null（VM 会压 Undefined 并跳过整个重定向块，对齐 Ikemen）。
         /// 需要参数的 redirect（target/helper/enemy 等）从 <paramref name="stack"/> 弹取。
         /// </summary>
+        // Project-specific: adapter surface for Ikemen src/bytecode.go redirect opcodes against this engine's entity context.
         IExprContext Redirect(OpCode op, List<BytecodeValue> stack);
     }
 
@@ -29,6 +31,7 @@ namespace Lockstep.Mugen.Expr
     /// </summary>
     public interface IExprVariableContext
     {
+        // Project-specific: variable storage adapter for Ikemen var/fvar/sysvar/sysfvar opcode reads.
         BytecodeValue ReadVariable(OpCode op, int index);
     }
 
@@ -38,6 +41,7 @@ namespace Lockstep.Mugen.Expr
     /// </summary>
     public interface IExprTwoArgumentRedirectContext
     {
+        // Project-specific: adapter for Ikemen helper/target redirects that need id plus match index.
         IExprContext Redirect(OpCode op, BytecodeValue firstArgument, BytecodeValue secondArgument);
     }
 
@@ -46,6 +50,7 @@ namespace Lockstep.Mugen.Expr
     {
         readonly byte[] _code;
 
+        // Ikemen reference: src/bytecode.go BytecodeExp stores compiled expression bytecode.
         public BytecodeExp(byte[] code)
         {
             _code = code;
@@ -54,6 +59,7 @@ namespace Lockstep.Mugen.Expr
         public byte[] Code => _code;
 
         /// <summary>求值，返回栈顶（空栈返回 Undefined）。context 可为 null（trigger 类压 Undefined）。</summary>
+        // Ikemen reference: src/bytecode.go BytecodeExp.run stack interpreter and opcode dispatch.
         public BytecodeValue Run(IExprContext context)
         {
             List<BytecodeValue> stack = new List<BytecodeValue>(16);
@@ -235,6 +241,7 @@ namespace Lockstep.Mugen.Expr
         delegate BytecodeValue BinOp(BytecodeValue a, BytecodeValue b);
         delegate BytecodeValue UnOp(BytecodeValue a);
 
+        // Ikemen reference: src/bytecode.go BytecodeExp.run binary opcode stack pop/evaluate/push behavior.
         static void Binary(List<BytecodeValue> stack, BinOp op)
         {
             BytecodeValue b = Pop(stack);
@@ -242,11 +249,13 @@ namespace Lockstep.Mugen.Expr
             stack.Add(op(a, b));
         }
 
+        // Ikemen reference: src/bytecode.go BytecodeExp.run unary opcode stack pop/evaluate/push behavior.
         static void Unary(List<BytecodeValue> stack, UnOp op)
         {
             stack.Add(op(Pop(stack)));
         }
 
+        // Ikemen reference: src/bytecode.go BytecodeExp.run range opcode stack operand order.
         static void RangeOp(List<BytecodeValue> stack, bool incMin, bool incMax)
         {
             BytecodeValue max = Pop(stack);
@@ -255,6 +264,7 @@ namespace Lockstep.Mugen.Expr
             stack.Add(BytecodeOps.Range(v, min, max, incMin, incMax));
         }
 
+        // Project-specific: tolerant C# stack pop returns Undefined instead of Ikemen's panic on invalid bytecode.
         static BytecodeValue Pop(List<BytecodeValue> stack)
         {
             if (stack.Count == 0)
@@ -266,11 +276,13 @@ namespace Lockstep.Mugen.Expr
             return v;
         }
 
+        // Project-specific: tolerant C# stack peek returns Undefined instead of Ikemen's panic on invalid bytecode.
         static BytecodeValue Peek(List<BytecodeValue> stack)
         {
             return stack.Count > 0 ? stack[stack.Count - 1] : BytecodeValue.Undefined();
         }
 
+        // Ikemen reference: src/bytecode.go BytecodeExp.run OC_swap stack behavior.
         static void Swap(List<BytecodeValue> stack)
         {
             if (stack.Count < 2)
@@ -284,6 +296,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // i 指向 8-bit offset 字节：offset==0 跳到末尾，否则返回 i + offset + 1（下一 opcode 索引）。
+        // Ikemen reference: src/bytecode.go BytecodeExp.run 8-bit jump offset decoding.
         int Jump8(int i)
         {
             byte off = _code[i];
@@ -291,18 +304,21 @@ namespace Lockstep.Mugen.Expr
         }
 
         // i 指向 4 字节小端长度 len：返回 i + len + 4（下一 opcode 索引）。
+        // Ikemen reference: src/bytecode.go BytecodeExp.run 32-bit jump/subexpression length decoding.
         int Jump32(int i)
         {
             return i + Peek32(i) + 4;
         }
 
         // 读 i 处 4 字节小端长度（对应 Ikemen PeekLength）。
+        // Ikemen reference: src/bytecode.go BytecodeExp.PeekLength little-endian length decoding.
         int Peek32(int i)
         {
             return _code[i] | (_code[i + 1] << 8) | (_code[i + 2] << 16) | (_code[i + 3] << 24);
         }
 
         // 截取子字节码 [start, start+len)。
+        // Ikemen reference: src/bytecode.go BytecodeExp.run subexpression bytecode extraction for OC_run/OC_nordrun.
         byte[] Slice(int start, int len)
         {
             byte[] sub = new byte[len];
@@ -310,6 +326,7 @@ namespace Lockstep.Mugen.Expr
             return sub;
         }
 
+        // Ikemen reference: src/bytecode.go BytecodeExp.run integer literal operand decoding.
         int ReadInt32(ref int i)
         {
             int v = _code[i] | (_code[i + 1] << 8) | (_code[i + 2] << 16) | (_code[i + 3] << 24);
@@ -317,6 +334,7 @@ namespace Lockstep.Mugen.Expr
             return v;
         }
 
+        // Project-specific: deterministic fixed-point/int64 operand decoding replacing Ikemen float32 literal payloads.
         long ReadInt64(ref int i)
         {
             long v = 0;

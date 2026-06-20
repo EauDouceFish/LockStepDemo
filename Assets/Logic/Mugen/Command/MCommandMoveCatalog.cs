@@ -15,6 +15,7 @@ namespace Lockstep.Mugen.Command
 
     public static class MCommandMoveCatalog
     {
+        // Project-specific: joins parsed CMD commands with C# transition entries for move probes; Ikemen evaluates triggers at runtime.
         public static List<MCommandMoveInfo> Build(
             IReadOnlyList<MCommandDef> commands,
             IReadOnlyList<MCommandTransitionEntry> transitions)
@@ -54,6 +55,7 @@ namespace Lockstep.Mugen.Command
             return result;
         }
 
+        // Project-specific: helper resolves a command name in the parsed C# command list; Ikemen stores commands on the player.
         static MCommandDef First(IReadOnlyList<MCommandDef> commands, string name)
         {
             for (int i = 0; i < commands.Count; i++)

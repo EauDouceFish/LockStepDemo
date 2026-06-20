@@ -1,5 +1,5 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/input.go Command.ReadCommandSymbols/Command.Step.
+// Source: src/input.go ReadCommand/Command.Step.
 using System;
 using System.Collections.Generic;
 using Lockstep.Core;
@@ -12,6 +12,7 @@ namespace Lockstep.Mugen.Command
     /// </summary>
     public static class MCommandMatcher
     {
+        // Ikemen reference: src/input.go ReadCommand/Command.Step compatibility matching over buffered command history.
         public static bool Matches(MCommandDef cmd, MCommandBuffer buf, bool facingRight)
         {
             if (cmd == null || cmd.Steps.Count == 0 || buf == null || buf.Count == 0)
@@ -62,6 +63,7 @@ namespace Lockstep.Mugen.Command
         int _currentTime;
         int _bufferTime;
 
+        // Ikemen reference: src/input.go Command.Step initializes per-step completion and timing state for one command.
         internal MCommandRuntime(MCommandDef definition)
         {
             _definition = definition;
@@ -70,6 +72,7 @@ namespace Lockstep.Mugen.Command
             _loopOrder = BuildLoopOrder(definition.Steps);
         }
 
+        // Project-specific: rollback clone constructor for C# Command.Step runtime state.
         MCommandRuntime(MCommandRuntime source)
         {
             _definition = source._definition;
@@ -82,8 +85,10 @@ namespace Lockstep.Mugen.Command
 
         internal MCommandDef Definition => _definition;
         internal bool Active => _bufferTime > 0;
+        // Project-specific: rollback clone duplicates Ikemen-style Command.Step progress and buffer timing.
         internal MCommandRuntime Clone() => new MCommandRuntime(this);
 
+        // Ikemen reference: src/input.go Command.Step checks command steps, time windows, greater constraints, and buffer.time.
         internal bool Step(MInputBuffer input)
         {
             if (_bufferTime > 0)
@@ -170,6 +175,7 @@ namespace Lockstep.Mugen.Command
             return complete;
         }
 
+        // Ikemen reference: src/input.go Command.Clear clears partial command step progress without changing definitions.
         internal void ClearProgress()
         {
             _currentTime = 0;
@@ -177,12 +183,14 @@ namespace Lockstep.Mugen.Command
             Array.Clear(_stepTimers, 0, _stepTimers.Length);
         }
 
+        // Ikemen reference: src/input.go CommandList.BufReset clears command progress and active buffer time.
         internal void Reset()
         {
             ClearProgress();
             _bufferTime = 0;
         }
 
+        // Project-specific: rollback determinism hash over C# Command.Step runtime fields.
         internal void WriteHash(ref Hash64 hash)
         {
             hash.AddInt32(_currentTime);
@@ -195,6 +203,7 @@ namespace Lockstep.Mugen.Command
             }
         }
 
+        // Ikemen reference: src/input.go Command.Step per-step AND/OR key matching against CommandBuffer state.
         static bool StepMatches(MCommandStep step, MInputBuffer input)
         {
             if (step.Keys.Count == 0)
@@ -216,6 +225,7 @@ namespace Lockstep.Mugen.Command
             return true;
         }
 
+        // Ikemen reference: src/input.go Command.Step reads key state and charge time from CommandBuffer counters.
         static bool KeyMatches(MCommandKey key, MInputBuffer input)
         {
             int state = input.State(key);
@@ -223,6 +233,7 @@ namespace Lockstep.Mugen.Command
             return matched && (key.ChargeTime <= 1 || input.StateCharge(key) >= key.ChargeTime);
         }
 
+        // Ikemen reference: src/input.go Command.Step handles '>' by rejecting unrelated key changes between command steps.
         static bool GreaterCheckFail(MCommandStep step, MInputBuffer input)
         {
             bool usePhysical = false;
@@ -249,6 +260,7 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        // Ikemen reference: src/input.go Command.Step greater-check helper for changed keys not listed in the current step.
         static bool ChangedKeyNotAllowed(MCommandKey key, MCommandStep step, MInputBuffer input)
         {
             MCommandKey press = key;
@@ -266,6 +278,7 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        // Ikemen reference: src/input.go cmdElem key comparison used while enforcing greater-step constraints.
         static bool Contains(MCommandStep step, MCommandKey key, bool release)
         {
             for (int i = 0; i < step.Keys.Count; i++)
@@ -275,6 +288,7 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        // Ikemen reference: src/input.go Command.Step iteration order allows direction-to-button chains to complete in one frame.
         static int[] BuildLoopOrder(List<MCommandStep> steps)
         {
             List<int> order = new List<int>(steps.Count);
@@ -296,6 +310,7 @@ namespace Lockstep.Mugen.Command
             return order.ToArray();
         }
 
+        // Ikemen reference: src/input.go Command.Step identifies direction/release steps followed by button press steps.
         static bool IsDirToButton(MCommandStep current, MCommandStep next)
         {
             for (int i = 0; i < next.Keys.Count; i++) if (next.Keys[i].Hold) return false;
@@ -322,21 +337,27 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        // Ikemen reference: src/input.go CommandKey equality by direction/button identity, ignoring transient match modifiers.
         static bool SameKey(MCommandKey a, MCommandKey b)
         {
             return a.Bits == b.Bits && a.IsBack == b.IsBack && a.IsFwd == b.IsFwd &&
                    a.IsButton == b.IsButton && a.IsNeutral == b.IsNeutral;
         }
 
+        // Ikemen reference: src/input.go CommandKey direction key construction for greater-check scan lists.
         static MCommandKey Dir(MInput bits) => new MCommandKey { Bits = bits };
+        // Ikemen reference: src/input.go CommandKey relative-back direction key construction.
         static MCommandKey Back() => new MCommandKey { IsBack = true };
+        // Ikemen reference: src/input.go CommandKey relative-forward direction key construction.
         static MCommandKey Forward() => new MCommandKey { IsFwd = true };
+        // Ikemen reference: src/input.go CommandKey diagonal relative direction key construction.
         static MCommandKey Diagonal(MInput vertical, bool back) => new MCommandKey
         {
             Bits = vertical,
             IsBack = back,
             IsFwd = !back,
         };
+        // Ikemen reference: src/input.go CommandKey button key construction for greater-check scan lists.
         static MCommandKey Button(MInput bit) => new MCommandKey { Bits = bit, IsButton = true };
     }
 }

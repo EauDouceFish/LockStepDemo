@@ -1,0 +1,1178 @@
+================================================================================
+LockstepActDemo 项目全景进度与 IKEMEN-GO 对标分析报告
+报告口径：Tencent 转正述职 / 项目复盘标准
+审计日期：2026-06-11
+项目目录：D:\Desktop\demo\LockstepActDemo
+目标引擎：IKEMEN-GO
+================================================================================
+
+一、执行摘要
+================================================================================
+
+1. 项目定位
+
+本项目是一个基于 Unity 2022.3.55f1、C#、Fix64 定点数的 MUGEN 兼容格斗引擎研究项目。
+核心目标不是简单制作一款格斗 Demo，而是验证并实现以下技术闭环：
+
+（1）直接读取 MUGEN 角色资源：DEF、CNS、CMD、AIR、SFF、SND。
+（2）复刻 IKEMEN-GO 的状态机、表达式、控制器、命中、实体和回合语义。
+（3）将 IKEMEN 的浮点运行模型改造成定点确定性模拟。
+（4）在确定性模拟之上实现帧同步、状态哈希、快照和最终回滚网络。
+（5）通过 Unity 完成资源展示、1v1、选人、车轮战、AI 和联机客户端。
+
+2. 当前结论
+
+截至 2026-06-11，项目已经完成“可运行的 MUGEN 格斗引擎研究原型”，而不是只有架构或
+静态解析器。核心战斗主循环、角色加载、命令识别、状态机、动画、碰撞、命中、受击、
+Helper、Projectile、Explod、投技自定义状态、Pause/SuperPause、回合、1v1、简单车轮战、
+简单 AI、延迟锁步和 KCP 输入中继均已有代码。
+
+但项目目前不能对外宣称“完整复刻 IKEMEN”或“任意 MUGEN 角色导入即用”，也不能宣称
+“回滚网络已完成”。最关键的缺口是：
+
+（1）IKEMEN headless Oracle 尚未真正跑通，缺少同场景逐帧差分证据。
+（2）网络仍是收齐输入才推进的 delay lockstep，未接入预测、回滚和重模拟。
+（3）调色板、PalFX、AfterImage、阴影、镜像、音效、相机、完整舞台和 motif 等表现不完整。
+（4）复杂 StateBlock、长尾 Trigger/Controller、完整 HitDef/GetHitVar 语义仍未全量覆盖。
+（5）联机没有房间握手、选人同步、内容指纹、配置同步、断线恢复和服务端生产治理。
+（6）当前有 50 个工作区变更项，其中 19 个未跟踪 C# 文件、约 2508 行代码尚未提交。
+
+3. 量化基线
+
+仓库提交基线：
+- Git 基线起点：2026-06-02。
+- 当前 HEAD：59af4a4，提交时间 2026-06-09。
+- 基线后提交数：147。
+- 当前工作区：50 个修改或未跟踪项。
+
+代码与测试：
+- 产品 C#：196 个文件，约 27213 行。
+- 测试 C#：112 个文件，约 14805 行。
+- NUnit 测试：2026-06-11 实跑 751/751 通过，0 失败，0 跳过。
+- 测试耗时：约 79 秒。
+- 当前识别到约 90 个 StateController 类。
+- 2026-06-08 自动函数审计口径：C# 战斗函数 627，IKEMEN 参考函数 1435。
+  该数字只能表示规模差，不代表功能覆盖率。
+
+IKEMEN 参考基线：
+- 本地 Oracle 仓库：ikemen-engine/Ikemen-GO develop。
+- 本地锚点：64ec28498210cd8ccb583ab6db53692c0f44685b。
+- 锚点时间：2026-05-30。
+- IKEMEN Go 源码：51 个 Go 文件，约 120535 行。
+- 核心文件规模：bytecode.go 15191 行、char.go 13925 行、compiler.go 8329 行、
+  compiler_functions.go 7025 行、system.go 5735 行。
+
+4. 完成度判断
+
+以下百分比是基于代码、测试、文档和可玩链路的审计估算，不是 IKEMEN 官方认证：
+
+- 技术研究原型完成度：约 70%。
+- 核心 1v1 战斗逻辑完成度：约 70% 至 80%。
+- 常规 MUGEN 角色兼容度：约 50% 至 65%，角色复杂度越高风险越大。
+- Unity 可玩客户端完成度：约 60%。
+- 延迟锁步网络原型完成度：约 55%。
+- 真正回滚网络完成度：约 20% 至 30%。
+- IKEMEN 全引擎等价完成度：约 35% 至 45%。
+- 商业上线成熟度：约 20%。
+
+最准确的项目表述应是：
+“已完成定点确定性 MUGEN 格斗内核和可玩客户端的主体原型，正在从功能可用阶段进入
+IKEMEN 差分对齐、回滚网络闭环和工程化阶段。”
+
+
+二、项目背景、目标与价值
+================================================================================
+
+1. 背景与挑战
+
+格斗游戏网络对输入延迟、逐帧一致性、碰撞顺序和状态恢复极度敏感。MUGEN/IKEMEN 角色又
+不是简单动画资源，而是一套包含表达式、状态定义、状态控制器、命令输入、受击语义和动态
+实体的可编程内容系统。项目同时面对四类复杂度：
+
+（1）兼容复杂度：需要理解并复刻 MUGEN/IKEMEN 的隐式语义和历史兼容行为。
+（2）确定性复杂度：Unity 和普通浮点不能直接保证跨机器逐位一致。
+（3）网络复杂度：格斗游戏需要延迟锁步或预测回滚，状态必须可快照、恢复和重模拟。
+（4）内容复杂度：不同角色的 localcoord、palette、common1、控制器和脚本习惯差异很大。
+
+2. 项目技术价值
+
+项目已经形成以下可复用资产：
+
+- 纯 C#、无 Unity 依赖的逻辑程序集。
+- Fix64 定点数学和确定性随机源。
+- MUGEN 表达式编译器与字节码虚拟机。
+- 数据驱动状态机和控制器体系。
+- MUGEN 资源读取链路。
+- 可 Clone、可 Hash 的战斗运行态。
+- 快照与恢复能力。
+- 逐帧 Trace 和差分比较数据结构。
+- Unity 表现层与逻辑层解耦。
+- Loopback、KCP、服务器权威输入广播和 MUGEN 输入中继等多种网络实验链路。
+
+3. 项目亮点
+
+（1）没有为了快速出 Demo 而把战斗逻辑写死在 MonoBehaviour 中。
+（2）逻辑层 asmdef 设置 noEngineReferences，绝大多数战斗代码可脱离 Unity 运行。
+（3）角色行为由 CNS/CMD/AIR 数据驱动，方向与 IKEMEN 一致。
+（4）定点数、确定性随机、Clone、WriteHash、Snapshot/Restore 为回滚预留了正确基础。
+（5）测试规模已达到 751 项，覆盖表达式、解析、状态机、命中、实体、回合、团队战和网络。
+（6）已经从单角色展示推进到 1v1、选人、3v3 turns、AI 和 KCP 联机原型。
+
+
+三、项目阶段进度与关键产出
+================================================================================
+
+1. 阶段一：帧同步和 ECS 基础
+
+已完成：
+- World、Entity、IComponent、ISystem。
+- WorldSnapshot、Snapshot、Restore、ComputeHash。
+- FrameInput、IInputProvider、ITransport、IPredictor。
+- Loopback 传输。
+- KCP 客户端和服务端传输。
+- LockstepClient、LockstepServer、Room。
+- DesyncDetector。
+
+说明：
+这是早期 clean-room 引擎的基础。它仍在仓库中，并被旧 BattleGameLogic 使用。该链路是 30Hz、
+服务器按帧广播权威输入、缺帧沿用上次输入的传统延迟同步模型。
+
+2. 阶段二：MUGEN 资源导入
+
+已完成或基本完成：
+- DEF 文件段和资源路径读取。
+- CNS/状态文件解析。
+- CMD 指令解析。
+- AIR 动画和 Clsn1/Clsn2 解析。
+- SFF v1 读取。
+- SFF v2 读取，包含 LZ5、RLE8、RLE5、raw 等解码路径。
+- PCX、PNG 解码。
+- ACT 调色板读取器。
+- SND 文件读取器。
+- Unity Sprite 构建与动画需要的按需加载。
+
+当前不足：
+- ACT 读取器存在，但完整 palette 选择、换色和 Unity 渲染链路未闭环。
+- SND 可读不等于可播，PlaySnd/StopSnd/SndPan 的正式音频系统未完成。
+- localcoord 对位置、速度、Clsn、宽度、相机和显示比例的全链路缩放仍需 Oracle 校准。
+- 舞台 DEF/BG/SFF、背景层、视差、缩放和镜头系统未形成完整加载管线。
+
+3. 阶段三：IKEMEN 风格表达式与状态机
+
+已完成：
+- BytecodeValue。
+- BytecodeExp 栈式解释器。
+- 算术、比较、逻辑、范围、短路跳转。
+- var/fvar/sysvar 读取。
+- 常用 trigger。
+- p2、root、parent、target、helper、partner 等 redirect 主干。
+- command、const、gethitvar、stagevar 等部分表达式。
+- Statedef 头部应用。
+- triggerall 和 trigger1..N 分组逻辑。
+- persistent 和 ignorehitpause。
+- -3、-2、-1 负状态执行。
+- ChangeState、SelfState、common state fallback。
+- 自定义状态的 StatePlayerNo/AnimPlayerNo/SpritePlayerNo 资源归属。
+
+当前不足：
+- 没有完整复刻 IKEMEN 的 StateBlock 树。
+- 嵌套 if/else、loop/for、块级 persistent 等结构语义不完整。
+- -4 和 IKEMEN 扩展状态语义未完整对齐。
+- Trigger 长尾、版本分支、历史兼容 bug 行为没有系统化覆盖。
+- 当前 parser 对不支持项存在退化为 NullController 或参数捕获的情况，需要严格兼容报告阻断。
+
+4. 阶段四：命令、动画、物理和命中
+
+已完成：
+- MInput 位输入。
+- 环形输入缓冲。
+- CMD 中方向、按钮、蓄力、释放、严格匹配、组合键、朝向相对转换。
+- 动画播放、指定 elem/elemtime、循环、零时长帧、AnimTime/AnimElem 派生。
+- 站立、蹲、空中基础物理，摩擦、重力、落地检测。
+- Clsn1 对 Clsn2 碰撞。
+- HitDef 关键字段。
+- 伤害、攻防倍率、guard、hitpause、击退、fall、down、numhits、hitonce。
+- 受击 5000 系主干。
+- 两阶段伤害累计，避免遍历顺序直接改变扣血结果。
+- juggle 主干。
+- ReversalDef、HitOverride 的部分运行路径。
+- target 列表和 TargetState/TargetLifeAdd/TargetVelSet 等控制器。
+
+当前不足：
+- 完整 HitDef 约 130 字段仍未逐字段 Oracle 验证。
+- cornerpush、guard distance、priority、chain、fall.recover、kill 细分、属性匹配等仍有边角风险。
+- GetHitVar 长尾字段和不同 MUGEN/IKEMEN 版本分支未全。
+- 倒地 5080 -> 5100 -> 5110 -> 5120 起身链需要标准 common1 和真实角色逐帧验证。
+- 物理尚未覆盖 IKEMEN 的完整屏幕边界、camera、push、stage、localcoord 和团队行为。
+
+5. 阶段五：动态实体与表现事件
+
+已完成：
+- Helper 请求队列、确定性 ID、Parent/Root/P2 关系。
+- Helper 自己运行状态机、物理、动画和命中。
+- Projectile 生成、运动、加速度、攻击框、命中和生命周期。
+- Explod 最小逻辑实体、修改、移除和 numexplod。
+- BindToParent、BindToRoot、BindToTarget、TargetBind。
+- ChangeAnim2。
+- p2getp1state 投技自定义状态。
+- PalFX、AfterImage、EnvShake、MakeDust、GameMakeAnim、PlaySnd 等确定性事件记录或参数捕获。
+
+当前不足：
+- 事件记录不等于 IKEMEN 视觉/声音等价。
+- Helper/Projectile/Explod 的全部销毁条件、暂停行为、绑定、层级、透明度和优先级未全。
+- Shadow、Reflection、AfterImage、PalFX shader、trans、remappal、ownpal 等表现不完整。
+- 同屏实体数量、对象池、GC 和渲染性能尚未系统压测。
+
+6. 阶段六：回合、1v1、团队战和 AI
+
+已完成：
+- MRoundSystem。
+- 以 Ikemen sys.intro 有符号计数器驱动 Intro、Fight、PreOver、Over。
+- 回合计时、KO、Double KO、Time Over、血量百分比比较。
+- Winner、FinishType、WinType、RoundsWon、几胜制。
+- 170/175/180 等输、平、胜姿态候选。
+- roundNoDamage 基础窗口。
+- MStage 最小左右边界。
+- MTeamMatch 简单 turns 模式。
+- 每队 3 人、败方换人、胜方留场、整队淘汰。
+- MSimpleAI 确定性简单 AI。
+
+当前不足：
+- IKEMEN 的 Simul、Tag、Ratio、完整 Turns 规则未实现。
+- 团队血量继承、回合回复、顺序、队友关系和 partner 语义是简化版。
+- AI 只是基于距离和状态的简单决策，不是 IKEMEN AILevel 和角色 AI 行为等价。
+- motif、胜利画面、continue、storyboard、排名和完整模式流程未实现。
+
+7. 阶段七：Unity 客户端
+
+已有场景：
+- SampleScene.unity。
+- MugenLive_kfm.unity。
+- MugenVersus_kfm.unity。
+- MugenCharacterMuseum.unity。
+- MugenGallery.unity。
+- MugenShowcase_kfm.unity。
+- MugenShowcase_Terrarian.unity。
+- MugenTeamSelect.unity。
+- MugenRelayServer.unity。
+
+已有客户端功能：
+- 单角色 Live。
+- 角色动作 Showcase。
+- 多角色 Museum/Gallery。
+- 1v1 对战。
+- 程序化 HUD。
+- 角色选择界面。
+- 3v3 车轮战。
+- 本地双人。
+- vs AI。
+- 联机模式入口。
+- 运行时 SFF 精灵加载。
+- 调试面板和逻辑调试桥。
+
+当前不足：
+- UI 大量为程序化占位，不是完整 motif/lifebar/select 系统。
+- 相机仅有基础尺寸和跟随，缺 IKEMEN 舞台相机语义。
+- 特效、音频、Shader、阴影、镜像和层级渲染不完整。
+- 缺少 Unity 自动化 PlayMode 测试、截图金图和多分辨率验证。
+- 未看到正式构建流水线、版本号、安装包、崩溃上报、性能指标和兼容矩阵。
+
+8. 阶段八：网络与服务器
+
+旧 ECS 网络链路：
+- Bootstrap 支持 Loopback、HostAndPlay、ClientConnect。
+- LockstepClient 以 30Hz 推进 World。
+- 客户端发送 frame + InputLag 的输入。
+- LockstepServer/Room 以 33ms tick 广播 FrameAuth。
+- 缺帧时服务端沿用玩家 LastInput。
+- NullPredictor 实际只在 FrameInputBuffer 有数据时推进，没有预测回滚。
+
+新 MUGEN 网络链路：
+- MugenLockstepSession 默认 InputLag=2。
+- 每端采样本地 MInput。
+- 输入按 frame/player 广播。
+- 收齐同一帧所有玩家输入后才调用 Round.Tick 或 TeamMatch.Tick。
+- 256 帧环形缓冲。
+- 每帧可计算 Engine.ComputeHash。
+- LoopbackNetBus 用于测试。
+- TransportNetChannel 将 MInput 包装为 MugenInputMsg。
+- MugenRelayServer 使用 KCP 收包并转发给其他连接。
+
+准确结论：
+新链路是 delay lockstep，不是 rollback。它在网络抖动或丢包时会停等；InputLag 只是固定输入延迟，
+没有远端输入预测，也没有发现预测错误后的 Snapshot、Restore、Replay。
+
+服务器现状：
+- MugenRelayServer 只做输入广播，不跑战斗模拟。
+- 没有正式房间、匹配、选人同步、内容校验和比赛状态。
+- 没有鉴权、限流、防作弊、超时、重连、观战和日志审计。
+- 当前联机要求两端手工使用相同 roster。
+- host=P0、client=P1 由本地配置约定，不是服务器握手分配。
+
+
+四、当前总体架构
+================================================================================
+
+1. 分层结构
+
+第一层：资源与导入
+- Assets/Logic/Import
+- Assets/Logic/Mugen/Parse
+- Assets/Scripts/Game/View/MugenDef.cs
+- MugenSpriteLoader.cs
+
+职责：
+读取 DEF/CNS/CMD/AIR/SFF/SND，将文本和二进制资源转换为不可变角色数据、动画数据、
+状态定义、命令和精灵。
+
+第二层：确定性逻辑基础
+- Assets/Logic/Framework/Core
+- Assets/Logic/Framework/Math
+- Assets/Logic/Framework/Input
+- Assets/Logic/Framework/Network
+- Assets/Logic/Framework/Predict
+
+职责：
+定点数、随机数、输入、传输接口、消息协议、ECS、Snapshot、Hash 和不同步检测。
+
+第三层：MUGEN 运行时
+- Assets/Logic/Mugen/Expr
+- Assets/Logic/Mugen/Command
+- Assets/Logic/Mugen/State
+- Assets/Logic/Mugen/StateCtrl
+- Assets/Logic/Mugen/Anim
+- Assets/Logic/Mugen/Hit
+- Assets/Logic/Mugen/Char
+
+职责：
+表达式编译与执行、指令匹配、状态机、控制器、动画、命中和角色运行态。
+
+第四层：战斗编排
+- Assets/Logic/Mugen/Battle
+- Assets/Logic/Mugen/Battle/AI
+- Assets/Logic/Mugen/Battle/Debug
+- Assets/Logic/Mugen/Battle/Net
+
+职责：
+每帧子系统顺序、回合、团队战、舞台边界、AI、快照、Trace、调试和网络会话。
+
+第五层：Unity 客户端表现
+- Assets/Scripts/Game/View
+- Assets/Scripts/Client
+- Assets/Scripts/Network
+- Assets/Scenes
+
+职责：
+输入采集、摄像机、SpriteRenderer、HUD、选人、场景、KCP socket 和服务器 MonoBehaviour。
+
+2. 核心数据模型
+
+MCharData：
+- 角色不可变资源。
+- States、CommonStates、Anims、Commands、Constants。
+
+MChar：
+- 角色全部运行态。
+- 位置、速度、朝向、生命、能量、状态号、动画号、控制权。
+- 输入缓冲、变量、GetHitVar、HitDef、Targets、Pause、Bind。
+- Parent、Root、P2、StateOwner。
+- Clone 和 WriteHash。
+
+MEntityWorld：
+- Helper、Projectile、Explod。
+- SpawnQueue、ProjSpawnQueue。
+- 确定性实体 ID。
+- 帧事件集合。
+
+MBattleEngine：
+- 玩家 Chars。
+- 角色数据 Data。
+- 共享 Random、PauseState、World、Stage、Resources。
+- 战斗 Tick、Snapshot、Restore、ComputeHash。
+
+MRoundSystem：
+- Intro、Timer、RoundNo、Winner、FinishType、WinType。
+- 回合状态分类、授控、判胜、姿态和几胜制。
+
+MTeamMatch：
+- 双方 roster。
+- 当前出场索引。
+- 每场重建 MBattleEngine 和 SingleRound MRoundSystem。
+- KO 后换人和整队结束。
+
+3. 每帧战斗流水线
+
+MBattleEngine.Tick 的实际顺序：
+
+（1）World.Events.BeginFrame。
+（2）推进 Pause/SuperPause，并计算角色 PauseBool。
+（3）推进 Projectile contact 时间。
+（4）玩家输入写入 CommandList 和 InputBuffer。
+（5）MActionSystem.Prepare 执行走、跳、蹲等硬编码基础动作。
+（6）MStateMachine.RunFrame 执行负状态和当前状态。
+（7）MPhysics.Step 和落地检测。
+（8）MAnimSystem.Action 推进动画。
+（9）DrainSpawns 创建 Helper 和 Projectile。
+（10）StepProjectiles 和 StepExplods。
+（11）玩家与 Helper 跨队稳定遍历并执行命中。
+（12）FlushPendingDamage 统一应用本帧伤害。
+（13）RemoveDestroyed 删除 Helper。
+（14）推进帧号并供 ComputeHash 对账。
+
+这个顺序是项目最重要的确定性契约之一。任何顺序调整都可能改变状态切换、动画帧、碰撞和伤害结果。
+
+4. 客户端链路
+
+传统客户端：
+Bootstrap -> ITransport -> LockstepClient -> World -> BattleGameLogic -> View。
+
+MUGEN 客户端：
+MugenSelectScreen -> MugenMatchSetup -> MugenTeamBattleView -> MTeamMatch ->
+MRoundSystem -> MBattleEngine -> MChar/View/HUD。
+
+联机时：
+MugenTeamBattleView -> MugenLockstepSession -> TransportNetChannel ->
+KcpClientTransport -> MugenRelayServer -> 另一端。
+
+5. 服务器链路
+
+传统房间服：
+KcpServerTransport -> LockstepServer -> Room -> FrameAuthMsg。
+
+MUGEN 中继服：
+KcpServerTransport -> MugenRelayServer -> 原样转发 MugenInputMsg。
+
+两套链路目前没有统一。这是演进过程中的合理结果，但需要在下一阶段收口，否则会形成长期维护成本。
+
+
+五、核心模块与核心函数清单
+================================================================================
+
+1. 战斗主循环
+
+文件：Assets/Logic/Mugen/Battle/MBattleEngine.cs
+
+- Add：注册玩家和角色数据，接入共享资源、随机、暂停和实体世界。
+- LinkPair：建立 1v1 P2/Root 引用。
+- StartRound：授予 KeyCtrl 和 Ctrl。
+- Tick：完整逐帧战斗主循环。
+- DrainSpawns：确定性创建 Helper 和 Projectile。
+- StepProjectiles：推进弹幕、碰撞、命中和移除。
+- RunHits：玩家和 Helper 跨队命中遍历。
+- FlushPendingDamage：统一应用延迟伤害。
+- StepPhysics：物理和落地。
+- Snapshot：克隆玩家、Helper、Projectile、Explod 和生成队列。
+- Restore：恢复快照并重建引用关系。
+- ComputeHash：计算当前模拟哈希。
+
+2. 状态机
+
+文件：Assets/Logic/Mugen/State/MStateMachine.cs
+
+- RunFrame：执行负状态和当前状态。
+- RunNegativeState：执行 -3/-2/-1。
+- RunCurrentState：执行当前 Statedef 的控制器。
+- PersistGate：persistent 门控。
+- ApplyTransition：应用 ChangeState/SelfState 和资源归属。
+- RescaleStateLocalCoordinates：自定义状态切换时的 localcoord 处理。
+- LookupForCurrentOwner：按 StateOwner 查找正确状态表。
+
+3. 表达式编译与执行
+
+文件：Assets/Logic/Mugen/Expr/MugenExprCompiler.cs
+
+- Compile / CompileStrict：表达式编译入口。
+- Tokenize：词法分析。
+- ParseBoolOr 至 ParseUnary：优先级递归下降解析。
+- ParseIdent / ParseFunction：Trigger、函数和变量。
+- EmitRedirect：p2/root/parent 等 redirect。
+- EmitIndexedRedirect / EmitTwoArgRedirect：helper/target 等带参数 redirect。
+- EmitCommandCompare：command 触发器。
+- EmitTypeCompare：StateType/MoveType。
+- EmitAnimElemCompare：AnimElem。
+
+文件：Assets/Logic/Mugen/Expr/BytecodeExp.cs
+
+- Run：字节码解释执行入口。
+- Binary / Unary / RangeOp：通用运算。
+- Jump8 / Jump32：短路和条件跳转。
+
+4. 角色运行态
+
+文件：Assets/Logic/Mugen/Char/Char.cs
+
+- RequestHelper / RequestProjectile：实体生成请求。
+- RecordProjectileContact：弹幕命中计时。
+- SetPause / SetSuperPause / ComputePauseBool：暂停语义。
+- PlayAnimation：按资源归属播放动画。
+- QueueTransition：排队状态切换。
+- BindTo / ApplyBind：绑定。
+- AddTarget / SelectTargetsByHitId：目标管理。
+- Clone：深拷运行态。
+- WriteHash：写入确定性哈希。
+- ReadTrigger：执行 Trigger。
+- Redirect：执行 p2/root/parent/helper/target 等上下文跳转。
+- ReadVariable：var/fvar/sysvar。
+
+5. 命中系统
+
+文件：Assets/Logic/Mugen/Hit/MHitSystem.cs
+
+- TryHit：普通角色/Helper 命中入口。
+- TryProjectileHit：Projectile 命中入口。
+- TryReversal：ReversalDef。
+- ApplyGuard：防御结算。
+- CanJuggle：空中连击点校验。
+- ApplyHit：命中主结算。
+- ResolveGetHitState：选择受击状态。
+- ComputeDamage：伤害公式。
+- QueueLifeDamage：延迟伤害。
+- ApplyPendingDamage：帧末扣血。
+
+6. 动画和物理
+
+文件：Assets/Logic/Mugen/Anim/MAnimSystem.cs
+
+- Action：动画逐帧推进。
+- Play：从头播放动画。
+- PlayAt：从指定 elem/elemtime 播放。
+- Next：跳转下一帧和循环。
+- DeriveAndPopulate：派生 AnimTime、Elem、Clsn。
+
+文件：Assets/Logic/Mugen/Battle/MPhysics.cs
+
+- Step：按 StateType/Physics 推进速度、重力、摩擦和位置。
+- ApplyGroundFriction：地面摩擦。
+
+7. 角色加载与解析
+
+文件：Assets/Logic/Mugen/Battle/MCharLoader.cs
+
+- Load：整合 state、cns、common、air、cmd。
+- SpawnChar：创建运行态角色。
+- ApplyInitialStateHeader：应用初始状态头。
+
+文件：Assets/Logic/Mugen/Parse/MugenCnsParser.cs
+
+- Parse：解析 Statedef 和 State。
+- ApplyStatedefField：状态头字段。
+- FlushController：完成一个控制器。
+- BuildController：按 type 构造控制器。
+- BuildTriggers：构造 triggerall 和 trigger 组。
+- BuildHitDef：构造 HitDef。
+
+文件：Assets/Logic/Mugen/Parse/MugenCmdParser.cs
+
+- Parse：解析 Command 定义。
+- ReadDefaults：读取 command.time 和 buffer.time。
+
+8. 回合和团队战
+
+文件：Assets/Logic/Mugen/Battle/MRoundSystem.cs
+
+- Tick：回合编排加底层引擎推进。
+- StepRoundState：sys.intro 风格回合状态机。
+- RoundEndDecision：KO 和超时判定。
+- DecideTimeOver：按生命百分比判定。
+- SendPoses：发送胜、负、平姿态。
+- AdvanceAfterRound：下一回合或整场结束。
+- WriteHash：回合状态哈希。
+
+文件：Assets/Logic/Mugen/Battle/MTeamMatch.cs
+
+- Tick：推进当前场。
+- StartBout：建立本场两名角色、引擎和回合。
+- ResolveBout：败方换人或整场结束。
+
+9. 网络
+
+文件：Assets/Logic/Mugen/Battle/Net/MugenLockstepSession.cs
+
+- Step：采本地输入、发送、收远端并在输入到齐后推进。
+- DrainIncoming：排空收件箱。
+- Store：写入 256 帧环形缓冲。
+- Ready：判断某帧是否收齐。
+- Gather：收集本帧所有玩家输入。
+
+文件：Assets/Logic/Client/LockstepClient.cs
+
+- ConnectAndJoin：加入旧 Room。
+- Tick：处理消息和 30Hz 推进。
+- FinishLoading：创建 World。
+- TryAdvance：采样输入并尝试推进。
+
+文件：Assets/Logic/Server/LockstepServer.cs
+
+- Tick：收消息并更新房间。
+- HandleJoin：建立或加入房间。
+- HandleMessage：路由输入。
+
+文件：Assets/Logic/Server/Room.cs
+
+- OnJoin：凑齐两人并发 RoomReady。
+- OnInput：缓存输入。
+- Tick：生成 FrameAuth，并在缺帧时沿用 LastInput。
+
+文件：Assets/Scripts/Network/MugenRelayServer.cs
+
+- OnJoin / OnLeave：维护连接列表。
+- Update：转发 MugenInputMsg。
+
+10. Unity 客户端
+
+文件：Assets/Scripts/Game/View/MugenSelectScreen.cs
+
+- DiscoverCharacters：发现角色。
+- LoadPortrait：读取头像。
+- Pick / Undo / RandomFill：选人操作。
+- TryStart：写入 MugenMatchSetup 并启动战斗。
+
+文件：Assets/Scripts/Game/View/MugenTeamBattleView.cs
+
+- Start：加载 roster、创建 Match、AI、HUD 和 Renderer。
+- LoadBundle：读取角色资源。
+- SetupNet：建立 KCP 和 MugenLockstepSession。
+- StepOneLogicFrame：本地、AI 或网络输入入口。
+- RenderChar：根据 MChar 状态渲染。
+
+文件：Assets/Scripts/Game/View/MugenSpriteLoader.cs
+
+- Open：识别 SFF v1/v2 并加载源。
+- BuildForAnim：按动画构建所需精灵。
+- BuildSingle：构建单个 Sprite。
+- BuildSpriteV1 / BuildSpriteV2：两种 SFF 路径。
+
+
+六、与 IKEMEN-GO 的差距
+================================================================================
+
+1. 架构差距
+
+IKEMEN-GO 是完整游戏引擎，包含约 12 万行 Go 源码和大量 Lua 数据/界面脚本。项目当前产品 C#
+约 2.7 万行，其中还包含旧 ECS、Unity View 和网络实验代码。规模不能直接代表质量，但说明当前
+只是复刻了 IKEMEN 的核心战斗子集，而不是完整运行时。
+
+最大结构差距：
+- IKEMEN 的 Char/System 是高度完整的运行态，项目 MChar 仍是逐步扩展版本。
+- IKEMEN 有 StateBlock 树和完整编译器，项目目前主要是扁平 StateController 列表。
+- IKEMEN 的资源、渲染、舞台、相机、音频、菜单和模式统一在完整引擎中，项目目前分散在研究原型层。
+
+2. 表达式和状态机差距
+
+项目已覆盖常用表达式和 redirect，但仍缺：
+- 完整 Trigger 集。
+- 完整 Controller 集和逐字段语义。
+- 嵌套 StateBlock。
+- if/else、loop/for 等块结构。
+- IKEMEN/ZSS 扩展。
+- 版本兼容分支。
+- 历史 bug compatibility。
+- 所有 undefined、类型转换、整数/浮点截断和错误恢复细节。
+
+风险：
+简单 KFM 类角色可用不代表复杂角色可用。大量角色依赖边角 Trigger、Helper redirect、Target、
+Explod、PalFX、HitDef 细节和自定义 common state。
+
+3. 命中和角色语义差距
+
+项目已有命中主干，但 IKEMEN 还包含更完整的：
+- HitDef 字段。
+- GetHitVar 字段。
+- Guard、Reversal、HitOverride、Priority、Juggle。
+- Corner push。
+- Target ownership。
+- 多实体接触顺序。
+- Hit pause、Pause、SuperPause 交互。
+- KO 同帧顺序。
+- 版本和角色类型差异。
+
+当前最缺的不是再增加几个字段，而是用 Oracle 在真实角色场景中逐帧证明顺序等价。
+
+4. 动画与渲染差距
+
+项目完成了逻辑动画推进和基础 SpriteRenderer，但 IKEMEN 还有：
+- 完整 blend/trans。
+- PalFX、AllPalFX、BGPalFX。
+- AfterImage。
+- remappal、ownpal。
+- shadow、reflection。
+- 插值、缩放、旋转和窗口裁剪。
+- draw priority、layerno、sprpriority。
+- camera 和 zoom。
+- stage 背景层和视差。
+- localcoord 的统一坐标转换。
+
+项目目前很多控制器只产生确定性事件或保存参数，没有达到最终画面等价。
+
+5. 音频差距
+
+项目已有 SND 读取和 PlaySnd 类事件，但缺少：
+- 真正的音频资源缓存。
+- group/index 查找。
+- channel 管理。
+- lowpriority。
+- loop、freqmul、volumescale。
+- panning。
+- Pause/SuperPause 下的音频行为。
+- 舞台 BGM、角色语音和 motif 音效。
+
+6. 舞台和相机差距
+
+项目 MStage 当前主要是左右边界。IKEMEN 的舞台系统还包括：
+- Stage DEF。
+- 背景 SFF。
+- 多层背景。
+- delta、velocity、tile、mask、window。
+- boundleft/right/high/low。
+- camera startx/starty、tension、verticalfollow、zoom。
+- player push 和 screenbound。
+- shadow/reflection。
+- 不同 localcoord 和分辨率。
+
+7. 游戏模式和外壳差距
+
+项目有 1v1 和简单 Turns。IKEMEN 还包括：
+- Arcade。
+- Versus。
+- Team Simul。
+- Team Turns。
+- Tag。
+- Survival。
+- Training。
+- Watch。
+- Netplay。
+- Replay。
+- Continue。
+- Storyboard。
+- Select、Options、Lifebar、Motif 全套配置。
+- Lua 外壳扩展。
+
+8. 输入差距
+
+项目主要是键盘位输入和简单 AI。IKEMEN 还支持：
+- 完整键盘/手柄映射。
+- 多控制器。
+- Analog axes。
+- SOCD resolution。
+- Button assist。
+- 输入配置 UI。
+- AILevel 行为。
+- Netplay 输入、Replay 输入和 Rollback 输入统一。
+
+9. 网络差距
+
+IKEMEN develop 当前源码明确包含 delay netplay 和 rollback netcode：
+- rollback.go。
+- SaveGameState / LoadGameState。
+- AdvanceFrame 重模拟。
+- LiveChecksum。
+- Desync test。
+- Replay 记录和回滚时间线截断。
+- netplay 配置同步。
+- 内容 fingerprint。
+- host 配置覆盖和 peer ack。
+
+项目目前：
+- 有 MBattleEngine.Snapshot/Restore。
+- 有 Engine.ComputeHash。
+- 有 MugenLockstepSession。
+- 但没有预测、回滚窗口、输入确认、错误预测检测和重模拟。
+- MugenLockstepSession 的 hash 只计算 Engine，未组合 MRoundSystem.WriteHash。
+- TeamMatch 联机 hash 也没有覆盖 ActiveIndex、BoutNo、MatchOver 等团队编排状态。
+- Snapshot 当前主要覆盖 MBattleEngine，不覆盖完整 RoundSystem 和 TeamMatch 的可恢复状态。
+- 没有把 hash 发到网络另一端比较。
+
+因此 M10 仍然是明确未完成状态。
+
+10. 测试和验证差距
+
+项目优势：
+- 751 个 .NET 测试。
+- 测试可脱 Unity 快速运行。
+- 已覆盖大量模块。
+
+与“IKEMEN 等价”之间仍缺：
+- IKEMEN headless 同输入 Trace。
+- 同一角色、同一随机种子、同一输入脚本的逐帧对账。
+- 离散字段全等。
+- 定点和 IKEMEN 浮点连续量容差。
+- 大规模角色冒烟矩阵。
+- Unity PlayMode 自动测试。
+- KCP 双进程端到端测试。
+- 网络抖动、丢包、乱序和长时间 stall 测试。
+- 1 小时以上 soak。
+- GC、CPU、内存和实体峰值性能测试。
+
+
+七、当前设计问题与风险
+================================================================================
+
+P0 风险 1：代码、提交和文档不同步
+
+现象：
+- HEAD 停在 2026-06-09 1v1 场景。
+- 当前工作区有 50 个修改/未跟踪项。
+- 19 个未跟踪 C# 文件约 2508 行。
+- 团队战、AI、网络、调试、回合重构和新场景尚未形成可审计提交。
+- 移植方案仍写 M10/M11 未开始，但代码已有 Snapshot、Unity View 和锁步会话。
+- 部分文档仍写 491/509/687/709/727 测试，而当前实跑是 751。
+
+影响：
+- 无法明确判断稳定基线。
+- 容易丢代码或在合并时产生大冲突。
+- 述职时会出现文档数字互相矛盾。
+
+建议：
+- 立即按“回合重构、团队战、AI、网络、调试工具、文档”拆分提交。
+- 创建唯一的 STATUS.txt 或 Generated/current_status.json，由脚本自动生成代码、测试和提交基线。
+
+P0 风险 2：回滚能力没有闭环
+
+现象：
+- 有快照，但网络会话不使用快照。
+- 有 Hash，但联机不交换 Hash。
+- Round/Team 状态未纳入统一 Snapshot 和 Hash。
+- 没有预测输入和错误预测修正。
+
+建议：
+- 建立 MatchStateSnapshot，统一包含 Engine、Round、TeamMatch 和网络时间线状态。
+- 建立 Match.ComputeHash，禁止只用 Engine.ComputeHash。
+- 实现 PredictionWindow、ConfirmedFrame、SaveFrame、RestoreFrame、Resimulate。
+- 首先做离线 rollback sync test，再接 KCP。
+
+P0 风险 3：没有 IKEMEN Oracle 证据
+
+现象：
+- 已经有 MBattleTraceRecorder 和 MBattleTraceComparer。
+- 但没有完成 IKEMEN 侧 headless producer。
+- 自动函数名匹配不能证明语义等价。
+
+建议：
+- 固定一个 IKEMEN commit。
+- 在 IKEMEN 增加最小 trace 输出。
+- 先选择 5 个黄金场景：站立、走跳、普通攻击命中、Projectile、投技。
+- 离散字段逐帧全等；Pos/Vel 使用明确 Q20 或 Raw 容差。
+- Oracle 测试进入 CI，任何控制器修改必须通过。
+
+P0 风险 4：联机内容没有同步
+
+现象：
+- roster 由双方手工约定。
+- 没有角色包 hash、common1 hash、配置 hash、seed 和版本协议。
+- 中继服务器没有 room/match 概念。
+
+建议：
+- 增加 Hello、MatchConfig、RosterCommit、Ready、StartAtFrame、HashReport、Disconnect 消息。
+- 对 DEF/CNS/CMD/AIR/SFF/SND/common1 和引擎版本生成内容指纹。
+- 不一致时禁止开局。
+
+P1 风险 5：两套引擎和两套网络并存
+
+现象：
+- Assets/Logic/Game 下旧 clean-room 引擎仍存在。
+- Assets/Logic/Mugen 下新引擎已成为主线。
+- LockstepClient/Room 和 MugenLockstepSession/Relay 各自实现不同模型。
+
+建议：
+- 明确旧链路只作为教学样例或直接归档。
+- 将通用 Transport、Codec、连接管理保留。
+- 将正式游戏统一到 MatchSession + MugenSimulation。
+- 删除或移出生产 asmdef 的旧 PlayerStates、旧 ExpressionVM 和旧 Systems，避免误接。
+
+P1 风险 6：网络会话健壮性不足
+
+问题：
+- 环形缓冲固定 256 帧，长 stall 可能覆盖旧帧。
+- 重复包取最后值，但没有输入承诺，恶意端可修改已发送帧。
+- 没有迟到帧、未来帧上限和窗口校验。
+- 没有超时、重连、对局结束握手。
+- KCP Update 在 View.Update 的模拟之后调用，可能增加一帧输入处理延迟。
+- 中继服接受连接后全部互相广播，没有房间隔离。
+
+建议：
+- 增加 MaxFutureFrame、MaxRollbackFrames 和 LastCommittedFrame。
+- 已提交输入不可更改。
+- 网络 Update 在逻辑步之前。
+- 使用 roomId/matchId 路由。
+- 增加心跳、断线和 session token。
+
+P1 风险 7：完整状态覆盖尚未审计
+
+问题：
+- 每增加 MChar 字段，都必须同步 Clone 和 WriteHash。
+- Stage、NoDamage、Round、Team、FrameEvents 是否属于模拟态需要统一定义。
+- 当前只有字段级人工纪律，缺少自动检查。
+
+建议：
+- 用反射测试检查 MChar 可变字段是否被 Clone/Hash 覆盖。
+- 为 Snapshot -> Mutate -> Restore -> Hash 建通用属性测试。
+- 为每个 Controller 增加两端相同输入的双实例哈希测试。
+
+P1 风险 8：表现层与逻辑事件未形成正式协议
+
+建议：
+- 定义 PresentationFrame：
+  EntityPose、SpriteState、VisualEvent、SoundEvent、CameraEvent、HudState。
+- 逻辑只输出可重放事件。
+- View 按 confirmed/predicted frame 区分一次性音效，避免回滚重复播放。
+- Explod/Helper/Projectile 建对象池。
+
+P2 风险 9：工程质量和 CI 不完整
+
+建议：
+- CI 至少执行 dotnet test、Unity batchmode compile、PlayMode smoke、格式检查、确定性扫描。
+- 自动扫描 Assets/Logic 中 UnityEngine、System.Random、double、非允许 float。
+- 自动生成函数审计、Controller/Trigger 覆盖和角色冒烟报告。
+- 增加 Release build 和 headless relay build。
+
+
+八、建议的优化方案
+================================================================================
+
+1. 第一优先级：建立可信基线
+
+目标：让任何人能回答“现在到底完成到哪里”。
+
+工作项：
+- 清理并提交当前 50 个工作区项。
+- 文档统一到 751/751。
+- 生成 BuildInfo：Git SHA、IKEMEN SHA、Unity 版本、测试数、角色包指纹。
+- 冻结 v0.1-prototype 标签。
+
+验收：
+- 干净工作区。
+- 一条命令生成状态报告。
+- 报告数字与 CI 一致。
+
+2. 第二优先级：Oracle 差分
+
+目标：把“看起来像 IKEMEN”变成“逐帧有证据”。
+
+工作项：
+- 完成 IKEMEN trace producer。
+- 接入现有 MBattleTraceComparer。
+- 建立 5 个基础场景、10 个真实角色、1000 帧黄金数据。
+- 差异分为：离散错误、连续量漂移、表现差异、明确不支持。
+
+验收：
+- 基础场景离散字段 100% 全等。
+- 连续量误差有明确阈值。
+- 每个失败可以定位到字段和帧。
+
+3. 第三优先级：真正回滚
+
+目标：完成课题最核心的技术闭环。
+
+设计建议：
+- SimulationFrame：当前模拟帧。
+- ConfirmedFrame：双方已确认的最大帧。
+- InputHistory：每玩家真实/预测输入。
+- SnapshotRing：每帧或每 N 帧快照。
+- Predict：远端缺失时沿用方向或 None，策略可配置。
+- Correct：真实输入到达且不同，恢复最早错误帧。
+- Resimulate：无渲染快速重跑到当前帧。
+- Presentation：只提交最终可见帧的一次性事件。
+
+必须补的状态：
+- Engine。
+- RoundSystem。
+- TeamMatch。
+- RNG。
+- Pause。
+- Stage 可变态。
+- 实体世界和生成队列。
+- 输入时间线必要元数据。
+
+验收：
+- 120ms 延迟、20ms 抖动下不卡帧。
+- 人工制造错误预测后最终 Hash 与无延迟基准一致。
+- 10000 帧同步测试无分叉。
+
+4. 第四优先级：内容和房间同步
+
+目标：两端无需人工约定即可安全开局。
+
+工作项：
+- 房间创建与加入。
+- P0/P1 分配。
+- 选人同步。
+- roster、stage、mode、seed、engine version、content fingerprint。
+- Ready barrier。
+- 开始帧同步。
+- HashReport 和 desync dump。
+
+5. 第五优先级：补齐高价值 IKEMEN 兼容项
+
+建议顺序：
+- 标准 common1 和倒地起身链。
+- localcoord。
+- Palette/RemapPal/PalFX。
+- SND/PlaySnd。
+- Stage/Camera/ScreenBound/PlayerPush。
+- HitDef/GetHitVar 长尾。
+- StateBlock。
+- Simul/Tag。
+- motif/lifebar/select 配置。
+
+不建议当前优先做：
+- 大量低频 Controller 的表面参数捕获。
+- 在 Oracle 未跑通前盲目增加兼容声明。
+- 先做复杂 UI 美化再修同步和状态覆盖。
+
+6. 第六优先级：性能与可维护性
+
+工作项：
+- MChar 拆分为运行态子结构，但保持 Snapshot 连续和可审计。
+- 热路径避免 Dictionary、List 临时分配和反射。
+- 实体、事件和渲染对象池。
+- 预编译角色数据，减少运行时 CNS 解析。
+- 角色包加载缓存。
+- Profiler 指标：Tick P50/P95/P99、GC alloc/frame、实体峰值、回滚重模拟耗时。
+
+
+九、建议里程碑
+================================================================================
+
+里程碑 A：可信原型基线，预计 2 至 3 天
+- 提交当前工作区。
+- 文档统一。
+- CI。
+- 版本和内容指纹。
+- 751 测试稳定。
+
+里程碑 B：Oracle MVP，预计 5 至 7 天
+- IKEMEN trace producer。
+- 5 个黄金场景。
+- C# comparer 自动执行。
+- 输出第一版差异清单。
+
+里程碑 C：Rollback MVP，预计 7 至 10 天
+- 完整 Match Snapshot/Hash。
+- 预测、恢复、重模拟。
+- 离线网络模拟器。
+- 10000 帧一致性。
+
+里程碑 D：可用联机，预计 5 至 7 天
+- 房间和握手。
+- 选人/内容/seed 同步。
+- Hash 上报。
+- 双进程 KCP 自动测试。
+
+里程碑 E：高价值兼容闭环，预计 10 至 15 天
+- common1/倒地起身。
+- localcoord。
+- palette/PalFX。
+- sound。
+- stage/camera。
+- 10 至 20 个角色矩阵。
+
+
+十、Tencent 转正述职口径总结
+================================================================================
+
+1. 目标承担
+
+项目承担的是“格斗游戏确定性模拟 + MUGEN 内容兼容 + 网络同步”的复合课题。难点不是单个功能，
+而是确保解析、状态机、命中、动画、实体、回合、客户端和网络在同一确定性时序下工作。
+
+2. 核心结果
+
+- 建立了纯 C# 定点逻辑层。
+- 完成了 MUGEN 资源主干读取。
+- 完成了 IKEMEN 风格表达式、状态机和大量控制器。
+- 完成了玩家、Helper、Projectile、Explod 的统一战斗推进。
+- 完成了 1v1、回合、3v3 turns、AI 和 Unity 可玩流程。
+- 完成了 751 项自动化测试。
+- 建立了 Snapshot、Restore、Hash 和 Trace 基础。
+- 建立了 KCP delay lockstep 原型。
+
+3. 技术判断与取舍
+
+正确取舍：
+- 战斗逻辑不引入 Lua/double。
+- Unity 与逻辑层隔离。
+- 角色行为数据驱动。
+- 以 IKEMEN 源码作为 Oracle。
+- 先做可测试逻辑，再接表现。
+
+需要纠偏：
+- 文档进度长期滞后于代码。
+- 未提交工作区过大。
+- 功能增加速度快于 Oracle 验证速度。
+- “有 Snapshot”不能等同于“有 Rollback”。
+- “能加载多个角色”不能等同于“兼容任意角色”。
+
+4. 项目影响
+
+该项目已经证明：
+- MUGEN/IKEMEN 的核心战斗语义可以迁移到 C# 定点运行时。
+- 逻辑层可以脱离 Unity 做高密度自动化测试。
+- 角色包可以驱动 Unity 中的真实战斗，而非写死角色技能。
+- 快照和哈希架构可以为后续回滚提供基础。
+
+5. 后续目标
+
+下一阶段的核心不应继续追求“模块数量”，而应追求三项可证明结果：
+
+（1）Oracle：同一输入下与 IKEMEN 逐帧对齐。
+（2）Rollback：高延迟和抖动下不中断，最终状态一致。
+（3）Compatibility：10 至 20 个真实角色形成稳定、可重复的冒烟矩阵。
+
+6. 最终评价
+
+从实习/转正述职角度，本项目具备较强的技术深度、复杂系统拆解能力和工程产出密度。尤其是
+定点确定性、状态机移植、资源解析、实体语义和测试体系，已经超过普通玩法 Demo 的范围。
+
+当前主要短板不是缺少代码量，而是缺少“最终闭环证据”和“生产化治理”。只要完成 Oracle、
+Rollback 和联机内容同步三个 P0 项目，项目就可以从“高完成度研究原型”升级为“可信的可演示
+引擎原型”。若再补齐表现、舞台、音频和模式系统，才有资格进一步讨论 IKEMEN 级完整引擎。
+
+
+十一、审计证据与参考
+================================================================================
+
+本项目关键文件：
+- CLAUDE.md
+- Docs/架构设计.md
+- Docs/移植方案_Ikemen.md
+- Docs/对战完整化路线图.md
+- Docs/MUGEN完整适配缺口总表.md
+- Docs/Ikemen架构审计与7-9进度.md
+- Docs/Generated/battle_completion_status.md
+- Assets/Logic/Mugen/Battle/MBattleEngine.cs
+- Assets/Logic/Mugen/Battle/MRoundSystem.cs
+- Assets/Logic/Mugen/Battle/MTeamMatch.cs
+- Assets/Logic/Mugen/Battle/Net/MugenLockstepSession.cs
+- Assets/Logic/Mugen/State/MStateMachine.cs
+- Assets/Logic/Mugen/Hit/MHitSystem.cs
+- Assets/Logic/Mugen/Expr/MugenExprCompiler.cs
+- Assets/Logic/Mugen/Char/Char.cs
+- Assets/Scripts/Game/View/MugenTeamBattleView.cs
+- Assets/Scripts/Network/MugenRelayServer.cs
+
+IKEMEN-GO 官方参考：
+- 官方仓库：https://github.com/ikemen-engine/Ikemen-GO
+- 官方 develop 源码：https://github.com/ikemen-engine/Ikemen-GO/tree/develop/src
+- bytecode.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/bytecode.go
+- compiler.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/compiler.go
+- char.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/char.go
+- system.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/system.go
+- input.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/input.go
+- rollback.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/rollback.go
+- netplay.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/netplay.go
+- state.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/state.go
+- state_clone.go：https://github.com/ikemen-engine/Ikemen-GO/blob/develop/src/state_clone.go
+
+验证命令与结果：
+- dotnet test Tests/Lockstep.Logic.Tests/Lockstep.Logic.Tests.csproj --no-restore
+- 结果：751 passed，0 failed，0 skipped。
+
+报告限制：
+- 本报告完成了代码、文档、Git、测试和本地 IKEMEN 源码审计。
+- 未在本次审计中启动 Unity Editor 做新的 PlayMode 实跑。
+- 未在本次审计中完成公网 KCP 双端部署验证。
+- 百分比为工程审计估算，应以 Oracle 和端到端验收结果持续校准。
+
+================================================================================
+报告结束
+================================================================================

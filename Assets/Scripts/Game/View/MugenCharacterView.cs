@@ -20,7 +20,7 @@ namespace Lockstep.View
 
         void Start()
         {
-            string baseDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource", CharacterFolder));
+            string baseDir = Path.Combine(MugenAssetPaths.MugenRoot(), CharacterFolder);
             string airPath = MugenDef.AnimPath(baseDir);
             string sffPath = MugenDef.SpritePath(baseDir);
             if (airPath == null || sffPath == null)

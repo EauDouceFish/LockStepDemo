@@ -27,6 +27,24 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void BufferTimeZeroClampsToOneFrame()
+        {
+            string text =
+                "[Defaults]\ncommand.buffer.time = 0\n" +
+                "[Command]\nname = \"tap\"\ncommand = a\nbuffer.time = 0\n";
+
+            System.Collections.Generic.List<MCommandDef> commands = MugenCmdParser.Parse(text);
+            MCommandList list = new MCommandList();
+            list.Commands.Add(commands[0]);
+
+            Assert.That(commands[0].BufferTime, Is.EqualTo(1));
+            list.Update(A, true);
+            Assert.That(list.IsActive("tap"), Is.True);
+            list.Update(MInput.None, true);
+            Assert.That(list.IsActive("tap"), Is.False);
+        }
+
+        [Test]
         public void ReleaseChargeRequiresReleaseAfterRequiredHoldTime()
         {
             MCommandList list = List("release", "~3a");

@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using Lockstep.Math;
 using Lockstep.Mugen.Anim;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.Parse;
@@ -114,6 +115,48 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void BindToTarget_NegativeTimePersistsUntilExplicitlyCleared()
+        {
+            MChar self = new MChar { Id = 10, Facing = FFloat.One };
+            MChar target = new MChar
+            {
+                Id = 20,
+                Pos = new FVector3(Fixed(40), Fixed(5), FFloat.Zero),
+                Facing = -FFloat.One,
+            };
+            self.Targets.Add(target);
+
+            new BindToTargetController
+            {
+                Time = Expression("0 - 1"),
+                Position = new BytecodeExp[] { Expression("7"), Expression("3") },
+            }.Run(self);
+
+            self.ApplyBind();
+            target.Pos = new FVector3(Fixed(50), Fixed(6), FFloat.Zero);
+            self.ApplyBind();
+
+            Assert.That(ReferenceEquals(self.BindTarget, target), Is.True);
+            Assert.That(self.BindTime, Is.EqualTo(-1), "time=-1 is an indefinite MUGEN bind and must not count down.");
+            Assert.That(self.Pos.X.Raw, Is.EqualTo(Fixed(43).Raw));
+            Assert.That(self.Pos.Y.Raw, Is.EqualTo(Fixed(9).Raw));
+        }
+
+        [Test]
+        public void BindToTarget_ClearsReciprocalBind()
+        {
+            MChar first = new MChar { Id = 10 };
+            MChar second = new MChar { Id = 20 };
+            first.BindTo(second, 3, FVector3.Zero, 0);
+
+            second.BindTo(first, 3, FVector3.Zero, 0);
+
+            Assert.That(first.BindTarget, Is.Null, "Ikemen clears the old reverse bind when a new bind would create a loop.");
+            Assert.That(first.BindTime, Is.EqualTo(0));
+            Assert.That(ReferenceEquals(second.BindTarget, first), Is.True);
+        }
+
+        [Test]
         public void ChangeAnim2_UsesStateOwnerAnimationTable()
         {
             MChar owner = new MChar { AnimTable = AnimTableWith(900) };
@@ -129,6 +172,77 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
 
             Assert.That(target.AnimNo, Is.EqualTo(900));
             Assert.That(target.AnimTable, Is.SameAs(owner.AnimTable));
+        }
+
+        [Test]
+        public void ChangeAnim2_RegisteredOwnerUsesStateOwnerAnimAndSelfSprite()
+        {
+            MCharData ownerData = new MCharData();
+            ownerData.Anims[900] = new MAnimData { No = 900, Frames = new[] { new MAnimFrame { Time = 1 } } };
+            MCharData selfData = new MCharData();
+            selfData.Anims[0] = new MAnimData { No = 0, Frames = new[] { new MAnimFrame { Time = 1 } } };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int selfPlayerNo = resources.Register(selfData);
+            MChar target = new MChar
+            {
+                Resources = resources,
+                OwnData = selfData,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+                AnimPlayerNo = selfPlayerNo,
+                SpritePlayerNo = selfPlayerNo,
+            };
+
+            new ChangeAnim2Controller { Value = Expression("900") }.Run(target);
+
+            Assert.That(target.AnimNo, Is.EqualTo(900));
+            Assert.That(target.AnimPlayerNo, Is.EqualTo(ownerPlayerNo));
+            Assert.That(target.SpritePlayerNo, Is.EqualTo(selfPlayerNo));
+            Assert.That(target.AnimExists(900), Is.True);
+            Assert.That(target.SelfAnimExists(900), Is.False);
+        }
+
+        [Test]
+        public void SelfState_ReturnsToOwnRegisteredStateTable()
+        {
+            MCharData ownerData = new MCharData();
+            MStateDef customState = new MStateDef { No = 1100 };
+            customState.Controllers.Add(new SelfStateController { Value = Expression("0") });
+            ownerData.States[1100] = customState;
+            ownerData.States[0] = new MStateDef { No = 0, Ctrl = Expression("0") };
+
+            MCharData selfData = new MCharData();
+            selfData.States[0] = new MStateDef { No = 0, Ctrl = Expression("1") };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int selfPlayerNo = resources.Register(selfData);
+            MChar owner = new MChar
+            {
+                Resources = resources,
+                OwnData = ownerData,
+                PlayerNo = ownerPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+            };
+            MChar target = new MChar
+            {
+                Resources = resources,
+                OwnData = selfData,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+                StateNo = 1100,
+                StateOwner = owner,
+                Ctrl = false,
+            };
+
+            new MStateMachine().RunFrame(target, selfData.States, selfData.CommonStates);
+
+            Assert.That(target.StateNo, Is.EqualTo(0));
+            Assert.That(target.StatePlayerNo, Is.EqualTo(selfPlayerNo));
+            Assert.That(target.StateOwner, Is.Null);
+            Assert.That(target.Ctrl, Is.True, "SelfState must apply state 0 from the target's own state table.");
         }
 
         [Test]

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Lockstep.Math;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Hit;
 using Lockstep.Mugen.Parse;
 using Lockstep.Mugen.State;
@@ -60,14 +62,73 @@ namespace Lockstep.Tests.Mugen
 
             Assert.IsTrue(MHitSystem.TryHit(atk, def), "命中检测仍成立(被防也算接触)");
             Assert.That(def.Life, Is.EqualTo(990), "守招只吃 chip 伤害 10");
-            Assert.That(def.PendingStateNo, Is.EqualTo(-1), "守招不进受击状态 5000");
+            Assert.That(def.PendingStateNo, Is.EqualTo(150), "站防进入 guard hit state 150");
+            Assert.That(def.Hitstop, Is.EqualTo(0), "守方使用 hitshake，不进入 hitpause");
+            Assert.That(def.MoveType, Is.EqualTo(2), "守方 guard hit 期间 movetype=H");
+            Assert.IsFalse(def.Ctrl, "守方 guard hit 期间失控");
             Assert.That(def.Vel.X.Raw, Is.EqualTo(F(-2).Raw), "守招用 guard.velocity 击退");
             Assert.That(def.Ghv.HitTime, Is.EqualTo(12), "GetHitVar 用 guard.hittime");
             Assert.That(def.Ghv.CtrlTime, Is.EqualTo(9), "guard.ctrltime");
+            Assert.That(def.Ghv.GuardCtrlTimeLeft, Is.EqualTo(9), "guard ctrl runtime countdown");
             Assert.IsTrue(def.Ghv.Guarded, "ghv.guarded");
             Assert.That(atk.MoveGuarded, Is.EqualTo(1), "攻方 moveguarded");
             Assert.That(atk.MoveHit, Is.EqualTo(0), "守招不算 movehit");
             Assert.That(atk.MoveContact, Is.EqualTo(1), "仍算 movecontact");
+        }
+
+        [Test]
+        public void GuardCtrlTime_LocksHardcodedBasicsUntilShakeAndCtrlTime()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = GuardableHitDef();
+            atk.HitDef.P2PauseTime = 2;
+            atk.HitDef.GuardCtrlTime = 3;
+            atk.HitDef.GuardHitTime = 10;
+            def.Guarding = true;
+            def.KeyCtrl = true;
+            def.Ctrl = true;
+            def.Input = new MInputBuffer();
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            MStateMachine sm = new MStateMachine();
+            Dictionary<int, MStateDef> empty = new Dictionary<int, MStateDef>();
+            for (int frame = 0; frame < 5; frame++)
+            {
+                def.Input.Update(MInput.Left, def.Facing.Raw >= 0);
+                MActionSystem.Prepare(def);
+                Assert.That(def.PendingStateNo, Is.Not.EqualTo(20),
+                    "guard hardstun must not be overridden by walk on frame " + frame);
+                sm.RunFrame(def, empty);
+            }
+
+            Assert.IsTrue(def.Ctrl, "control returns only after hitshake and guard.ctrltime elapsed");
+            Assert.That(def.Ghv.CtrlTime, Is.EqualTo(3), "gethitvar(ctrltime) remains the authored threshold");
+            Assert.That(def.Ghv.GuardCtrlTimeLeft, Is.EqualTo(0), "runtime guard ctrl countdown reaches zero");
+
+            def.Input.Update(MInput.Left, def.Facing.Raw >= 0);
+            MActionSystem.Prepare(def);
+            Assert.That(def.PendingStateNo, Is.EqualTo(20), "after recovery the same held forward input can walk");
+        }
+
+        [Test]
+        public void Hitstun_LocksHardcodedJumpUntilRecovery()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = GuardableHitDef();
+            atk.HitDef.Active = true;
+            def.KeyCtrl = true;
+            def.Ctrl = true;
+            def.Input = new MInputBuffer();
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            def.Input.Update(MInput.Up, def.Facing.Raw >= 0);
+            MActionSystem.Prepare(def);
+
+            Assert.That(def.PendingStateNo, Is.EqualTo(5000),
+                "gethit transition must not be overridden by hardcoded jump");
+            Assert.IsFalse(def.Ctrl, "hitstun removes control immediately");
         }
 
         [Test]

@@ -8,6 +8,7 @@ namespace Lockstep.Mugen.Command
     /// </summary>
     public static class MCommandInputSynthesizer
     {
+        // Project-specific: synthesizes deterministic C# input scripts from Ikemen-style command definitions for tests/previews.
         public static List<MInput> BuildSequence(MCommandDef command, bool facingRight)
         {
             List<MInput> frames = new List<MInput>();
@@ -21,6 +22,7 @@ namespace Lockstep.Mugen.Command
             return frames;
         }
 
+        // Project-specific: merges several synthesized command prefixes so the C# preview harness can activate multi-command transitions.
         public static List<MInput> BuildCombinedSequence(IReadOnlyList<MCommandDef> commands, bool facingRight)
         {
             List<List<MInput>> prefixes = new List<List<MInput>>();
@@ -53,6 +55,7 @@ namespace Lockstep.Mugen.Command
             return combined;
         }
 
+        // Project-specific: probes MCommandList until an Ikemen-style command becomes active, then returns the minimal test prefix.
         public static List<MInput> ActivationPrefix(MCommandDef command, bool facingRight)
         {
             List<MInput> sequence = BuildSequence(command, facingRight);
@@ -69,6 +72,7 @@ namespace Lockstep.Mugen.Command
             return sequence;
         }
 
+        // Project-specific: helper emits one scripted input step from src/input.go cmdElem key semantics.
         static void AppendStep(List<MInput> frames, MCommandStep step, bool facingRight)
         {
             List<MCommandKey> keys = SelectedKeys(step);
@@ -106,6 +110,7 @@ namespace Lockstep.Mugen.Command
             frames.Add(current);
         }
 
+        // Project-specific: helper chooses a deterministic branch for OR command steps; Ikemen receives real player input instead.
         static List<MCommandKey> SelectedKeys(MCommandStep step)
         {
             List<MCommandKey> keys = new List<MCommandKey>();
@@ -125,6 +130,7 @@ namespace Lockstep.Mugen.Command
             return keys;
         }
 
+        // Ikemen reference: src/input.go CommandKey direction/button bits, with B/F resolved against player facing.
         static MInput KeyBits(MCommandKey key, bool facingRight)
         {
             if (key.IsNeutral)

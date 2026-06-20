@@ -16,12 +16,14 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Facing;
         public BytecodeExp[] Position;
 
+        // Ikemen reference: src/bytecode.go BindToParent StateController binds helper to parent.
         public override bool Run(MChar character)
         {
             Bind(character, character.Parent);
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go bindToParent shares bind time/facing/pos resolution.
         void Bind(MChar character, MChar target)
         {
             if (target == null)
@@ -39,6 +41,7 @@ namespace Lockstep.Mugen.StateCtrl
             character.BindTo(target, time, ReadPosition(character), bindFacing);
         }
 
+        // Ikemen reference: src/bytecode.go bindToParent pos parameter maps to bind offset vector.
         FVector3 ReadPosition(MChar character)
         {
             FFloat x = FFloat.Zero;
@@ -66,6 +69,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Facing;
         public BytecodeExp[] Position;
 
+        // Ikemen reference: src/bytecode.go BindToRoot StateController binds helper to root or self.
         public override bool Run(MChar character)
         {
             MChar target = character.Root ?? character;
@@ -81,6 +85,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go bindToRoot pos parameter maps to bind offset vector.
         FVector3 ReadPosition(MChar character)
         {
             FFloat x = FFloat.Zero;
@@ -107,6 +112,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Time;
         public BytecodeExp[] Position;
 
+        // Ikemen reference: src/bytecode.go TargetBind StateController binds selected targets to self.
         public override bool Run(MChar character)
         {
             int time = Time != null ? Time.Run(character).ToI() : 1;
@@ -119,6 +125,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go targetBind pos parameter maps to target bind offset.
         FVector3 ReadPosition(MChar character)
         {
             FFloat x = FFloat.Zero;
@@ -146,6 +153,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] Position;
         public BytecodeExp PosZ;
 
+        // Ikemen reference: src/bytecode.go BindToTarget StateController binds self to selected target.
         public override bool Run(MChar character)
         {
             List<MChar> targets = SelectTargets(character);
@@ -159,6 +167,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go bindToTarget pos/posz parameters map to bind offset.
         FVector3 ReadPosition(MChar character)
         {
             FFloat x = FFloat.Zero;
@@ -186,6 +195,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Elem;
         public BytecodeExp ElemTime;
 
+        // Ikemen reference: src/bytecode.go ChangeAnim2 StateController plays state-owner animation.
         public override bool Run(MChar character)
         {
             if (Value == null)

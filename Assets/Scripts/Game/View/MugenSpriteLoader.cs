@@ -99,6 +99,22 @@ namespace Lockstep.View
             }
         }
 
+        /// <summary>按 (group,image) 构建并缓存单张精灵（如头像 9000,0/9000,1）。失败返回 null。</summary>
+        public static Sprite BuildSingle(Source source, int group, int image)
+        {
+            long key = MugenSpriteAnimator.Key(group, image);
+            if (source.Cache.TryGetValue(key, out Sprite cached))
+            {
+                return cached;
+            }
+            Sprite sprite = source.IsV2 ? BuildSpriteV2(source, key) : BuildSpriteV1(source, key);
+            if (sprite != null)
+            {
+                source.Cache[key] = sprite;
+            }
+            return sprite;
+        }
+
         /// <summary>一次性构建若干动画的全部精灵（单动画场景用）。</summary>
         public static Dictionary<long, Sprite> Load(string sffPath, IEnumerable<AnimData> anims, float pixelsPerUnit)
         {
@@ -118,25 +134,19 @@ namespace Lockstep.View
             {
                 return null;
             }
-            SffV2Sprite pixelSprite = sprite;
-            if (sprite.DataLength == 0 && sprite.LinkedIndex >= 0 && sprite.LinkedIndex < source.V2.Sprites.Count)
-            {
-                pixelSprite = source.V2.Sprites[sprite.LinkedIndex];
-            }
-            if (pixelSprite.DataLength == 0 || pixelSprite.Format >= 10)
-            {
-                return null;   // 空链接或 PNG（头像）跳过
-            }
-            PcxImage image;
             try
             {
-                image = SffV2Reader.Decode(source.SffPath, source.V2, sprite);
+                PcxImage image = SffV2Reader.Decode(source.SffPath, source.V2, sprite);
+                return BuildSpriteFromImage(image, sprite.AxisX, sprite.AxisY, source.PixelsPerUnit);
             }
             catch (SffException)
             {
                 return null;
             }
-            return BuildSpriteFromImage(image, pixelSprite.AxisX, pixelSprite.AxisY, source.PixelsPerUnit);
+            catch (System.Exception)
+            {
+                return null;
+            }
         }
 
         // ---- SFFv1 ----
@@ -203,23 +213,60 @@ namespace Lockstep.View
 
         static Sprite BuildSpriteFromImage(PcxImage image, short axisX, short axisY, float pixelsPerUnit)
         {
-            if (image.Palette == null)
+            if (image == null || image.Width <= 0 || image.Height <= 0)
             {
                 return null;
             }
+            long pixelCountLong = (long)image.Width * image.Height;
+            if (pixelCountLong > int.MaxValue)
+            {
+                return null;
+            }
+            int pixelCount = (int)pixelCountLong;
+            if (image.IsTrueColor)
+            {
+                long requiredRgbaLength = pixelCountLong * 4;
+                if (requiredRgbaLength > int.MaxValue || image.Rgba.Length < requiredRgbaLength)
+                {
+                    return null;
+                }
+            }
+            else if (image.Indices == null || image.Indices.Length < pixelCount ||
+                     image.Palette == null || image.Palette.Length < 768)
+            {
+                return null;
+            }
+
             Texture2D texture = new Texture2D(image.Width, image.Height, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
-            Color32[] pixels = new Color32[image.Width * image.Height];
-            for (int y = 0; y < image.Height; y++)
+            Color32[] pixels = new Color32[pixelCount];
+            if (image.IsTrueColor)
             {
-                int srcRow = y * image.Width;
-                int dstRow = (image.Height - 1 - y) * image.Width;   // 翻转 Y（Unity 原点在左下）
-                for (int x = 0; x < image.Width; x++)
+                for (int y = 0; y < image.Height; y++)
                 {
-                    byte index = image.Indices[srcRow + x];
-                    byte alpha = (byte)(index == 0 ? 0 : 255);       // 索引 0 透明
-                    pixels[dstRow + x] = new Color32(
-                        image.Palette[index * 3], image.Palette[index * 3 + 1], image.Palette[index * 3 + 2], alpha);
+                    int srcRow = y * image.Width;
+                    int dstRow = (image.Height - 1 - y) * image.Width;   // Flip Y for Unity's bottom-left origin.
+                    for (int x = 0; x < image.Width; x++)
+                    {
+                        int source = (srcRow + x) * 4;
+                        pixels[dstRow + x] = new Color32(
+                            image.Rgba[source], image.Rgba[source + 1], image.Rgba[source + 2], image.Rgba[source + 3]);
+                    }
+                }
+            }
+            else
+            {
+                for (int y = 0; y < image.Height; y++)
+                {
+                    int srcRow = y * image.Width;
+                    int dstRow = (image.Height - 1 - y) * image.Width;   // 翻转 Y（Unity 原点在左下）
+                    for (int x = 0; x < image.Width; x++)
+                    {
+                        byte index = image.Indices[srcRow + x];
+                        byte alpha = (byte)(index == 0 ? 0 : 255);       // 索引 0 透明
+                        pixels[dstRow + x] = new Color32(
+                            image.Palette[index * 3], image.Palette[index * 3 + 1], image.Palette[index * 3 + 2], alpha);
+                    }
                 }
             }
             texture.SetPixels32(pixels);

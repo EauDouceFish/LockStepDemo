@@ -233,14 +233,28 @@ namespace Lockstep.Mugen.Parse
                     };
                 }
                 case "changestate":
-                    return new ChangeStateController { Value = Expr(comp, p, "value"), Ctrl = IntP(p, "ctrl", -1), Anim = IntP(p, "anim", -1) };
+                    return new ChangeStateController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        Ctrl = IntP(p, "ctrl", -1),
+                        Anim = IntP(p, "anim", -1),
+                        CtrlExpr = Expr(comp, p, "ctrl"),
+                        AnimExpr = Expr(comp, p, "anim"),
+                    };
                 case "selfstate":
-                    return new SelfStateController { Value = Expr(comp, p, "value"), Ctrl = IntP(p, "ctrl", -1), Anim = IntP(p, "anim", -1) };
-                case "velset": return new VelSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
-                case "veladd": return new VelAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
+                    return new SelfStateController
+                    {
+                        Value = Expr(comp, p, "value"),
+                        Ctrl = IntP(p, "ctrl", -1),
+                        Anim = IntP(p, "anim", -1),
+                        CtrlExpr = Expr(comp, p, "ctrl"),
+                        AnimExpr = Expr(comp, p, "anim"),
+                    };
+                case "velset": return new VelSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
+                case "veladd": return new VelAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
                 case "velmul": return new VelMulController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
-                case "posset": return new PosSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
-                case "posadd": return new PosAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y") };
+                case "posset": return new PosSetController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
+                case "posadd": return new PosAddController { X = Expr(comp, p, "x"), Y = Expr(comp, p, "y"), Z = Expr(comp, p, "z") };
                 case "changeanim":
                     return new ChangeAnimController
                     {
@@ -322,9 +336,9 @@ namespace Lockstep.Mugen.Parse
                 case "width":
                     return WithParams(new WidthController
                     {
-                        Value = ExprList(comp, p, "value"),
-                        Player = ExprList(comp, p, "player"),
-                        Edge = ExprList(comp, p, "edge"),
+                        Value = (p.ContainsKey("edge") || p.ContainsKey("player")) ? null : ExprList(comp, p, "value"),
+                        Player = ExprListSkipBlank(comp, p, "player"),
+                        Edge = ExprListSkipBlank(comp, p, "edge"),
                     }, p);
                 case "playerpush":
                     return WithParams(new PlayerPushController
@@ -566,7 +580,7 @@ namespace Lockstep.Mugen.Parse
             {
                 MugenCodes.HitFlags(gf, out hd.GuardHigh, out hd.GuardLow, out hd.GuardAir, out _);
             }
-            if (p.TryGetValue("guard.velocity", out string gv)) { hd.GuardVelX = EvalF(comp, gv.Split(',')[0]); }
+            if (p.TryGetValue("guard.velocity", out string gv)) { hd.GuardVelX = EvalF(comp, FirstTopLevelComma(gv)); }
             if (p.TryGetValue("guard.hittime", out string ghtt)) { hd.GuardHitTime = EvalI(comp, ghtt); }
             if (p.TryGetValue("guard.ctrltime", out string gct)) { hd.GuardCtrlTime = EvalI(comp, gct); }
             if (p.TryGetValue("hitflag", out string hf))
@@ -575,13 +589,23 @@ namespace Lockstep.Mugen.Parse
             }
             if (p.TryGetValue("damage", out string dmg))
             {
-                string[] d = dmg.Split(',');
-                hd.HitDamage = EvalI(comp, d[0]);
-                hd.GuardDamage = d.Length > 1 ? EvalI(comp, d[1]) : hd.HitDamage;
+                string[] d = SplitTopLevelComma(dmg);
+                hd.HitDamageExpr = comp.Compile(d[0].Trim());
+                hd.HitDamage = hd.HitDamageExpr.Run(null).ToI();
+                if (d.Length > 1)
+                {
+                    hd.GuardDamageExpr = comp.Compile(d[1].Trim());
+                    hd.GuardDamage = hd.GuardDamageExpr.Run(null).ToI();
+                }
+                else
+                {
+                    hd.GuardDamageExpr = hd.HitDamageExpr;
+                    hd.GuardDamage = hd.HitDamage;
+                }
             }
             if (p.TryGetValue("pausetime", out string pt))
             {
-                string[] t = pt.Split(',');
+                string[] t = SplitTopLevelComma(pt);
                 hd.P1PauseTime = EvalI(comp, t[0]);
                 hd.P2PauseTime = t.Length > 1 ? EvalI(comp, t[1]) : hd.P1PauseTime;
             }
@@ -613,11 +637,15 @@ namespace Lockstep.Mugen.Parse
             hd.FallAnimType = hd.AirAnimType == MReaction.Up ? MReaction.Up : MReaction.Back;
             if (p.TryGetValue("fall.animtype", out string fat)) { hd.FallAnimType = ParseReaction(fat); }
             if (p.TryGetValue("yaccel", out string ya)) { hd.YAccel = EvalF(comp, ya); }
-            if (p.TryGetValue("fall.xvelocity", out string fxv)) { hd.FallXVel = EvalF(comp, fxv); }
+            if (p.TryGetValue("fall.xvelocity", out string fxv)) { hd.FallXVel = EvalF(comp, fxv); hd.FallXVelSet = true; }
             if (p.TryGetValue("fall.yvelocity", out string fyv)) { hd.FallYVel = EvalF(comp, fyv); }
             if (p.TryGetValue("fall.recover", out string frc)) { hd.FallRecover = EvalI(comp, frc) != 0; }
             if (p.TryGetValue("fall.recovertime", out string frt)) { hd.FallRecoverTime = EvalI(comp, frt); }
-            if (p.TryGetValue("fall.damage", out string fdmg)) { hd.FallDamage = EvalI(comp, fdmg); }
+            if (p.TryGetValue("fall.damage", out string fdmg))
+            {
+                hd.FallDamageExpr = comp.Compile(fdmg.Trim());
+                hd.FallDamage = hd.FallDamageExpr.Run(null).ToI();
+            }
             if (p.TryGetValue("air.juggle", out string aj)) { hd.AirJuggle = EvalI(comp, aj); }
 
             // 击打倒地分支：down.velocity 默认随 air.velocity（char.go:892-894）；down.hittime 默认 20；down.bounce 默认 0。
@@ -656,13 +684,13 @@ namespace Lockstep.Mugen.Parse
             bool giveGuardSet = false;
             if (p.TryGetValue("getpower", out string gp))
             {
-                string[] parts = gp.Split(',');
+                string[] parts = SplitTopLevelComma(gp);
                 hd.HitGetPower = EvalI(comp, parts[0]);
                 if (parts.Length > 1) { hd.GuardGetPower = EvalI(comp, parts[1]); getGuardSet = true; }
             }
             if (p.TryGetValue("givepower", out string gvp))
             {
-                string[] parts = gvp.Split(',');
+                string[] parts = SplitTopLevelComma(gvp);
                 hd.HitGivePower = EvalI(comp, parts[0]);
                 if (parts.Length > 1) { hd.GuardGivePower = EvalI(comp, parts[1]); giveGuardSet = true; }
             }
@@ -683,10 +711,22 @@ namespace Lockstep.Mugen.Parse
             y = FFloat.Zero;
             if (p.TryGetValue(key, out string v))
             {
-                string[] parts = v.Split(',');
-                x = EvalF(comp, parts[0]);
-                if (parts.Length > 1) { y = EvalF(comp, parts[1]); }
+                string[] parts = SplitTopLevelComma(v);
+                if (parts.Length > 0 && !IsVelocityNoChange(parts[0]))
+                {
+                    x = EvalF(comp, parts[0]);
+                }
+                if (parts.Length > 1 && !IsVelocityNoChange(parts[1]))
+                {
+                    y = EvalF(comp, parts[1]);
+                }
             }
+        }
+
+        static bool IsVelocityNoChange(string value)
+        {
+            string trimmed = value.Trim();
+            return trimmed.Length == 0 || string.Equals(trimmed, "n", System.StringComparison.OrdinalIgnoreCase);
         }
 
         static MReaction ParseReaction(string v)
@@ -721,6 +761,53 @@ namespace Lockstep.Mugen.Parse
         static FFloat EvalF(MugenExprCompiler comp, string expr)
         {
             return comp.Compile(expr.Trim()).Run(null).ToF();
+        }
+
+        static string FirstTopLevelComma(string value)
+        {
+            string[] parts = SplitTopLevelComma(value);
+            return parts.Length > 0 ? parts[0] : string.Empty;
+        }
+
+        static string[] SplitTopLevelComma(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return new[] { string.Empty };
+            }
+
+            List<string> parts = new List<string>();
+            int depth = 0;
+            int start = 0;
+            bool inString = false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (ch == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString)
+                {
+                    continue;
+                }
+                if (ch == '(')
+                {
+                    depth++;
+                }
+                else if (ch == ')' && depth > 0)
+                {
+                    depth--;
+                }
+                else if (ch == ',' && depth == 0)
+                {
+                    parts.Add(value.Substring(start, i - start).Trim());
+                    start = i + 1;
+                }
+            }
+            parts.Add(value.Substring(start).Trim());
+            return parts.ToArray();
         }
 
         static int ParseFlags(Dictionary<string, string> p)
@@ -797,13 +884,22 @@ namespace Lockstep.Mugen.Parse
             {
                 return null;
             }
-            string[] parts = v.Split(',');
+            string[] parts = SplitTopLevelComma(v);
             BytecodeExp[] values = new BytecodeExp[parts.Length];
             for (int index = 0; index < parts.Length; index++)
             {
                 values[index] = comp.Compile(parts[index].Trim());
             }
             return values;
+        }
+
+        static BytecodeExp[] ExprListSkipBlank(MugenExprCompiler comp, Dictionary<string, string> p, string key)
+        {
+            if (!p.TryGetValue(key, out string v) || string.IsNullOrWhiteSpace(v))
+            {
+                return null;
+            }
+            return ExprList(comp, p, key);
         }
 
         static TController WithParams<TController>(TController controller, Dictionary<string, string> p) where TController : ParameterOnlyController
@@ -1036,7 +1132,7 @@ namespace Lockstep.Mugen.Parse
             {
                 return def;
             }
-            string first = v.Split(',')[0].Trim();
+            string first = FirstTopLevelComma(v).Trim();
             return int.TryParse(first, NumberStyles.Integer, CultureInfo.InvariantCulture, out int r) ? r : def;
         }
 

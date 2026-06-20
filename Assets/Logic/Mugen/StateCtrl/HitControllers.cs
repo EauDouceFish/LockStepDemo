@@ -108,11 +108,11 @@ namespace Lockstep.Mugen.StateCtrl
             }
             if (XVelocity != null)
             {
-                character.Ghv.XVel = XVelocity.Run(character).ToF();
+                character.Ghv.FallXVel = XVelocity.Run(character).ToF();
             }
             if (YVelocity != null)
             {
-                character.Ghv.YVel = YVelocity.Run(character).ToF();
+                character.Ghv.FallYVel = YVelocity.Run(character).ToF();
             }
             if (ZVelocity != null)
             {
@@ -131,7 +131,7 @@ namespace Lockstep.Mugen.StateCtrl
         {
             if (character.MoveType == MoveTypeHit)
             {
-                character.Vel = new FVector3(character.Ghv.XVel, character.Ghv.YVel, character.Ghv.ZVel);
+                character.Vel = new FVector3(character.Ghv.FallXVel, character.Ghv.FallYVel, FFloat.Zero);
             }
             return false;
         }

@@ -13,6 +13,9 @@ namespace Lockstep.Mugen.Battle
         public int RandomSeed;
         public MPauseState Pause = new MPauseState();
         public int NextEntityId;
+        public MStage Stage = new MStage();
+        public bool NoDamage;
+        public bool EnableDemoAutoTurnFallback = true;
         public readonly List<MChar> Chars = new List<MChar>();
         public readonly List<MChar> Helpers = new List<MChar>();
         public readonly List<MProjectile> Projectiles = new List<MProjectile>();

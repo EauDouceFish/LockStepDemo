@@ -87,15 +87,19 @@ namespace Lockstep.Tests.Mugen.StateCtrl
                 MoveHit = 1,
                 MoveGuarded = 1,
                 MoveReversed = 1,
+                MoveContactTime = 5,
+                CounterHit = true,
             };
 
-            // oracle: bytecode.go:11262-11280 calls clearMoveHit; current C# port exposes move contact flags.
+            // oracle: bytecode.go:11262-11280 calls clearMoveHit; C# mirrors exposed trigger fields too.
             new MoveHitResetController().Run(character);
 
             Assert.That(character.MoveContact, Is.EqualTo(0));
             Assert.That(character.MoveHit, Is.EqualTo(0));
             Assert.That(character.MoveGuarded, Is.EqualTo(0));
             Assert.That(character.MoveReversed, Is.EqualTo(0));
+            Assert.That(character.MoveContactTime, Is.EqualTo(0));
+            Assert.That(character.CounterHit, Is.False);
         }
 
         [Test]

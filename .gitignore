@@ -33,6 +33,8 @@ sysinfo.txt
 # .NET 测试工程产物
 [Bb]in/
 TestResults/
+TestOutput/
+Tests/**/TestOutput/
 
 # 但手写的测试工程 csproj 必须入库（覆盖上面 *.csproj 的忽略）
 !Tests/**/*.csproj

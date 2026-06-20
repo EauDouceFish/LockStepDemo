@@ -31,6 +31,7 @@ namespace Lockstep.Mugen.Char
         public int HitTime;          // 受击硬直帧
         public int SlideTime;        // 滑行帧
         public int CtrlTime;         // 防御硬直帧
+        public int GuardCtrlTimeLeft; // runtime guard ctrl lock; gethitvar(ctrltime) stays constant
         public int Damage;           // 本次伤害
         public int HitCount;         // 连击数
         public int FallCount;        // 浮空内被击次数
@@ -91,7 +92,8 @@ namespace Lockstep.Mugen.Char
             {
                 XVel = XVel, YVel = YVel, ZVel = ZVel,
                 HitShakeTime = HitShakeTime, HitTime = HitTime, SlideTime = SlideTime,
-                CtrlTime = CtrlTime, Damage = Damage, HitCount = HitCount, FallCount = FallCount,
+                CtrlTime = CtrlTime, GuardCtrlTimeLeft = GuardCtrlTimeLeft,
+                Damage = Damage, HitCount = HitCount, FallCount = FallCount,
                 AnimType = AnimType, AttrType = AttrType, GroundType = GroundType, AirType = AirType,
                 GroundAnimType = GroundAnimType, AirAnimType = AirAnimType, FallAnimType = FallAnimType,
                 Fall = Fall, Guarded = Guarded, Up = Up, ForceStand = ForceStand, Kill = Kill,
@@ -107,7 +109,8 @@ namespace Lockstep.Mugen.Char
         {
             hash.AddFixed(XVel); hash.AddFixed(YVel); hash.AddFixed(ZVel);
             hash.AddInt32(HitShakeTime); hash.AddInt32(HitTime); hash.AddInt32(SlideTime);
-            hash.AddInt32(CtrlTime); hash.AddInt32(Damage); hash.AddInt32(HitCount); hash.AddInt32(FallCount);
+            hash.AddInt32(CtrlTime); hash.AddInt32(GuardCtrlTimeLeft);
+            hash.AddInt32(Damage); hash.AddInt32(HitCount); hash.AddInt32(FallCount);
             hash.AddInt32(AnimType); hash.AddInt32(AttrType); hash.AddInt32(GroundType); hash.AddInt32(AirType);
             hash.AddInt32(GroundAnimType); hash.AddInt32(AirAnimType); hash.AddInt32(FallAnimType);
             hash.AddBool(Fall); hash.AddBool(Guarded); hash.AddBool(Up);

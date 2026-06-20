@@ -1,0 +1,95 @@
+弱网模拟 / 手感优化 / 状态回滚方案
+日期：2026-06-13
+
+一、最终收敛方案
+
+1. 默认 Online 仍是延迟锁步。
+   BattleScene 链路为 KcpClientTransport -> MugenRoutedNetChannel -> MugenLockstepSession -> MTeamMatch.Tick。
+   不按“手感优化”按钮时，MugenLockstepSession 只在全玩家输入到齐后推进逻辑；弱网下能明显感到等待卡顿。
+
+2. 弱网模拟放在 KCP/UDP datagram 边界。
+   KcpClientTransport 对入站/出站 datagram 做轻微丢包、固定延迟、随机 jitter、短 burst 丢包。
+   不在逻辑层丢 MugenInputMsg，避免永久缺帧导致锁步死等。
+   模拟队列有容量上限，溢出或连续发送失败会转为 transport fault，关闭房间侧连接并清空排队包。
+
+3. 手感优化 = 表现辅助 + 可选逻辑预测回滚。
+   表现层仍保留本地角色的方向偏移、攻击 pulse 和 tint/scale 反馈，且每帧由 MugenDrawStateApplier 先重置权威颜色，避免表现污染。
+   逻辑层在 Online、已开战、Fight 状态、按钮开启时启用预测；按钮关闭时回到纯延迟锁步。
+
+4. 状态回滚框架已落地。
+   参考 Lockstep-Tutorial-0.4.2 的 FrameBuffer / World.RollbackTo / TimeMachineContainer 思路，本项目采用 MugenLockstepSession 内置预测缓冲与快照环：
+   - 每个模拟帧前保存 simulation snapshot。
+   - 远端输入缺失时用 LastKnownInputs 预测。
+   - 真实输入到达后与预测值比较。
+   - 若分叉，恢复到分叉帧快照，并从真实输入开始重放到当前帧。
+
+二、已实现模块清单
+
+1. KcpClientTransport
+   - SetNetworkSimulation 开关。
+   - 出站/入站延迟、jitter、丢包、burst drop。
+   - 关闭模拟时清空 backlog，不再瞬间 flush 残留弱网包。
+   - 队列容量上限 MaxSimulatedPacketsPerDirection。
+   - Faulted/FaultReason，用于 BattleScene 展示和断线收口。
+
+2. MRoundSystem
+   - MRoundSystemSnapshot。
+   - Snapshot/Restore 覆盖 Intro、RoundNo、Timer、Winner、FinishType、MatchOver、MatchWinner、RoundsWon、WinType、BoutComplete、_ticked、_posed、_scored、_ctrlRemoved、_stateTimer、_prevState 及回合配置。
+   - WriteHash 纳入 SingleRound、BoutComplete、_stateTimer、_prevState、_ticked。
+
+3. MTeamMatch
+   - MTeamMatchSnapshot。
+   - Snapshot/Restore 覆盖 BoutNo、activeIndex、MatchOver、MatchWinner、当前 EngineSnapshot、当前 RoundSnapshot。
+   - Restore 会静默重建当前 bout，避免回滚触发 UI 事件副作用。
+   - ComputeHash 覆盖车轮战外层状态、回合状态和引擎状态。
+
+4. MugenLockstepSession
+   - MugenLockstepSessionSnapshot。
+   - PredictionEnabled 开关，默认关闭。
+   - _inputs/_present/_predicted/_frameStamp/_received 输入环形缓冲。
+   - LastKnownInputs 远端预测输入。
+   - simulation snapshot 环形缓冲。
+   - 预测分叉检测、RollbackCount、LastRollbackFrame、OnPredictionFork、OnRollback。
+   - IsFrameAuthoritative 供 hash report 只上报确认帧。
+
+5. MugenTeamBattleView
+   - “弱网模拟”按钮接 KcpClientTransport。
+   - “手感优化”按钮同时开启表现辅助与逻辑预测。
+   - 预测只在 Online、已开始、Fight、未结束状态生效。
+   - transport fault 后关闭 net started、弱网开关和手感辅助。
+   - RunLog 使用 MTeamMatch.ComputeHash，不再只记 Engine.ComputeHash。
+
+6. 服务端对账与反作弊
+   - MugenHashReportMsg + MessageCodec。
+   - 客户端确认帧上报 match-level hash。
+   - MugenMatchServerCore 按房间/帧/玩家比较双方 hash，不一致则关闭房间并返回 hash mismatch reason。
+   - 输入校验覆盖非法 bit、负帧、大帧跳、重复帧冲突。
+   - 连续批量输入逐帧递增不会误封。
+
+7. 内容兼容 manifest
+   - BuildContentHash 纳入 ClientVersion、协议人数、队伍大小、common1.cns。
+   - 纳入所有可见可战斗角色包的 DEF/CNS/CMD/AIR/SFF/StCommon/StatePaths 内容。
+   - 服务端仍通过 ContentHash 强制匹配，避免同名不同内容进入同一房间。
+
+三、验收标准
+
+1. 未开启手感优化：弱网模拟下逻辑等待远端输入，能感到卡顿。
+2. 开启手感优化：本地输入立即有表现反馈，Fight 状态下逻辑可预测推进；真实输入分叉后能回滚重放。
+3. 预测帧不上报 hash，确认帧才上报服务端。
+4. Round / TeamMatch / Session 任一生命周期状态回滚后 hash 应回到快照值。
+5. 服务端发现 hash mismatch、非法输入 bit、冲突重复输入时关闭房间；连续合法批量输入不误封。
+
+四、当前测试覆盖
+
+1. MugenLockstepSessionTests.Prediction_RollsBackAndReplaysWhenConfirmedRemoteInputDiffers。
+2. MTeamMatchTests.SnapshotRestore_RestoresCurrentBoutRoundAndEngineState。
+3. MugenMatchServerCoreTests.HashMismatchClosesRoomForBothPlayers。
+4. MugenMatchServerCoreTests.SequentialInputBatchDoesNotTripFrameJumpGuard。
+5. MugenMatchServerCoreTests.ConflictingDuplicateInputClosesRoom。
+6. MatchMessagesRoundTripThroughCodec 覆盖 MugenHashReportMsg codec。
+
+五、后续限制
+
+1. 当前 prediction 仍是客户端本地体验优化，不改变服务端权威输入转发模型。
+2. 服务端只做 hash 对账和输入合法性校验，不模拟完整 MUGEN 战斗。
+3. 正式发布时弱网模拟按钮应仅在 debug/dev 房间启用。

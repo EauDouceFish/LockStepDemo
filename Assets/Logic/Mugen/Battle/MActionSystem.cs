@@ -1,40 +1,34 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/char.go actionPrepare（11435-11481 的引擎硬编码基础动作块）。
-// Adapted to fixed-point. 这是 MUGEN/Ikemen "站/走/蹲/跳/刹车" 的状态转移——不在角色 .cns 数据里，
-// 由引擎按输入边沿 + ctrl 直接驱动 changeState。守招(120)需 inguarddist+敌方攻击，单角色 demo 未接，标 deferred。
-// See Docs/动作系统_Ikemen移植.md.
+// Source: src/char.go actionPrepare/actionRun hardcoded basic action paths.
+// Adapted to fixed-point and this demo's MChar/MInputBuffer model.
 using Lockstep.Math;
 using Lockstep.Mugen.Char;
 
 namespace Lockstep.Mugen.Battle
 {
     /// <summary>
-    /// 引擎硬编码基础动作（移植 Ikemen actionPrepare）。每帧在状态机之前对受控角色判定：
-    /// 持上→跳(40)、空中持上边沿→空跳(45)、立持下→蹲(10)、蹲松下→起立(12)、立持前/后→走(20)、走中无方向→刹车(0)。
-    /// 仅设 <see cref="MChar.PendingStateNo"/>（changeState 的缓冲），由 <see cref="State.MStateMachine"/> 同帧应用。
-    /// 读 <see cref="MChar.Input"/> 的边沿计数（Fb/Bb/Ub/Db）与 <see cref="MChar.Control"/>()/KeyCtrl。
+    /// Engine hardcoded basic actions. This runs before the state machine for controlled
+    /// characters and queues common state transitions such as jump, crouch, walk and guard.
     /// </summary>
     public static class MActionSystem
     {
-        // statetype 码（对齐 MugenCodes：S=1/C=2/A=4/L=8）。
         const int ST_S = 1;
         const int ST_C = 2;
         const int ST_A = 4;
-        // physics 码（对齐 MugenCodes.Physics：A=4）。空中物理用于落地检测。
+        const int MT_A = 4;
         const int PHYS_A = 4;
 
-        // 保留状态号（对齐 Ikemen / MUGEN 公共状态约定）。
         const int StWalk = 20;
         const int StStand = 0;
         const int StStandToCrouch = 10;
         const int StCrouchToStand = 12;
+        const int StStandGuard = 120;
         const int StJumpStart = 40;
         const int StAirJumpStart = 45;
         const int StLand = 52;
         const int StRunFwd = 100;
         const int StRunJumpLand = 105;
 
-        /// <summary>对受控角色执行引擎内置基础动作判定（移植 actionPrepare 硬编码键块）。</summary>
         // Ikemen reference: src/char.go:11435-11481 Char.actionPrepare hardcoded jump/crouch/walk/brake decisions.
         public static void Prepare(MChar c)
         {
@@ -43,17 +37,28 @@ namespace Lockstep.Mugen.Battle
                 return;
             }
 
-            // gate：玩家按键控制 + 未禁用硬编码键（对齐 c.keyctrl[0] && c.cmd != nil && !asf(nohardcodedkeys)）。
-            if (c.KeyCtrl && !Asf(c, MAssertFlag.NoHardcodedKeys))
+            bool canUseHardcodedKeys = c.KeyCtrl && !Asf(c, MAssertFlag.NoHardcodedKeys);
+            bool canStartBasicAction = canUseHardcodedKeys && c.MoveType != MT_A;
+            bool wantsStandGuard = canStartBasicAction && c.Control() &&
+                c.StateType == ST_S && c.Input.Bb > 0 && InGuardDist(c);
+            c.Guarding = wantsStandGuard || IsGuardState(c.StateNo);
+
+            if (canUseHardcodedKeys)
             {
-                if (c.Control())
+                if (canStartBasicAction && c.Control())
                 {
-                    // 守招(120)：需 inguarddist + 敌方攻击中，单角色无法满足 → deferred（不入 else-if 链）。
-                    if (!Asf(c, MAssertFlag.NoJump) && c.StateType == ST_S && c.Input.Ub > 0)
+                    if (wantsStandGuard)
+                    {
+                        if (c.StateNo != StStandGuard)
+                        {
+                            c.QueueTransition(StStandGuard, c.PlayerNo);
+                        }
+                    }
+                    else if (!Asf(c, MAssertFlag.NoJump) && c.StateType == ST_S && c.Input.Ub > 0)
                     {
                         if (c.StateNo != StJumpStart)
                         {
-                            c.QueueTransition(StJumpStart, c.PlayerNo);   // 跳跃起始
+                            c.QueueTransition(StJumpStart, c.PlayerNo);
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoAirJump) && c.StateType == ST_A && c.Input.Ub == 1 &&
@@ -62,7 +67,7 @@ namespace Lockstep.Mugen.Battle
                         if (c.StateNo != StAirJumpStart || c.Time > 0)
                         {
                             c.AirJumpCount++;
-                            c.QueueTransition(StAirJumpStart, c.PlayerNo);   // 空中跳跃
+                            c.QueueTransition(StAirJumpStart, c.PlayerNo);
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoCrouch) && c.StateType == ST_S && c.Input.Db > 0)
@@ -73,20 +78,19 @@ namespace Lockstep.Mugen.Battle
                             {
                                 c.Vel = new FVector3(FFloat.Zero, c.Vel.Y, c.Vel.Z);
                             }
-                            c.QueueTransition(StStandToCrouch, c.PlayerNo);   // 立 → 蹲
+                            c.QueueTransition(StStandToCrouch, c.PlayerNo);
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoStand) && c.StateType == ST_C && c.Input.Db <= 0)
                     {
                         if (c.StateNo != StCrouchToStand)
                         {
-                            c.QueueTransition(StCrouchToStand, c.PlayerNo);   // 蹲 → 起立
+                            c.QueueTransition(StCrouchToStand, c.PlayerNo);
                         }
                     }
                     else if (!Asf(c, MAssertFlag.NoWalk) && c.StateType == ST_S &&
                         (c.Input.Fb > 0) != (c.Input.Bb > 0))
                     {
-                        // 走路：前/后恰一方持续按住即走（inguarddist 未接，等价 Ikemen 无敌人靠近时的 XOR 解）。
                         if (c.StateNo != StWalk)
                         {
                             c.QueueTransition(StWalk, c.PlayerNo);
@@ -94,26 +98,46 @@ namespace Lockstep.Mugen.Battle
                     }
                 }
 
-                // 刹车：走路中前后同按或同松 → 回站立。不需要 ctrl（对齐 Ikemen 注释 "Braking is special"）。
-                if (!Asf(c, MAssertFlag.NoBrake) && c.StateNo == StWalk &&
+                // Braking is special in Ikemen: walk can brake even outside the ctrl branch.
+                if (c.MoveType != MT_A && !Asf(c, MAssertFlag.NoBrake) && c.StateNo == StWalk &&
                     (c.Input.Bb > 0) == (c.Input.Fb > 0))
                 {
                     c.QueueTransition(StStand, c.PlayerNo);
                 }
             }
 
-            // 落地（非空中）即清零空跳计数（对齐 char.go 11479-11481，在 keyctrl 块之外，无条件执行）。
             if (c.StateType != ST_A)
             {
                 c.AirJumpCount = 0;
             }
         }
 
-        /// <summary>
-        /// 空中物理落地检测（移植 char.go actionRun 内 posUpdate 之后的 "Land from aerial physics"，11717-11723）。
-        /// 在物理积分之后调用：空中物理 + 下落(vel.y>0) + 触地(pos.y>=地面) + 非跑跳落地特例(105) → 强制落地态 52。
-        /// 缺此则跳起后无限下落（地面夹取在 MUGEN 由此引擎硬编码转移负责，不在 .cns 数据里）。
-        /// </summary>
+        // Project-specific demo shim: keep controllable grounded fighters facing their opponent.
+        // Full MUGEN/Ikemen turning is authored through common state 5 and Turn controllers. The
+        // engine calls this after input buffering and state logic, so current-frame B/F command
+        // parsing and state triggers use the pre-turn facing; render and the next frame see the new facing.
+        public static void AutoTurn(MChar c)
+        {
+            if (c == null || c.P2 == null || !c.KeyCtrl || !c.Control())
+            {
+                return;
+            }
+            if ((c.AssertFlags & (int)MAssertFlag.NoAutoTurn) != 0 || c.StateOwner != null)
+            {
+                return;
+            }
+            if (c.MoveType == 2 || c.StateType == ST_A)
+            {
+                return;
+            }
+            if (c.Pos.X == c.P2.Pos.X)
+            {
+                return;
+            }
+
+            c.Facing = c.P2.Pos.X > c.Pos.X ? FFloat.One : FFloat.MinusOne;
+        }
+
         // Ikemen reference: src/char.go:11717-11723 Char.actionRun aerial-physics land transition to state 52.
         public static void LandCheck(MChar c)
         {
@@ -133,16 +157,39 @@ namespace Lockstep.Mugen.Battle
             return (c.AssertFlags & (int)flag) != 0;
         }
 
-        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump height check using movement.airjump.height.
+        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump height check.
         static FFloat AirjumpHeight(MChar c)
         {
             return c.Constants != null ? c.Constants.AirjumpHeight : FFloat.FromInt(35);
         }
 
-        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump count check using movement.airjump.num.
+        // Ikemen reference: src/char.go:11456-11464 actionPrepare airjump count check.
         static int AirjumpNum(MChar c)
         {
             return c.Constants != null ? c.Constants.AirjumpNum : 0;
+        }
+
+        // Ikemen reference: src/char.go inguarddist guard-entry gate.
+        static bool InGuardDist(MChar c)
+        {
+            if (c.P2 == null || c.P2.MoveType != 4)
+            {
+                return false;
+            }
+            FFloat dx = c.Pos.X - c.P2.Pos.X;
+            if (dx.Raw < 0)
+            {
+                dx = -dx;
+            }
+            return dx <= c.P2.AttackDistX;
+        }
+
+        // Ikemen reference: common guard states stay guard-capable while the authored state runs.
+        static bool IsGuardState(int stateNo)
+        {
+            return stateNo == 120 || stateNo == 130 || stateNo == 131 || stateNo == 132 ||
+                stateNo == 140 || stateNo == 150 || stateNo == 151 || stateNo == 152 ||
+                stateNo == 153 || stateNo == 154 || stateNo == 155;
         }
     }
 }

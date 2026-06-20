@@ -240,6 +240,7 @@ namespace KcpProject
 
         // internal time.
         public UInt32 CurrentMS { get { return currentMS(); } }
+        public int Srtt { get { return rx_srtt; } }
 
         // log
         Action<string> writelog = null;

@@ -229,6 +229,7 @@ namespace Lockstep.Tests.Mugen
             Assert.That(hd.FallAnimType, Is.EqualTo(MReaction.Back), "air.animtype 非 Up → fall.animtype 默认 Back");
             Assert.IsFalse(hd.FallRecover, "fall.recover=0");
             Assert.That(hd.FallRecoverTime, Is.EqualTo(30));
+            Assert.IsFalse(hd.FallXVelSet, "fall.xvelocity 未写时应保持未定义语义");
         }
 
         [Test]
@@ -248,6 +249,20 @@ namespace Lockstep.Tests.Mugen
             Assert.IsFalse(noY.ForceStand, "ground.velocity Y==0 → forcestand 默认关");
         }
 
+        [Test]
+        public void Cns_GroundVelocity_NComponentLeavesAxisDefault()
+        {
+            MHitDef keepX = ParseHitDef("attr = S, NA\ndamage = 80\nground.velocity = n, -3\n");
+            Assert.That(keepX.GroundVelX.Raw, Is.EqualTo(FFloat.Zero.Raw));
+            Assert.That(keepX.GroundVelY.Raw, Is.EqualTo(F(-3).Raw));
+            Assert.IsTrue(keepX.ForceStand);
+
+            MHitDef keepY = ParseHitDef("attr = S, NA\ndamage = 80\nground.velocity = -4, n\n");
+            Assert.That(keepY.GroundVelX.Raw, Is.EqualTo(F(-4).Raw));
+            Assert.That(keepY.GroundVelY.Raw, Is.EqualTo(FFloat.Zero.Raw));
+            Assert.IsFalse(keepY.ForceStand);
+        }
+
         // ───────── CopyInto 完整性（修遗漏 bug）─────────
 
         [Test]
@@ -258,9 +273,12 @@ namespace Lockstep.Tests.Mugen
             template.AirAnimType = MReaction.Back;
             template.FallAnimType = MReaction.Up;
             template.YAccel = F(2);
+            template.FallXVel = F(-8);
+            template.FallXVelSet = true;
             template.FallYVel = F(-9);
             template.FallRecover = false;
             template.FallRecoverTime = 25;
+            template.AirJuggle = 6;
             template.Kill = false;
             template.GuardKill = false;
             template.FallKill = false;
@@ -278,9 +296,12 @@ namespace Lockstep.Tests.Mugen
             Assert.That(dst.AirAnimType, Is.EqualTo(MReaction.Back));
             Assert.That(dst.FallAnimType, Is.EqualTo(MReaction.Up));
             Assert.That(dst.YAccel.Raw, Is.EqualTo(F(2).Raw));
+            Assert.That(dst.FallXVel.Raw, Is.EqualTo(F(-8).Raw));
+            Assert.IsTrue(dst.FallXVelSet);
             Assert.That(dst.FallYVel.Raw, Is.EqualTo(F(-9).Raw));
             Assert.IsFalse(dst.FallRecover);
             Assert.That(dst.FallRecoverTime, Is.EqualTo(25));
+            Assert.That(dst.AirJuggle, Is.EqualTo(6));
             Assert.IsFalse(dst.Kill);
             Assert.IsFalse(dst.GuardKill);
             Assert.IsFalse(dst.FallKill);

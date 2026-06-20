@@ -16,6 +16,7 @@ namespace Lockstep.Mugen.StateCtrl
         public override bool Run(MChar c)
         {
             CopyInto(Template, c.HitDef);
+            c.HitDef.ResolveDynamicValues(c);
             c.HitDef.Active = true;
             c.MoveType = 4;          // A 攻击中
             c.ClearTargets();        // 新 HitDef：清空已命中目标，使本招可重新命中
@@ -30,6 +31,7 @@ namespace Lockstep.Mugen.StateCtrl
             dst.GuardHigh = src.GuardHigh; dst.GuardLow = src.GuardLow; dst.GuardAir = src.GuardAir;
             dst.GuardHitTime = src.GuardHitTime; dst.GuardCtrlTime = src.GuardCtrlTime; dst.GuardVelX = src.GuardVelX;
             dst.HitDamage = src.HitDamage; dst.GuardDamage = src.GuardDamage;
+            dst.HitDamageExpr = src.HitDamageExpr; dst.GuardDamageExpr = src.GuardDamageExpr; dst.FallDamageExpr = src.FallDamageExpr;
             dst.P1PauseTime = src.P1PauseTime; dst.P2PauseTime = src.P2PauseTime;
             dst.GroundHitTime = src.GroundHitTime; dst.AirHitTime = src.AirHitTime; dst.GroundSlideTime = src.GroundSlideTime;
             dst.GroundVelX = src.GroundVelX; dst.GroundVelY = src.GroundVelY;
@@ -37,8 +39,8 @@ namespace Lockstep.Mugen.StateCtrl
             dst.AnimType = src.AnimType; dst.AirAnimType = src.AirAnimType; dst.FallAnimType = src.FallAnimType;
             dst.GroundType = src.GroundType; dst.AirType = src.AirType; dst.Fall = src.Fall;
             dst.P1StateNo = src.P1StateNo; dst.P2StateNo = src.P2StateNo; dst.P2GetP1State = src.P2GetP1State; dst.NumHits = src.NumHits; dst.HitOnce = src.HitOnce;
-            dst.YAccel = src.YAccel; dst.FallXVel = src.FallXVel; dst.FallYVel = src.FallYVel;
-            dst.FallRecover = src.FallRecover; dst.FallRecoverTime = src.FallRecoverTime; dst.FallDamage = src.FallDamage;
+            dst.YAccel = src.YAccel; dst.FallXVel = src.FallXVel; dst.FallXVelSet = src.FallXVelSet; dst.FallYVel = src.FallYVel;
+            dst.FallRecover = src.FallRecover; dst.FallRecoverTime = src.FallRecoverTime; dst.FallDamage = src.FallDamage; dst.AirJuggle = src.AirJuggle;
             dst.DownVelX = src.DownVelX; dst.DownVelY = src.DownVelY; dst.DownHitTime = src.DownHitTime; dst.DownBounce = src.DownBounce;
             dst.Kill = src.Kill; dst.GuardKill = src.GuardKill; dst.FallKill = src.FallKill;
             dst.ForceStand = src.ForceStand;

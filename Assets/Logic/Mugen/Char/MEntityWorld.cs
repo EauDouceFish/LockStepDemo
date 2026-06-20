@@ -2,6 +2,7 @@
 // Source: src/char.go helper/projectile/explod helpers + system.go entity lists.
 // Adapted to fixed-point lockstep. See Docs/移植方案_Ikemen.md.
 using System.Collections.Generic;
+using System;
 using Lockstep.Core;
 using Lockstep.Math;
 
@@ -59,9 +60,14 @@ namespace Lockstep.Mugen.Char
         public bool OwnPal;
         public bool RemoveOnGetHit;
         public bool RemoveOnChangeState;
+        public bool IgnoreHitPause = true;
 
-        public void Step()
+        public void Step(bool ownerHitpause = false)
         {
+            if (ownerHitpause && !IgnoreHitPause)
+            {
+                return;
+            }
             Vel = new FVector3(Vel.X + Accel.X, Vel.Y + Accel.Y, Vel.Z + Accel.Z);
             Pos = new FVector3(Pos.X + Vel.X, Pos.Y + Vel.Y, Pos.Z + Vel.Z);
             if (BindTime > 0)
@@ -101,6 +107,7 @@ namespace Lockstep.Mugen.Char
                 OwnPal = OwnPal,
                 RemoveOnGetHit = RemoveOnGetHit,
                 RemoveOnChangeState = RemoveOnChangeState,
+                IgnoreHitPause = IgnoreHitPause,
             };
         }
 
@@ -123,6 +130,7 @@ namespace Lockstep.Mugen.Char
             hash.AddBool(OwnPal);
             hash.AddBool(RemoveOnGetHit);
             hash.AddBool(RemoveOnChangeState);
+            hash.AddBool(IgnoreHitPause);
         }
     }
 
@@ -211,11 +219,13 @@ namespace Lockstep.Mugen.Char
             return count;
         }
 
-        public void StepExplods()
+        public void StepExplods(Func<int, bool> ownerHitpause = null)
         {
             for (int index = 0; index < Explods.Count; index++)
             {
-                Explods[index].Step();
+                MExplod explod = Explods[index];
+                bool hitpause = ownerHitpause != null && ownerHitpause(explod.OwnerId);
+                explod.Step(hitpause);
             }
             for (int index = Explods.Count - 1; index >= 0; index--)
             {
@@ -300,8 +310,14 @@ namespace Lockstep.Mugen.Char
         public MEntityWorld Clone()
         {
             MEntityWorld world = new MEntityWorld { NextEntityId = NextEntityId };
-            world.SpawnQueue.AddRange(SpawnQueue);
-            world.ProjSpawnQueue.AddRange(ProjSpawnQueue);
+            for (int index = 0; index < SpawnQueue.Count; index++)
+            {
+                world.SpawnQueue.Add(CloneRequest(SpawnQueue[index]));
+            }
+            for (int index = 0; index < ProjSpawnQueue.Count; index++)
+            {
+                world.ProjSpawnQueue.Add(CloneRequest(ProjSpawnQueue[index]));
+            }
             world.Helpers.AddRange(Helpers);
             for (int index = 0; index < Projectiles.Count; index++)
             {
@@ -312,6 +328,17 @@ namespace Lockstep.Mugen.Char
                 world.Explods.Add(Explods[index].Clone());
             }
             return world;
+        }
+
+        static MHelperRequest CloneRequest(MHelperRequest request)
+        {
+            return request;
+        }
+
+        static MProjectileRequest CloneRequest(MProjectileRequest request)
+        {
+            request.HitDef = request.HitDef != null ? request.HitDef.Clone() : null;
+            return request;
         }
 
         public void WriteHash(ref Hash64 hash)
@@ -326,6 +353,11 @@ namespace Lockstep.Mugen.Char
             for (int index = 0; index < ProjSpawnQueue.Count; index++)
             {
                 WriteHash(ref hash, ProjSpawnQueue[index]);
+            }
+            hash.AddInt32(Projectiles.Count);
+            for (int index = 0; index < Projectiles.Count; index++)
+            {
+                Projectiles[index].WriteHash(ref hash);
             }
             hash.AddInt32(Explods.Count);
             for (int index = 0; index < Explods.Count; index++)

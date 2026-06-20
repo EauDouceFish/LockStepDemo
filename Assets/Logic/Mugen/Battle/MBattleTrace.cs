@@ -546,6 +546,7 @@ namespace Lockstep.Mugen.Battle
             return "unowned";
         }
 
+        // Project-specific: resolves stable trace entity keys; Ikemen runtime uses Char pointers/ids rather than this diff schema.
         string KeyOf(MChar character)
         {
             if (character == null) { return null; }
@@ -553,6 +554,7 @@ namespace Lockstep.Mugen.Battle
             return _entityKeys.TryGetValue(character, out key) ? key : null;
         }
 
+        // Project-specific: captures C# entity state for oracle diffing; fields mirror src/char.go Char actionRun/update state.
         MEntityTrace CaptureEntity(MChar character, MCharData data, bool helper, int creationOrdinal)
         {
             int width = data != null && data.Definition != null ? data.Definition.LocalCoordWidth : 320;
@@ -659,12 +661,14 @@ namespace Lockstep.Mugen.Battle
             return trace;
         }
 
+        // Project-specific: maps runtime ids to stable trace keys for event ownership; Ikemen does not emit this trace schema.
         string KeyByRuntimeId(int id)
         {
             string key;
             return _runtimeIdKeys.TryGetValue(id, out key) ? key : null;
         }
 
+        // Ikemen reference: src/char.go posUpdate/vel integration and localcoord scaling represented as trace transform fields.
         static MTraceTransform CaptureTransform(MChar character, int width, int height)
         {
             return new MTraceTransform
@@ -680,6 +684,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Ikemen reference: src/char.go HitDef/contact bookkeeping including movecontact/movehit/guard and projectile contact timers.
         static MTraceCombat CaptureCombat(MChar character)
         {
             return new MTraceCombat
@@ -711,6 +716,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Ikemen reference: src/char.go gethit processing stores hit velocity, hittime, fall, guard, and recovery fields.
         static MTraceGetHit CaptureGetHit(MGetHitVar value)
         {
             return new MTraceGetHit
@@ -728,6 +734,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Ikemen reference: src/char.go Projectile tick/contact/remove state captured into a stable trace record.
         MProjectileTrace CaptureProjectile(MProjectile value, MCharData data)
         {
             int width = data != null && data.Definition != null ? data.Definition.LocalCoordWidth : 320;
@@ -752,6 +759,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Ikemen reference: src/char.go Explod init/update fields captured into a stable trace record.
         MExplodTrace CaptureExplod(MExplod value, MCharData data)
         {
             int width = data != null && data.Definition != null ? data.Definition.LocalCoordWidth : 320;
@@ -779,6 +787,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: captures C# visual/sound event queues for diffing; related Ikemen behavior is PlaySnd/Explod/PalFX emission.
         void CaptureEvents(MBattleEngine engine, List<MEventTrace> destination)
         {
             Dictionary<string, int> occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -843,6 +852,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific: resolves C# character data ownership for trace scaling; Ikemen keeps owner data on Char/System objects.
         static MCharData DataForOwner(MBattleEngine engine, MChar character)
         {
             if (character == null) { return null; }
@@ -857,6 +867,7 @@ namespace Lockstep.Mugen.Battle
             return null;
         }
 
+        // Project-specific: resolves owner runtime id to C# character data for trace scaling; Ikemen does not need this lookup layer.
         static MCharData DataForOwnerId(MBattleEngine engine, int ownerId)
         {
             for (int i = 0; i < engine.Chars.Count; i++)
@@ -870,6 +881,7 @@ namespace Lockstep.Mugen.Battle
             return null;
         }
 
+        // Project-specific: extracts stable trace creation order from generated keys; Ikemen uses live entity ordering internally.
         static int CreationOrdinal(string key)
         {
             int end = key.Length - 1;
@@ -880,11 +892,13 @@ namespace Lockstep.Mugen.Battle
                 : 0;
         }
 
+        // Project-specific: serializes C# fixed vectors into trace Q20 local-coordinate arrays; Ikemen uses native float/fixed values.
         static long[] LocalVector(FVector3 value)
         {
             return new[] { ToQ20(value.X), ToQ20(value.Y), ToQ20(value.Z) };
         }
 
+        // Ikemen reference: src/char.go localcoord/world-coordinate conversion represented in trace-space Q20 values.
         static long[] WorldVector(FVector3 value, int localCoordWidth)
         {
             long[] local = LocalVector(value);
@@ -897,6 +911,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: normalizes C# fixed-point values for trace comparison; Ikemen traces are converted to the same Q20 schema externally.
         public static long ToQ20(FFloat value)
         {
             const long divisor = 1L << 12;
@@ -911,6 +926,7 @@ namespace Lockstep.Mugen.Battle
             return quotient;
         }
 
+        // Project-specific: deterministic trace-space scaling helper for localcoord comparisons; no direct Ikemen function counterpart.
         static long ScaleRoundEven(long value, int numerator, int denominator)
         {
             long scaled = value * numerator;
@@ -926,6 +942,7 @@ namespace Lockstep.Mugen.Battle
             return quotient;
         }
 
+        // Project-specific: canonicalizes trace record ordering; Ikemen does not expose this comparer schema.
         static void Sort<T>(List<T> values) where T : IMTraceKeyed
         {
             values.Sort((left, right) => string.CompareOrdinal(left.TraceKey, right.TraceKey));
@@ -940,6 +957,7 @@ namespace Lockstep.Mugen.Battle
         public long ScaleQ20 = 16;
         public long OtherQ20;
 
+        // Project-specific: creates zero-tolerance C# trace comparison settings; no Ikemen battle-runtime counterpart.
         public static MTraceTolerance Exact()
         {
             return new MTraceTolerance
@@ -961,6 +979,7 @@ namespace Lockstep.Mugen.Battle
         public string Expected;
         public string Actual;
 
+        // Project-specific: formats C# trace differences for tests/tools; no Ikemen battle-runtime counterpart.
         public override string ToString()
         {
             return "frame " + Frame + " [" + Category + "] " + Path + ": expected " + Expected +
@@ -974,6 +993,7 @@ namespace Lockstep.Mugen.Battle
     /// </summary>
     public static class MBattleTraceComparer
     {
+        // Project-specific: compares full C# vs Ikemen oracle traces; Ikemen only supplies the expected trace data.
         public static List<MTraceDifference> Compare(
             MBattleTrace expected,
             MBattleTrace actual,
@@ -990,6 +1010,7 @@ namespace Lockstep.Mugen.Battle
             return differences;
         }
 
+        // Project-specific: compares frame lists by stable trace keys; no Ikemen battle-runtime counterpart.
         public static List<MTraceDifference> Compare(
             IReadOnlyList<MBattleTraceFrame> expected,
             IReadOnlyList<MBattleTraceFrame> actual,
@@ -1001,6 +1022,7 @@ namespace Lockstep.Mugen.Battle
             return differences;
         }
 
+        // Project-specific: schema-driven recursive trace comparison; no Ikemen battle-runtime counterpart.
         static void CompareValue(string path, object expected, object actual, int frame,
             MTraceTolerance tolerance, List<MTraceDifference> differences)
         {
@@ -1060,6 +1082,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific: reflection helper for trace comparison; no Ikemen battle-runtime counterpart.
         static bool IsScalar(Type type)
         {
             return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal);

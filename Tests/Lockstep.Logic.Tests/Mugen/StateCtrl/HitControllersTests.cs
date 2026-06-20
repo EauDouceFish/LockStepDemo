@@ -87,9 +87,11 @@ namespace Lockstep.Tests.Mugen.StateCtrl
         }
 
         [Test]
-        public void HitFallSet_UpdatesFallFlagAndVelocityProxy()
+        public void HitFallSet_UpdatesFallFlagAndFallVelocity()
         {
             MChar character = new MChar();
+            character.Ghv.XVel = Fixed(11);
+            character.Ghv.YVel = Fixed(12);
 
             new HitFallSetController
             {
@@ -99,9 +101,10 @@ namespace Lockstep.Tests.Mugen.StateCtrl
             }.Run(character);
 
             Assert.IsTrue(character.Ghv.Fall);
-            Assert.That(character.Ghv.XVel.Raw, Is.EqualTo(Fixed(-3).Raw));
-            Assert.That(character.Ghv.YVel.Raw, Is.EqualTo(Fixed(7).Raw));
-            Assert.That(character.Ghv.ZVel.Raw, Is.EqualTo(FFloat.Zero.Raw));
+            Assert.That(character.Ghv.FallXVel.Raw, Is.EqualTo(Fixed(-3).Raw));
+            Assert.That(character.Ghv.FallYVel.Raw, Is.EqualTo(Fixed(7).Raw));
+            Assert.That(character.Ghv.XVel.Raw, Is.EqualTo(Fixed(11).Raw));
+            Assert.That(character.Ghv.YVel.Raw, Is.EqualTo(Fixed(12).Raw));
         }
 
         [Test]
@@ -113,6 +116,7 @@ namespace Lockstep.Tests.Mugen.StateCtrl
                 Vel = new FVector3(Fixed(1), Fixed(2), Fixed(3)),
             };
             idleCharacter.Ghv.XVel = Fixed(9);
+            idleCharacter.Ghv.FallXVel = Fixed(10);
             new HitFallVelController().Run(idleCharacter);
             Assert.That(idleCharacter.Vel.X.Raw, Is.EqualTo(Fixed(1).Raw));
 
@@ -120,11 +124,13 @@ namespace Lockstep.Tests.Mugen.StateCtrl
             hitCharacter.Ghv.XVel = Fixed(-5);
             hitCharacter.Ghv.YVel = Fixed(6);
             hitCharacter.Ghv.ZVel = Fixed(1);
+            hitCharacter.Ghv.FallXVel = Fixed(-8);
+            hitCharacter.Ghv.FallYVel = Fixed(9);
             new HitFallVelController().Run(hitCharacter);
 
-            Assert.That(hitCharacter.Vel.X.Raw, Is.EqualTo(Fixed(-5).Raw));
-            Assert.That(hitCharacter.Vel.Y.Raw, Is.EqualTo(Fixed(6).Raw));
-            Assert.That(hitCharacter.Vel.Z.Raw, Is.EqualTo(Fixed(1).Raw));
+            Assert.That(hitCharacter.Vel.X.Raw, Is.EqualTo(Fixed(-8).Raw));
+            Assert.That(hitCharacter.Vel.Y.Raw, Is.EqualTo(Fixed(9).Raw));
+            Assert.That(hitCharacter.Vel.Z.Raw, Is.EqualTo(FFloat.Zero.Raw));
         }
 
         [Test]

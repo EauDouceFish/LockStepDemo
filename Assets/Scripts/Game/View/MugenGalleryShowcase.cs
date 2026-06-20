@@ -27,7 +27,7 @@ namespace Lockstep.View
         void Start()
         {
             Application.runInBackground = true;   // 编辑器失焦也持续播放（MCP 截图需要）
-            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource"));
+            string root = MugenAssetPaths.MugenRoot();
             ScanCharacters(root);
             if (_characterFolders.Count == 0)
             {
@@ -132,7 +132,7 @@ namespace Lockstep.View
             ScaleToTargetHeight(go);
 
             _spawned.Add(go);
-            _spawnedNames.Add(name);
+            _spawnedNames.Add(MugenChineseText.CharacterName(name));
         }
 
         static AnimData PickStandingAnim(Dictionary<int, AnimData> anims)
@@ -203,6 +203,7 @@ namespace Lockstep.View
             }
 
             GUIStyle title = new GUIStyle(GUI.skin.label);
+            title.font = MugenChineseText.Font();
             title.fontSize = 18;
             title.normal.textColor = Color.white;
             GUI.Label(new Rect(12f, 8f, 500f, 28f),
@@ -224,6 +225,7 @@ namespace Lockstep.View
                 return;
             }
             GUIStyle nameStyle = new GUIStyle(GUI.skin.label);
+            nameStyle.font = MugenChineseText.Font();
             nameStyle.fontSize = 15;
             nameStyle.alignment = TextAnchor.MiddleCenter;
             nameStyle.normal.textColor = Color.white;

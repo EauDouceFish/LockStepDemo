@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Lockstep.Mugen.Anim;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.State;
+using Lockstep.Mugen.StateCtrl;
 
 namespace Lockstep.Tests.Mugen
 {
@@ -67,6 +69,50 @@ namespace Lockstep.Tests.Mugen
             Assert.That(c.StateType, Is.EqualTo(2), "应用 statedef 的 statetype");
             Assert.That(c.MoveType, Is.EqualTo(1));
             Assert.IsFalse(c.Ctrl, "statedef ctrl=0");
+        }
+
+        [Test]
+        public void Reentry_TargetStateSeesTimeZeroAndStateDefAnimTime()
+        {
+            MAnimData anim = new MAnimData
+            {
+                No = 210,
+                Frames = new[]
+                {
+                    new MAnimFrame { SpriteGroup = 210, SpriteImage = 0, Time = 2 },
+                    new MAnimFrame { SpriteGroup = 210, SpriteImage = 1, Time = 3 },
+                },
+            };
+            anim.ComputePacing();
+
+            MStateDef start = new MStateDef { No = 100 };
+            start.Controllers.Add(ChangeState(200, "1"));
+            MStateDef target = new MStateDef { No = 200, Anim = Comp.Compile("210") };
+            target.Controllers.Add(ChangeState(300, "time = 0 && animtime = -5"));
+            MStateDef chained = new MStateDef { No = 300 };
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef>
+            {
+                [100] = start,
+                [200] = target,
+                [300] = chained,
+            };
+            MChar c = new MChar
+            {
+                StateNo = 100,
+                AnimNo = 0,
+                AnimTable = new Dictionary<int, MAnimData> { [210] = anim },
+                PlayerNo = 1,
+                StatePlayerNo = 1,
+                AnimPlayerNo = 1,
+                SpritePlayerNo = 1,
+            };
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(300));
+            Assert.That(c.AnimNo, Is.EqualTo(210));
+            Assert.That(c.AnimTime, Is.EqualTo(-5));
+            Assert.That(c.Time, Is.EqualTo(1));
         }
 
         [Test]
@@ -305,6 +351,110 @@ namespace Lockstep.Tests.Mugen
         }
 
         // ───────── M4 补全：SelfState ─────────
+
+        [Test]
+        public void NegativeState_DoesNotSeePendingTransitionStateDefCtrlBeforeCurrentState()
+        {
+            MStateDef neg1 = new MStateDef { No = -1 };
+            neg1.Controllers.Add(new ChangeStateController
+            {
+                Triggers = MTriggerSet.Single(Comp.Compile("ctrl")),
+                Value = Comp.Compile("200"),
+            });
+
+            MStateDef attack = new MStateDef { No = 400, Ctrl = Comp.Compile("0") };
+            MStateDef idle = new MStateDef { No = 0, Ctrl = Comp.Compile("1") };
+            MStateDef chained = new MStateDef { No = 200 };
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef>
+            {
+                [-1] = neg1,
+                [0] = idle,
+                [200] = chained,
+                [400] = attack,
+            };
+
+            MChar c = new MChar { StateNo = 400, Time = 9, Ctrl = false, PlayerNo = 1, StatePlayerNo = 1 };
+            c.QueueTransition(0, c.PlayerNo);
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(0),
+                "-1 must run before the pending state's statedef ctrl=1 is applied.");
+            Assert.That(c.Ctrl, Is.True, "statedef ctrl=1 should still apply before current state 0 runs.");
+            Assert.That(c.Time, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NegativeState_DoesNotSeeCurrentStateCtrlSetUntilNextFrame()
+        {
+            MStateDef neg1 = new MStateDef { No = -1 };
+            neg1.Controllers.Add(new ChangeStateController
+            {
+                Triggers = MTriggerSet.Single(Comp.Compile("ctrl")),
+                Value = Comp.Compile("200"),
+            });
+
+            MStateDef attack = new MStateDef { No = 400 };
+            attack.Controllers.Add(new CtrlSetController
+            {
+                Triggers = MTriggerSet.Single(Comp.Compile("time = 0")),
+                Value = Comp.Compile("1"),
+            });
+            MStateDef chained = new MStateDef { No = 200 };
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef>
+            {
+                [-1] = neg1,
+                [200] = chained,
+                [400] = attack,
+            };
+
+            MChar c = new MChar { StateNo = 400, Time = 0, Ctrl = false, PlayerNo = 1, StatePlayerNo = 1 };
+            MStateMachine sm = new MStateMachine();
+
+            sm.RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(400),
+                "-1 should have sampled ctrl before state 400 CtrlSet executed.");
+            Assert.That(c.Ctrl, Is.True);
+            Assert.That(c.Time, Is.EqualTo(1));
+
+            sm.RunFrame(c, states);
+            Assert.That(c.StateNo, Is.EqualTo(200),
+                "-1 may consume the restored ctrl on the following frame.");
+        }
+
+        [Test]
+        public void HitpauseChangeState_DefersTargetStateDefHeaderUntilHitpauseEnds()
+        {
+            MStateDef attack = new MStateDef { No = 400 };
+            attack.Controllers.Add(new ChangeStateController
+            {
+                Triggers = null,
+                IgnoreHitPause = true,
+                Value = Comp.Compile("0"),
+            });
+            MStateDef idle = new MStateDef { No = 0, Ctrl = Comp.Compile("1") };
+            Dictionary<int, MStateDef> states = new Dictionary<int, MStateDef>
+            {
+                [0] = idle,
+                [400] = attack,
+            };
+            MChar c = new MChar { StateNo = 400, Time = 5, Ctrl = false, Hitstop = 1, PlayerNo = 1, StatePlayerNo = 1 };
+            MStateMachine sm = new MStateMachine();
+
+            sm.RunFrame(c, states);
+
+            Assert.That(c.StateNo, Is.EqualTo(0));
+            Assert.That(c.Time, Is.EqualTo(0), "Time stays frozen on the hitpause frame.");
+            Assert.That(c.Ctrl, Is.False, "target statedef ctrl must not run while hitpause is active.");
+            Assert.That(c.PendingTransition.InitPending, Is.True);
+
+            sm.RunFrame(c, states);
+
+            Assert.That(c.Ctrl, Is.True);
+            Assert.That(c.PendingTransition.InitPending, Is.False);
+            Assert.That(c.Time, Is.EqualTo(1));
+        }
 
         [Test]
         public void SelfState_TransitionsAndClearsFlag()

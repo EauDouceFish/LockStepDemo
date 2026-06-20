@@ -1,4 +1,5 @@
 using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Anim;
 using Lockstep.Mugen.Expr;
 using NUnit.Framework;
 
@@ -51,6 +52,67 @@ namespace Lockstep.Tests.Mugen.Expr
         public void AnimElemNo_ReturnsCurrentElement()
         {
             Assert.That(Eval("animelemno", CharOnElem(5, 7)), Is.EqualTo(5));
+        }
+
+        [Test]
+        public void AnimElemNoFunction_UsesRelativeTimeArgument()
+        {
+            MAnimData anim = new MAnimData
+            {
+                No = 0,
+                LoopStart = 0,
+                Frames = new[]
+                {
+                    new MAnimFrame { Time = 2 },
+                    new MAnimFrame { Time = 3 },
+                },
+            };
+            anim.ComputePacing();
+            MChar c = new MChar
+            {
+                AnimNo = 0,
+                AnimRunningNo = 0,
+                AnimElem = 1,
+                AnimElemNo = 2,
+                AnimElemTime = 0,
+                AnimTable = new System.Collections.Generic.Dictionary<int, MAnimData> { [0] = anim },
+            };
+
+            Assert.That(Eval("animelemno(0)", c), Is.EqualTo(2));
+            Assert.That(Eval("animelemno(-1)", c), Is.EqualTo(1));
+            Assert.That(Eval("animelemno(3)", c), Is.EqualTo(2));
+            Assert.That(Eval("animelemno(4)", c), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AnimElemSecondArgument_UsesAnimElemTimeComparison()
+        {
+            MAnimData anim = new MAnimData
+            {
+                No = 0,
+                LoopStart = 0,
+                Frames = new[]
+                {
+                    new MAnimFrame { Time = 4 },
+                    new MAnimFrame { Time = 4 },
+                    new MAnimFrame { Time = 4 },
+                },
+            };
+            MChar c = new MChar
+            {
+                AnimNo = 0,
+                AnimRunningNo = 0,
+                AnimElem = 1,
+                AnimElemNo = 2,
+                AnimElemTime = 1,
+                AnimCurTime = 5,
+                AnimTable = new System.Collections.Generic.Dictionary<int, MAnimData> { [0] = anim },
+            };
+
+            Assert.That(Eval("animelem = 2, = 1", c), Is.EqualTo(1));
+            Assert.That(Eval("animelem = 2, >= 0", c), Is.EqualTo(1));
+            Assert.That(Eval("animelem = 3, < 0", c), Is.EqualTo(1));
+            Assert.That(Eval("animelem = 2, < 1", c), Is.EqualTo(0));
         }
 
         [Test]

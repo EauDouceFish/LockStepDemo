@@ -17,11 +17,30 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Id;
         public BytecodeExp Index;
 
+        // Ikemen reference: src/char.go target selection helpers used by Target* StateControllers.
         protected List<MChar> SelectTargets(MChar character)
         {
             int targetId = Id != null ? Id.Run(character).ToI() : -1;
             int targetIndex = Index != null ? Index.Run(character).ToI() : -1;
             return character.SelectTargetsByHitId(targetId, targetIndex);
+        }
+
+        protected static int CurrentStateOwnerPlayerNo(MChar character)
+        {
+            return character.StatePlayerNo >= 0 ? character.StatePlayerNo : character.PlayerNo;
+        }
+
+        protected static MChar CurrentStateOwner(MChar character, int ownerPlayerNo)
+        {
+            if (ownerPlayerNo == character.PlayerNo)
+            {
+                return character;
+            }
+            if (character.StateOwner != null && character.StateOwner.PlayerNo == ownerPlayerNo)
+            {
+                return character.StateOwner;
+            }
+            return null;
         }
     }
 
@@ -30,6 +49,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go TargetState StateController queues target state change.
         public override bool Run(MChar character)
         {
             if (Value == null)
@@ -44,11 +64,14 @@ namespace Lockstep.Mugen.StateCtrl
             }
 
             List<MChar> targets = SelectTargets(character);
+            int ownerPlayerNo = CurrentStateOwnerPlayerNo(character);
+            MChar owner = CurrentStateOwner(character, ownerPlayerNo);
             for (int index = 0; index < targets.Count; index++)
             {
-                targets[index].Ctrl = false;
-                targets[index].StateOwner = character;
-                targets[index].QueueTransition(stateNo, character.StatePlayerNo);
+                MChar target = targets[index];
+                target.Ctrl = false;
+                target.StateOwner = ownerPlayerNo == target.PlayerNo ? null : owner;
+                target.QueueTransition(stateNo, ownerPlayerNo);
             }
             return false;
         }
@@ -63,6 +86,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp RedLife;
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go TargetLifeAdd StateController applies kill-clamped life delta.
         public override bool Run(MChar character)
         {
             if (Value == null)
@@ -86,6 +110,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go TargetLifeAdd clamps target life after applying value.
         static int Clamp(int value, int low, int high)
         {
             return value < low ? low : (value > high ? high : value);
@@ -97,6 +122,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go TargetPowerAdd StateController applies clamped target power delta.
         public override bool Run(MChar character)
         {
             if (Value == null)
@@ -114,6 +140,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go TargetPowerAdd clamps target power to legal range.
         static int Clamp(int value, int low, int high)
         {
             return value < low ? low : (value > high ? high : value);
@@ -127,6 +154,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Y;
         public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go TargetVelSet StateController sets selected target velocity.
         public override bool Run(MChar character)
         {
             List<MChar> targets = SelectTargets(character);
@@ -149,6 +177,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Y;
         public BytecodeExp Z;
 
+        // Ikemen reference: src/bytecode.go TargetVelAdd StateController adds selected target velocity.
         public override bool Run(MChar character)
         {
             List<MChar> targets = SelectTargets(character);
@@ -169,6 +198,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go TargetFacing StateController sets selected target facing.
         public override bool Run(MChar character)
         {
             if (Value == null)
@@ -198,6 +228,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp ExcludeId;
         public BytecodeExp KeepOne;
 
+        // Ikemen reference: src/bytecode.go TargetDrop StateController prunes the character target list.
         public override bool Run(MChar character)
         {
             int excludeId = ExcludeId != null ? ExcludeId.Run(character).ToI() : -1;

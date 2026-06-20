@@ -2,6 +2,7 @@
 // Source: src/char.go posUpdate()(位置积分 + 物理类型摩擦/重力) + gravity()。
 // Adapted to fixed-point. 落地/地面夹取不在此（MUGEN 由公共状态 common1 的 trigger 检测 pos/vel 处理）。
 // localcoord 缩放因子在 v1 单坐标(320)下为 1，故略。See Docs/移植方案_Ikemen.md.
+using System.Collections.Generic;
 using Lockstep.Math;
 using Lockstep.Mugen.Char;
 
@@ -17,7 +18,10 @@ namespace Lockstep.Mugen.Battle
         const int PhysicsStand = 1;
         const int PhysicsCrouch = 2;
         const int PhysicsAir = 4;
+        const int StateAir = 4;
+        static readonly FFloat MinimumPushHalfWidth = FFloat.FromInt(5);
 
+        // Ikemen reference: src/char.go:9549 posUpdate plus src/char.go:9455 gravity for per-frame position/velocity integration.
         public static void Step(MChar c)
         {
             // 位置积分：pos = oldPos + vel*facing(x) + vel(y)（对齐 Ikemen setPosX/Y）。
@@ -48,6 +52,7 @@ namespace Lockstep.Mugen.Battle
         }
 
         // 地面摩擦：vel.x *= friction，绝对值低于阈值则归零（对齐 Ikemen getStandFriction + snap）。
+        // Ikemen reference: src/char.go posUpdate ground physics applies stand/crouch friction and snaps small velocities to zero.
         static void ApplyGroundFriction(MChar c, FFloat friction, FFloat threshold)
         {
             FFloat vx = c.Vel.X * friction;
@@ -57,6 +62,198 @@ namespace Lockstep.Mugen.Battle
                 vx = FFloat.Zero;
             }
             c.Vel = new FVector3(vx, c.Vel.Y, c.Vel.Z);
+        }
+
+        // Ikemen reference: src/char.go CharList.pushDetection. This is the current 2D subset:
+        // use Width/player size on X and SizeHeight on Y, then split overlap deterministically.
+        public static void ResolvePlayerPush(IReadOnlyList<MChar> chars, MStage stage)
+        {
+            if (chars == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < chars.Count; i++)
+            {
+                MChar a = chars[i];
+                if (!CanPush(a))
+                {
+                    continue;
+                }
+                for (int j = i + 1; j < chars.Count; j++)
+                {
+                    MChar b = chars[j];
+                    if (!CanPush(b) || !PushTeamsInteract(a, b) || !VerticalOverlaps(a, b))
+                    {
+                        continue;
+                    }
+
+                    FFloat aLeft;
+                    FFloat aRight;
+                    FFloat bLeft;
+                    FFloat bRight;
+                    PushBoundsX(a, out aLeft, out aRight);
+                    PushBoundsX(b, out bLeft, out bRight);
+                    FFloat overlap = Min(aRight, bRight) - Max(aLeft, bLeft);
+                    if (overlap <= FFloat.Zero)
+                    {
+                        continue;
+                    }
+
+                    SeparatePair(a, b, overlap);
+                    ClampAfterPush(a, stage);
+                    ClampAfterPush(b, stage);
+                }
+            }
+        }
+
+        static bool CanPush(MChar c)
+        {
+            return c != null && !c.PauseBool && !c.PosFreeze && !c.Destroyed && c.PlayerPushEnabled;
+        }
+
+        static bool PushTeamsInteract(MChar a, MChar b)
+        {
+            bool sameTeam = TeamOf(a) == TeamOf(b);
+            if (sameTeam)
+            {
+                return a.PushAffectTeam <= 0 || b.PushAffectTeam <= 0;
+            }
+            return a.PushAffectTeam >= 0 && b.PushAffectTeam >= 0;
+        }
+
+        static int TeamOf(MChar c)
+        {
+            return c.Root != null ? c.Root.Id : c.Id;
+        }
+
+        static bool VerticalOverlaps(MChar a, MChar b)
+        {
+            FFloat aTop;
+            FFloat aBottom;
+            FFloat bTop;
+            FFloat bBottom;
+            PushBoundsY(a, out aTop, out aBottom);
+            PushBoundsY(b, out bTop, out bBottom);
+            return Min(aBottom, bBottom) - Max(aTop, bTop) > FFloat.Zero;
+        }
+
+        static void PushBoundsX(MChar c, out FFloat left, out FFloat right)
+        {
+            FFloat localLeft;
+            FFloat localRight;
+            PushLocalBoundsX(c, out localLeft, out localRight);
+            if (c.Facing.Raw < 0)
+            {
+                FFloat mirroredLeft = -localRight;
+                localRight = -localLeft;
+                localLeft = mirroredLeft;
+            }
+            left = c.Pos.X + localLeft;
+            right = c.Pos.X + localRight;
+        }
+
+        static void PushLocalBoundsX(MChar c, out FFloat left, out FFloat right)
+        {
+            left = -WidthBack(c);
+            right = WidthFront(c);
+            if (left > right)
+            {
+                FFloat t = left;
+                left = right;
+                right = t;
+            }
+            if (left > -MinimumPushHalfWidth) { left = -MinimumPushHalfWidth; }
+            if (right < MinimumPushHalfWidth) { right = MinimumPushHalfWidth; }
+        }
+
+        static void PushBoundsY(MChar c, out FFloat top, out FFloat bottom)
+        {
+            FFloat height = c.Constants != null ? c.Constants.SizeHeight : FFloat.FromInt(60);
+            top = c.Pos.Y - height;
+            bottom = c.Pos.Y;
+        }
+
+        static FFloat WidthFront(MChar c)
+        {
+            if (c.WidthPlayerFrontSet)
+            {
+                return c.WidthPlayerFront;
+            }
+            if (c.Constants == null)
+            {
+                return FFloat.Zero;
+            }
+            return c.StateType == StateAir ? c.Constants.SizeAirFront : c.Constants.SizeGroundFront;
+        }
+
+        static FFloat WidthBack(MChar c)
+        {
+            if (c.WidthPlayerBackSet)
+            {
+                return c.WidthPlayerBack;
+            }
+            if (c.Constants == null)
+            {
+                return FFloat.Zero;
+            }
+            return c.StateType == StateAir ? c.Constants.SizeAirBack : c.Constants.SizeGroundBack;
+        }
+
+        static void SeparatePair(MChar a, MChar b, FFloat overlap)
+        {
+            bool aIsLeft = a.Pos.X < b.Pos.X || (a.Pos.X == b.Pos.X && a.Id <= b.Id);
+            FFloat aMove;
+            FFloat bMove;
+            if (a.PushPriority > b.PushPriority)
+            {
+                aMove = FFloat.Zero;
+                bMove = overlap;
+            }
+            else if (a.PushPriority < b.PushPriority)
+            {
+                aMove = overlap;
+                bMove = FFloat.Zero;
+            }
+            else
+            {
+                aMove = overlap / FFloat.FromInt(2);
+                bMove = overlap - aMove;
+            }
+
+            if (aIsLeft)
+            {
+                a.Pos = new FVector3(a.Pos.X - aMove, a.Pos.Y, a.Pos.Z);
+                b.Pos = new FVector3(b.Pos.X + bMove, b.Pos.Y, b.Pos.Z);
+            }
+            else
+            {
+                a.Pos = new FVector3(a.Pos.X + aMove, a.Pos.Y, a.Pos.Z);
+                b.Pos = new FVector3(b.Pos.X - bMove, b.Pos.Y, b.Pos.Z);
+            }
+        }
+
+        static void ClampAfterPush(MChar c, MStage stage)
+        {
+            if (stage == null || !stage.BoundsEnabled || !c.ScreenBoundStageBound)
+            {
+                return;
+            }
+            FFloat clampedX = c.Pos.X;
+            if (stage.ClampX(ref clampedX))
+            {
+                c.Pos = new FVector3(clampedX, c.Pos.Y, c.Pos.Z);
+            }
+        }
+
+        static FFloat Min(FFloat a, FFloat b)
+        {
+            return a < b ? a : b;
+        }
+
+        static FFloat Max(FFloat a, FFloat b)
+        {
+            return a > b ? a : b;
         }
     }
 }

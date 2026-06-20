@@ -48,7 +48,7 @@ namespace Lockstep.View
         MugenSpriteLoader.Source _source;
         MMovePreviewSession _movePreview;
         string _loadedFolder = "";
-        string _previewStatus = "None";
+        string _previewStatus = "无";
         MInput _lastInput;
         float _accumulator;
         int _frame;
@@ -108,7 +108,7 @@ namespace Lockstep.View
             }
             MChar actor = _engine.Chars[0];
             actor.QueueTransition(0, actor.PlayerNo);
-            _previewStatus = preview.StatusText + " | presentation recovery queued";
+            _previewStatus = preview.StatusText + " | 表现恢复已排队";
         }
 
         MInput NextMuseumInput()
@@ -152,6 +152,7 @@ namespace Lockstep.View
 
         void OnGUI()
         {
+            GUI.skin.font = MugenChineseText.Font();
             GUI.Box(new Rect(10f, 10f, 260f, Screen.height - 20f), "MUGEN 角色展馆");
             if (_characterFolders.Count == 0)
             {
@@ -194,7 +195,7 @@ namespace Lockstep.View
                 {
                     break;
                 }
-                string label = Path.GetFileName(_characterFolders[index]);
+                string label = MugenChineseText.CharacterName(Path.GetFileName(_characterFolders[index]));
                 if (GUI.Button(new Rect(24f, listY + i * 30f, 220f, 26f), label))
                 {
                     _selected = index;
@@ -222,11 +223,12 @@ namespace Lockstep.View
             string folder = _characterFolders[_selected];
             MugenMuseumReport report = BuildReport(folder);
             float x = 290f;
-            GUI.Box(new Rect(x, 10f, Screen.width - x - 10f, Screen.height - 20f), report.Name);
+            GUI.Box(new Rect(x, 10f, Screen.width - x - 10f, Screen.height - 20f),
+                MugenChineseText.CharacterName(report.Name));
 
             float y = 42f;
-            DrawLine(x, ref y, "DEF", report.DefPath);
-            DrawLine(x, ref y, "localcoord", report.LocalCoord);
+            DrawLine(x, ref y, "DEF 文件", report.DefPath);
+            DrawLine(x, ref y, "本地坐标", report.LocalCoord);
             DrawLine(x, ref y, "状态数", report.StateCount.ToString());
             DrawLine(x, ref y, "公共状态", report.CommonStateCount.ToString());
             DrawLine(x, ref y, "动画数", report.AnimationCount.ToString());
@@ -235,23 +237,23 @@ namespace Lockstep.View
             DrawLine(x, ref y, "命令激活", report.ActivatedCommands + "/" + report.CommandCount);
             DrawLine(x, ref y, "未知控制器", report.UnknownControllers.ToString());
             DrawLine(x, ref y, "仅解析控制器", report.ParsedOnlyControllers.ToString());
-            DrawLine(x, ref y, "native hash", report.NativeHash);
-            DrawLine(x, ref y, "status", report.Status);
+            DrawLine(x, ref y, "原始哈希", report.NativeHash);
+            DrawLine(x, ref y, "状态", report.Status);
             if (_engine != null)
             {
                 y += 8f;
                 MChar p1 = _engine.Chars[0];
                 MChar p2 = _engine.Chars[1];
                 DrawLine(x, ref y, "帧", _frame.ToString());
-                DrawLiveDebugLine(x, ref y, "P1", p1);
-                DrawLiveDebugLine(x, ref y, "P2", p2);
+                DrawLiveDebugLine(x, ref y, "玩家一", p1);
+                DrawLiveDebugLine(x, ref y, "玩家二", p2);
                 DrawLine(x, ref y, "输入", MInputDisplayFormatter.Format(_lastInput));
                 DrawLine(x, ref y, "当前命令", ActiveCommandText(p1));
                 DrawLine(x, ref y, "预览招式", _movePreview != null ? _movePreview.StatusText : _previewStatus);
-                DrawLine(x, ref y, "实体", "helper " + _engine.Helpers.Count + " / projectile " +
-                    _engine.World.Projectiles.Count + " / explod " + _engine.World.Explods.Count);
-                DrawLine(x, ref y, "表现事件", "sound " + _engine.World.Events.Sounds.Count +
-                    " / visual " + _engine.World.Events.Visuals.Count + " " + LastVisualEventText());
+                DrawLine(x, ref y, "实体", "助手 " + _engine.Helpers.Count + " / 弹体 " +
+                    _engine.World.Projectiles.Count + " / 特效 " + _engine.World.Explods.Count);
+                DrawLine(x, ref y, "表现事件", "声音 " + _engine.World.Events.Sounds.Count +
+                    " / 画面 " + _engine.World.Events.Visuals.Count + " " + LastVisualEventText());
                 DrawLine(x, ref y, "按键说明", MCommandMoveHelpFormatter.KeyboardLegend());
                 if (GUI.Button(new Rect(x + 18f, y + 8f, 90f, 30f), "重置"))
                 {
@@ -285,10 +287,10 @@ namespace Lockstep.View
         static void DrawLiveDebugLine(float x, ref float y, string label, MChar c)
         {
             string firstLine = string.Format(
-                "StateNo {0}   AnimNo {1}   Elem {2}   Physics {3}   Type {4}   Ctrl {5}",
+                "状态 {0}   动画 {1}   帧段 {2}   物理 {3}   体态 {4}   可控 {5}",
                 c.StateNo, c.AnimNo, c.AnimElem, c.Physics, c.StateType, c.Ctrl);
             string secondLine = string.Format(
-                "Pos ({0:0.0},{1:0.0})   Vel ({2:0.00},{3:0.00})   Facing {4}   Life {5}",
+                "坐标 ({0:0.0},{1:0.0})   速度 ({2:0.00},{3:0.00})   朝向 {4}   生命 {5}",
                 c.Pos.X.ToFloat(), c.Pos.Y.ToFloat(), c.Vel.X.ToFloat(), c.Vel.Y.ToFloat(),
                 c.Facing.Raw < 0 ? -1 : 1, c.Life);
 
@@ -322,11 +324,11 @@ namespace Lockstep.View
                 report.ParsedOnlyControllers = Sum(data.Compatibility.ParsedOnlyControllers);
                 report.ActivatedCommands = CountActivatableCommands(data.Commands);
                 report.NativeHash = ComputeInitialHash(data);
-                report.Status = report.UnknownControllers == 0 ? "Ready for move probes" : "Import diagnostics present";
+                report.Status = report.UnknownControllers == 0 ? "可进行招式探测" : "存在导入诊断项";
             }
             catch (System.Exception ex)
             {
-                report.Status = "ImportFailure: " + ex.GetType().Name + " " + ex.Message;
+                report.Status = "导入失败：" + ex.GetType().Name + " " + ex.Message;
             }
             _reports[folder] = report;
             return report;
@@ -378,7 +380,7 @@ namespace Lockstep.View
                 _lastInput = MInput.None;
                 _manualInputs.Clear();
                 _movePreview = null;
-                _previewStatus = "None";
+                _previewStatus = "无";
                 _loadedFolder = folder;
                 _movePage = 0;
                 _moveHelpPage = 0;
@@ -616,7 +618,7 @@ namespace Lockstep.View
                 return "";
             }
             MVisualEvent visual = _engine.World.Events.Visuals[_engine.World.Events.Visuals.Count - 1];
-            return visual.Type + " owner " + visual.OwnerId + " t " + visual.Time;
+            return visual.Type + " 所有者 " + visual.OwnerId + " 时间 " + visual.Time;
         }
 
         static MInput SampleInput()
@@ -652,7 +654,7 @@ namespace Lockstep.View
                 return;
             }
             _movePreview = null;
-            _previewStatus = "Manual button input";
+            _previewStatus = "手动按键输入";
             _manualInputs.Clear();
             _engine.Chars[0].CommandList?.ResetRuntime();
             _lastInput = input;
@@ -681,7 +683,7 @@ namespace Lockstep.View
             bool facingRight = _engine.Chars[0].Facing.Raw >= 0;
             _engine.Chars[0].CommandList?.ResetRuntime();
             _movePreview = new MMovePreviewSession(new[] { command }, facingRight, targetStateNo,
-                "Preview " + commandName + " -> " + targetStateNo);
+                "预览 " + commandName + " -> " + targetStateNo);
             _previewStatus = _movePreview.StatusText;
             return true;
         }
@@ -880,20 +882,20 @@ namespace Lockstep.View
         {
             if (_moveCatalog.Count == 0)
             {
-                DrawLine(x, ref y, "move help", "No executable move help.");
+                DrawLine(x, ref y, "招式说明", "没有可执行招式说明。");
                 return;
             }
 
             int perPage = Mathf.Max(4, Mathf.Min(12, (Screen.height - Mathf.RoundToInt(y) - 34) / 24));
             int pageCount = (_moveCatalog.Count + perPage - 1) / perPage;
-            GUI.Box(new Rect(x + 8f, y, Screen.width - x - 28f, perPage * 24f + 58f), "All Move Commands");
+            GUI.Box(new Rect(x + 8f, y, Screen.width - x - 28f, perPage * 24f + 58f), "全部招式命令");
             GUI.Label(new Rect(x + 22f, y + 26f, 240f, 22f),
-                "Move Help " + (_moveHelpPage + 1) + "/" + pageCount + "  Total " + _moveCatalog.Count);
-            if (GUI.Button(new Rect(x + 272f, y + 24f, 64f, 24f), "Prev"))
+                "招式说明 " + (_moveHelpPage + 1) + "/" + pageCount + "  总数 " + _moveCatalog.Count);
+            if (GUI.Button(new Rect(x + 272f, y + 24f, 64f, 24f), "上页"))
             {
                 _moveHelpPage = (_moveHelpPage + pageCount - 1) % pageCount;
             }
-            if (GUI.Button(new Rect(x + 342f, y + 24f, 64f, 24f), "Next"))
+            if (GUI.Button(new Rect(x + 342f, y + 24f, 64f, 24f), "下页"))
             {
                 _moveHelpPage = (_moveHelpPage + 1) % pageCount;
             }
@@ -1093,7 +1095,7 @@ namespace Lockstep.View
 
         static string MugenRoot()
         {
-            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource"));
+            return MugenAssetPaths.MugenRoot();
         }
 
         sealed class MugenMuseumReport

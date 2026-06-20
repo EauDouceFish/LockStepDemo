@@ -4,6 +4,7 @@ namespace Lockstep.Mugen.Command
 {
     public static class MCommandMoveHelpFormatter
     {
+        // Project-specific: formats Ikemen-style CMD motion text for the Unity/demo move help UI.
         public static string FormatMotion(string motion)
         {
             if (string.IsNullOrWhiteSpace(motion))
@@ -25,6 +26,7 @@ namespace Lockstep.Mugen.Command
             return labels.Count == 0 ? "无输入" : string.Join(" -> ", labels.ToArray());
         }
 
+        // Project-specific: formats a C# move-catalog entry for the Unity/demo move help UI.
         public static string FormatMove(MCommandMoveInfo move)
         {
             if (move == null)
@@ -36,6 +38,7 @@ namespace Lockstep.Mugen.Command
             return "招式 " + move.CommandText + "：搓法 " + FormatMoveInput(move) + "，进入状态 " + target;
         }
 
+        // Project-specific: formats combined command motions for the Unity/demo move help UI.
         public static string FormatMoveInput(MCommandMoveInfo move)
         {
             if (move == null || move.Motions.Count == 0)
@@ -51,11 +54,13 @@ namespace Lockstep.Mugen.Command
             return string.Join("；", motions.ToArray());
         }
 
+        // Project-specific: describes this project's keyboard mapping for Ikemen-style command buttons.
         public static string KeyboardLegend()
         {
             return "键盘：方向键=移动，A/S/D=轻拳x/重拳y/三拳z，Z/X/C=轻脚a/重脚b/三脚c，空格/回车=Start";
         }
 
+        // Project-specific: helper formats one comma-delimited Ikemen CMD step for display.
         static string FormatStep(string step)
         {
             string[] parts = step.Split('+');
@@ -71,6 +76,7 @@ namespace Lockstep.Mugen.Command
             return string.Join("+", labels.ToArray());
         }
 
+        // Project-specific: helper formats Ikemen CMD modifiers such as '~', '/', '$', and charge counts for display.
         static string FormatToken(string token)
         {
             bool release = token.IndexOf('~') >= 0;
@@ -102,6 +108,7 @@ namespace Lockstep.Mugen.Command
             return label;
         }
 
+        // Project-specific: helper maps Ikemen CMD key symbols to this project's localized display labels.
         static string KeyLabel(string key)
         {
             switch (key)
@@ -125,6 +132,7 @@ namespace Lockstep.Mugen.Command
             }
         }
 
+        // Project-specific: helper maps Ikemen '$' direction symbols to this project's localized display labels.
         static string AnyDirectionLabel(string key)
         {
             switch (key)

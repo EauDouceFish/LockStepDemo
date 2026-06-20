@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Lockstep.Math;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.Parse;
@@ -53,6 +54,60 @@ namespace Lockstep.Tests.Mugen.StateCtrl
 
             Assert.That(first.PendingStateNo, Is.EqualTo(-1));
             Assert.That(second.PendingStateNo, Is.EqualTo(5050));
+        }
+
+        [Test]
+        public void TargetState_FromCustomStateKeepsCurrentStateOwner()
+        {
+            MCharData ownerData = new MCharData();
+            MStateDef ownerTargetState = new MStateDef { No = 1200 };
+            ownerTargetState.Controllers.Add(new VarSetController
+            {
+                Index = 8,
+                Value = Expression("88"),
+            });
+            ownerData.States[1200] = ownerTargetState;
+
+            MCharData controlledData = new MCharData();
+            MCharData victimData = new MCharData();
+            victimData.States[0] = new MStateDef { No = 0 };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int controlledPlayerNo = resources.Register(controlledData);
+            int victimPlayerNo = resources.Register(victimData);
+            MChar owner = new MChar
+            {
+                Resources = resources,
+                OwnData = ownerData,
+                PlayerNo = ownerPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+            };
+            MChar controlled = new MChar
+            {
+                Resources = resources,
+                OwnData = controlledData,
+                PlayerNo = controlledPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+                StateOwner = owner,
+            };
+            MChar victim = new MChar
+            {
+                Resources = resources,
+                OwnData = victimData,
+                PlayerNo = victimPlayerNo,
+                StatePlayerNo = victimPlayerNo,
+                StateNo = 0,
+            };
+            controlled.Targets.Add(victim);
+
+            new TargetStateController { Value = Expression("1200") }.Run(controlled);
+            new MStateMachine().RunFrame(victim, victimData.States, victimData.CommonStates);
+
+            Assert.That(victim.StateNo, Is.EqualTo(1200));
+            Assert.That(victim.StatePlayerNo, Is.EqualTo(ownerPlayerNo));
+            Assert.That(victim.StateOwner, Is.SameAs(owner), "stateowner redirect should point to the actual custom-state owner.");
+            Assert.That(victim.IntVars[8], Is.EqualTo(88), "target should run the owner state table on the victim.");
         }
 
         [Test]

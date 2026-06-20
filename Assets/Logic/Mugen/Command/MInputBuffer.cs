@@ -1,5 +1,5 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/input.go InputBuffer（updateInputTime 的有符号帧计数 + B/F 按朝向推导）。
+// Source: src/input.go CommandBuffer/updateInputTime signed frame counters plus B/F facing resolution.
 // Adapted to fixed-point lockstep. 仅逻辑相关方向/按钮缓冲，供引擎硬编码基础动作（actionPrepare）读边沿。
 // See Docs/动作系统_Ikemen移植.md.
 using Lockstep.Core;
@@ -7,7 +7,7 @@ using Lockstep.Core;
 namespace Lockstep.Mugen.Command
 {
     /// <summary>
-    /// 输入边沿缓冲（移植 Ikemen InputBuffer）：每个方向/按钮一个有符号帧计数器——
+    /// 输入边沿缓冲（移植 Ikemen CommandBuffer）：每个方向/按钮一个有符号帧计数器——
     /// 按住第 N 帧 = +N、松开第 N 帧 = -N。引擎硬编码基础动作读 `Fb>0`(本帧持前进)、`Ub==1`(本帧刚按上) 等。
     /// 方向 B/F（后/前）由 L/R 按朝向推导；U/D、B/F 各做 SOCD 对消（同轴双向同按 → 中立）。
     /// 命令 runtime 直接读取本类；<see cref="MCommandBuffer"/> 仅保留给历史 API 和调试工具。

@@ -4,6 +4,7 @@ using Lockstep.Math;
 using Lockstep.Mugen.Char;
 using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Battle;
+using Lockstep.Mugen.StateCtrl;
 using Lockstep.Tests;
 using NUnit.Framework;
 
@@ -40,6 +41,28 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void DestroySelf_Helper_MarksDestroyedAndStopsControllerChain()
+        {
+            MChar helper = new MChar { IsHelper = true };
+
+            bool stop = new DestroySelfController().Run(helper);
+
+            Assert.IsTrue(stop);
+            Assert.IsTrue(helper.Destroyed);
+        }
+
+        [Test]
+        public void DestroySelf_Player_IsIgnoredAndKeepsControllerChainRunning()
+        {
+            MChar player = new MChar { IsHelper = false };
+
+            bool stop = new DestroySelfController().Run(player);
+
+            Assert.IsFalse(stop);
+            Assert.IsFalse(player.Destroyed);
+        }
+
+        [Test]
         public void HelperController_SpawnsHelperFromCns()
         {
             MBattleEngine engine = OneCharEngine();
@@ -49,6 +72,24 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
             MChar helper = engine.Helpers[0];
             Assert.That(helper.HelperType, Is.EqualTo(9), "id=9");
             Assert.That(helper.StateNo, Is.EqualTo(1000), "helper 进 stateno=1000");
+        }
+
+        [Test]
+        public void HelperController_SpawnedHelperStartsRunningOnNextFrame()
+        {
+            MBattleEngine engine = OneCharEngine();
+
+            engine.Tick(NoInput());
+            Assert.That(engine.Helpers.Count, Is.EqualTo(0));
+
+            engine.Tick(NoInput());
+            Assert.That(engine.Helpers.Count, Is.EqualTo(1));
+            MChar helper = engine.Helpers[0];
+            Assert.That(helper.StateNo, Is.EqualTo(1000));
+            Assert.That(helper.Time, Is.EqualTo(0), "helper is created at frame end and does not run its state machine immediately");
+
+            engine.Tick(NoInput());
+            Assert.That(helper.Time, Is.EqualTo(1), "helper starts on the first frame after DrainSpawns");
         }
 
         [Test]

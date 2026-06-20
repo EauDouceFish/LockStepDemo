@@ -29,6 +29,7 @@ namespace Lockstep.Mugen.Expr
         List<byte> _out = new List<byte>();   // 非 readonly：redirect 子表达式编译时临时切换缓冲
         List<MugenExprDiagnostic> _diagnostics;
 
+        // Ikemen reference: src/compiler.go expression parser/compiler entry point.
         public BytecodeExp Compile(string expr)
         {
             return CompileCore(expr).Expression;
@@ -38,11 +39,13 @@ namespace Lockstep.Mugen.Expr
         /// Compiles with strict, structured diagnostics. Existing <see cref="Compile"/> callers keep
         /// their recovery behavior; import/audit code should require <see cref="MugenExprCompileResult.Success"/>.
         /// </summary>
+        // Project-specific: diagnostic-preserving wrapper around the Ikemen-compatible expression compiler.
         public MugenExprCompileResult CompileStrict(string expr)
         {
             return CompileCore(expr);
         }
 
+        // Ikemen reference: src/compiler.go CharCompiler expression compile flow from token stream to bytecode.
         MugenExprCompileResult CompileCore(string expr)
         {
             expr = expr ?? string.Empty;
@@ -64,6 +67,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // ───────── 词法 ─────────
+        // Ikemen reference: src/compiler.go expression tokenizer for numbers, strings, identifiers, and operators.
         static List<Tok> Tokenize(string s, List<MugenExprDiagnostic> diagnostics)
         {
             List<Tok> toks = new List<Tok>();
@@ -201,6 +205,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // 文本定点解析（导入期允许）：整数部分 + 小数分子÷10^位数（一次除法，使 0.5/0.25 等精确）。
+        // Project-specific: deterministic fixed-point parser for Ikemen numeric literals.
         static FFloat ParseFixed(string num)
         {
             int dot = num.IndexOf('.');
@@ -225,9 +230,12 @@ namespace Lockstep.Mugen.Expr
 
         // ───────── 词法游标 ─────────
         Tok Cur => _toks[_pos];
+        // Ikemen reference: src/compiler.go expression parser operator lookahead.
         bool IsOp(string op) => Cur.Kind == TokKind.Op && Cur.Text == op;
+        // Ikemen reference: src/compiler.go expression parser token advance.
         void Next() => _pos++;
 
+        // Project-specific: structured diagnostics for Ikemen-compatible expression compiler recovery.
         void Error(MugenExprDiagnosticCode code, Tok token, string message)
         {
             _diagnostics.Add(new MugenExprDiagnostic(
@@ -238,6 +246,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // ───────── 优先级链（低→高，照搬 Ikemen）─────────
+        // Ikemen reference: src/compiler.go expBoolOr expression precedence compiler.
         void ParseBoolOr()
         {
             ParseBoolXor();
@@ -248,11 +257,13 @@ namespace Lockstep.Mugen.Expr
                 EmitShortCircuit(OpCode.OC_jnz8, OpCode.OC_jnz, right);
             }
         }
+        // Ikemen reference: src/compiler.go expBoolXor expression precedence compiler.
         void ParseBoolXor()
         {
             ParseBoolAnd();
             while (IsOp("^^")) { Next(); ParseBoolAnd(); Emit(OpCode.OC_blxor); }
         }
+        // Ikemen reference: src/compiler.go expBoolAnd expression precedence compiler.
         void ParseBoolAnd()
         {
             ParseOr();
@@ -263,21 +274,25 @@ namespace Lockstep.Mugen.Expr
                 EmitShortCircuit(OpCode.OC_jz8, OpCode.OC_jz, right);
             }
         }
+        // Ikemen reference: src/compiler.go expOr bitwise precedence compiler.
         void ParseOr()
         {
             ParseXor();
             while (IsOp("|")) { Next(); ParseXor(); Emit(OpCode.OC_or); }
         }
+        // Ikemen reference: src/compiler.go expXor bitwise precedence compiler.
         void ParseXor()
         {
             ParseAnd();
             while (IsOp("^")) { Next(); ParseAnd(); Emit(OpCode.OC_xor); }
         }
+        // Ikemen reference: src/compiler.go expAnd bitwise precedence compiler.
         void ParseAnd()
         {
             ParseEqne();
             while (IsOp("&")) { Next(); ParseEqne(); Emit(OpCode.OC_and); }
         }
+        // Ikemen reference: src/compiler.go expEqne comparison/range precedence compiler.
         void ParseEqne()
         {
             ParseGrls();
@@ -300,6 +315,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // 区间 [min,max] / (min,max] / [min,max) / (min,max)：左操作数已压栈，再压 min、max，发对应 range opcode。
+        // Ikemen reference: src/compiler.go range expression compiler for =/!= []/[)/(]/() forms.
         void EmitRange(bool negate)
         {
             bool incMin = IsOp("[");
@@ -315,6 +331,7 @@ namespace Lockstep.Mugen.Expr
             Emit(rop);
             if (negate) { Emit(OpCode.OC_blnot); }
         }
+        // Ikemen reference: src/compiler.go expGrls greater/less comparison precedence compiler.
         void ParseGrls()
         {
             ParseAddSub();
@@ -327,6 +344,7 @@ namespace Lockstep.Mugen.Expr
                 else break;
             }
         }
+        // Ikemen reference: src/compiler.go expAdsb arithmetic precedence compiler.
         void ParseAddSub()
         {
             ParseMulDiv();
@@ -337,6 +355,7 @@ namespace Lockstep.Mugen.Expr
                 else break;
             }
         }
+        // Ikemen reference: src/compiler.go expMldv arithmetic precedence compiler.
         void ParseMulDiv()
         {
             ParsePow();
@@ -348,12 +367,14 @@ namespace Lockstep.Mugen.Expr
                 else break;
             }
         }
+        // Ikemen reference: src/compiler.go expPow power-precedence compiler.
         void ParsePow()
         {
             ParseUnary();
             // ** 右结合
             if (IsOp("**")) { Next(); ParsePow(); Emit(OpCode.OC_pow); }
         }
+        // Ikemen reference: src/compiler.go expPostNot unary/postfix-not precedence compiler.
         void ParseUnary()
         {
             if (IsOp("-")) { Next(); ParseUnary(); Emit(OpCode.OC_neg); return; }
@@ -363,6 +384,7 @@ namespace Lockstep.Mugen.Expr
         }
 
         // ───────── 值：字面量 / 括号 / 函数 / trigger ─────────
+        // Ikemen reference: src/compiler.go expValue literal, parenthesized expression, function, and trigger compiler.
         void ParseValue()
         {
             if (Cur.Kind == TokKind.Number)
@@ -400,6 +422,7 @@ namespace Lockstep.Mugen.Expr
             if (Cur.Kind != TokKind.End) { Next(); }
         }
 
+        // Ikemen reference: src/compiler.go expValue identifier dispatch for triggers, redirects, and functions.
         void ParseIdent()
         {
             Tok identifier = Cur;
@@ -467,8 +490,8 @@ namespace Lockstep.Mugen.Expr
                 return;
             }
 
-            // statetype/movetype/prevstatetype 字母枚举比较（自行消费 = / != 与字母列表，是 expValue 级原子布尔）
-            if (name == "statetype" || name == "movetype" || name == "prevstatetype")
+            // statetype/movetype/prevstatetype/physics 字母枚举比较（自行消费 = / != 与字母列表，是 expValue 级原子布尔）
+            if (name == "statetype" || name == "movetype" || name == "prevstatetype" || name == "physics")
             {
                 EmitTypeCompare(name);
                 return;
@@ -545,6 +568,7 @@ namespace Lockstep.Mugen.Expr
             EmitInt(0);
         }
 
+        // Ikemen reference: src/compiler.go expression function-call compiler.
         void ParseFunction(string name, Tok identifier)
         {
             Next(); // 吃掉 '('
@@ -636,6 +660,7 @@ namespace Lockstep.Mugen.Expr
                 "Unknown function '" + name + "'.");
         }
 
+        // Ikemen reference: src/compiler.go projectile contact trigger aliases compiled through Proj*Time comparisons.
         void EmitProjectileContactAlias(string name)
         {
             if (IsOp("("))
@@ -655,6 +680,7 @@ namespace Lockstep.Mugen.Expr
             Emit(OpCode.OC_ge);
         }
 
+        // Ikemen reference: src/compiler.go expression parser delimiter consumption and recovery.
         void Expect(string op)
         {
             if (IsOp(op))
@@ -667,6 +693,7 @@ namespace Lockstep.Mugen.Expr
                 + (Cur.Kind == TokKind.End ? "the end of the expression." : "'" + Cur.Text + "'."));
         }
 
+        // Ikemen reference: src/compiler.go subexpression bytecode capture for short-circuit and conditional codegen.
         List<byte> Capture(Action parser)
         {
             List<byte> outer = _out;
@@ -677,6 +704,7 @@ namespace Lockstep.Mugen.Expr
             return captured;
         }
 
+        // Ikemen reference: src/compiler.go boolean short-circuit jump emission.
         void EmitShortCircuit(OpCode shortJump, OpCode longJump, List<byte> right)
         {
             AppendJump(shortJump, longJump, right.Count + 1);
@@ -684,6 +712,7 @@ namespace Lockstep.Mugen.Expr
             _out.AddRange(right);
         }
 
+        // Ikemen reference: src/compiler.go cond/ifelse conditional bytecode emission.
         void EmitConditional(List<byte> trueValue, List<byte> falseValue)
         {
             List<byte> falsePath = new List<byte>(falseValue.Count + 1);
@@ -700,11 +729,13 @@ namespace Lockstep.Mugen.Expr
             _out.AddRange(falsePath);
         }
 
+        // Ikemen reference: src/compiler.go jump opcode emission with short/long offset selection.
         void AppendJump(OpCode shortJump, OpCode longJump, int skippedByteCount)
         {
             AppendJump(_out, shortJump, longJump, skippedByteCount);
         }
 
+        // Ikemen reference: src/compiler.go jump opcode encoding helper.
         static void AppendJump(
             List<byte> output,
             OpCode shortJump,
@@ -750,7 +781,7 @@ namespace Lockstep.Mugen.Expr
             return ConstFields.TryGetValue(field, out MConstId id) ? id : MConstId.Unknown;
         }
 
-        // statetype/movetype = X[,Y...] / != X[,Y...]：发 OC_statetype/OC_movetype + 1字节类型掩码，
+        // statetype/movetype/physics = X[,Y...] / != X[,Y...]：发对应 opcode + 1字节类型掩码，
         // 多字母用 OC_blor 串成 OR；!= 末尾追加 OC_blnot。无比较运算符则容错压 0(false)。
         void EmitTypeCompare(string trigger)
         {
@@ -758,19 +789,18 @@ namespace Lockstep.Mugen.Expr
             if (negate || IsOp("=")) { Next(); }
             else { EmitInt(0); return; }
             OpCode op = TypeOpcode(trigger);
-            bool isMove = trigger == "movetype";
-            EmitTypeCheck(op, isMove);
+            EmitTypeCheck(op, trigger);
             while (IsOp(","))
             {
                 Next();
-                EmitTypeCheck(op, isMove);
+                EmitTypeCheck(op, trigger);
                 Emit(OpCode.OC_blor);
             }
             if (negate) { Emit(OpCode.OC_blnot); }
         }
 
         // animelem = n / != n：首帧触发比较。无 =/!= 时（如 animelem >= n）退化为发当前元素号，交外层比较。
-        // 第二参形式 `animelem = n, >= m`（= 元素 n 且其已播 >= m tick）暂不支持，罕见，待 animelemtime(n) 一并补。
+        // 第二参形式 `animelem = n, >= m` 编译为 animelemtime(n) >= m。
         void EmitAnimElemCompare()
         {
             bool negate = IsOp("!=");
@@ -778,11 +808,19 @@ namespace Lockstep.Mugen.Expr
             {
                 Next();
                 ParseAddSub();                 // 目标元素号 n（算术级，不吞外层比较/逻辑运算）
-                Emit(OpCode.OC_animelem);      // 弹 n → bool(AnimElemNo==n && AnimElemTime==0)
-                if (negate)
+                if (IsOp(","))
                 {
-                    Emit(OpCode.OC_blnot);
+                    Next();
+                    Emit(OpCode.OC_animelemtime);
+                    OpCode comparison = ReadComparisonOperator(OpCode.OC_eq);
+                    ParseAddSub();
+                    Emit(comparison);
                 }
+                else
+                {
+                    Emit(OpCode.OC_animelem);      // 弹 n → bool(AnimElemNo==n && AnimElemTime==0)
+                }
+                if (negate) { Emit(OpCode.OC_blnot); }
             }
             else
             {
@@ -790,11 +828,23 @@ namespace Lockstep.Mugen.Expr
             }
         }
 
+        OpCode ReadComparisonOperator(OpCode fallback)
+        {
+            if (IsOp("=")) { Next(); return OpCode.OC_eq; }
+            if (IsOp("!=")) { Next(); return OpCode.OC_ne; }
+            if (IsOp(">")) { Next(); return OpCode.OC_gt; }
+            if (IsOp(">=")) { Next(); return OpCode.OC_ge; }
+            if (IsOp("<")) { Next(); return OpCode.OC_lt; }
+            if (IsOp("<=")) { Next(); return OpCode.OC_le; }
+            return fallback;
+        }
+
         static OpCode TypeOpcode(string trigger)
         {
             switch (trigger)
             {
                 case "movetype": return OpCode.OC_movetype;
+                case "physics": return OpCode.OC_physics;
                 case "prevstatetype": return OpCode.OC_ex2_;   // 子表标记：MChar 解码为 PrevStateType 比较
                 default: return OpCode.OC_statetype;
             }
@@ -903,13 +953,15 @@ namespace Lockstep.Mugen.Expr
             if (negate) { Emit(OpCode.OC_blnot); }
         }
 
-        void EmitTypeCheck(OpCode op, bool isMove)
+        void EmitTypeCheck(OpCode op, string trigger)
         {
             int mask = 0;
             if (Cur.Kind == TokKind.Ident && Cur.Text.Length > 0)
             {
                 char letter = Cur.Text[0];
-                mask = isMove ? MoveTypeMask(letter) : StateTypeMask(letter);
+                mask = trigger == "movetype"
+                    ? MoveTypeMask(letter)
+                    : trigger == "physics" ? PhysicsTypeMask(letter) : StateTypeMask(letter);
                 Next();
             }
             Emit(op);
@@ -937,6 +989,19 @@ namespace Lockstep.Mugen.Expr
                 case 'i': return 1;
                 case 'h': return 2;
                 case 'a': return 4;
+                default: return 0;
+            }
+        }
+
+        // Physics uses StateType bit values plus N=16.
+        static int PhysicsTypeMask(char letter)
+        {
+            switch (letter)
+            {
+                case 's': return 1;
+                case 'c': return 2;
+                case 'a': return 4;
+                case 'n': return 16;
                 default: return 0;
             }
         }
@@ -1096,6 +1161,7 @@ namespace Lockstep.Mugen.Expr
                 case "fall.xvel": case "fall.xvelocity": return 18;
                 case "fall.recovertime": return 19;
                 case "fall.recover": return 20;
+                case "isbound": return 21;
                 default: return 255;
             }
         }
@@ -1201,6 +1267,7 @@ namespace Lockstep.Mugen.Expr
             ["animexist"] = OpCode.OC_animexist, ["selfanimexist"] = OpCode.OC_selfanimexist,
             // animelemtime(n)：求值元素号 n 后发 opcode，运行期 MChar 算「自元素 n 起已播 tick」。
             ["animelemtime"] = OpCode.OC_animelemtime,
+            ["animelemno"] = OpCode.OC_animelemno_time,
             ["projcontacttime"] = OpCode.OC_projcontacttime,
             ["projhittime"] = OpCode.OC_projhittime,
             ["projguardedtime"] = OpCode.OC_projguardedtime,

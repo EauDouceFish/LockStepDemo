@@ -27,7 +27,7 @@ namespace Lockstep.View
 
         void Start()
         {
-            string baseDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource", CharacterFolder));
+            string baseDir = Path.Combine(MugenAssetPaths.MugenRoot(), CharacterFolder);
             string airPath = MugenDef.AnimPath(baseDir);
             string sffPath = MugenDef.SpritePath(baseDir);
             if (airPath == null || sffPath == null)
@@ -106,11 +106,12 @@ namespace Lockstep.View
                 return;
             }
             AnimData anim = _anims[_index];
-            string text = string.Format("[{0}/{1}]  AnimNo = {2}   帧数 {3}{4}\n←/→ 切换    空格 {5}",
+            string text = string.Format("[{0}/{1}]  动画号 = {2}   帧数 {3}{4}\n←/→ 切换    空格 {5}",
                 _index + 1, _anims.Count, anim.Id, anim.Frames.Length,
                 anim.Frames.Length == 0 ? "  (空动画)" : string.Empty,
                 _paused ? "继续" : "暂停");
             GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.font = MugenChineseText.Font();
             style.fontSize = 18;
             style.normal.textColor = Color.white;
             GUI.Label(new Rect(12f, 10f, 600f, 60f), text, style);

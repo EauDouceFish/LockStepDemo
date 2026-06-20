@@ -101,5 +101,30 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
             Assert.That(character.World.CountExplods(-1, character.Id), Is.EqualTo(2));
             Assert.That(character.World.Explods[0].AnimNo, Is.EqualTo(101));
         }
+
+        [Test]
+        public void Explod_WithIgnoreHitPauseFalse_FreezesLifecycleDuringOwnerHitPause()
+        {
+            MEntityWorld world = new MEntityWorld();
+            MExplod explod = new MExplod
+            {
+                OwnerId = 7,
+                Vel = new FVector3(FFloat.FromInt(3), FFloat.Zero, FFloat.Zero),
+                RemoveTime = 2,
+                IgnoreHitPause = false,
+            };
+            world.AddExplod(explod);
+
+            world.StepExplods(ownerId => ownerId == 7);
+
+            Assert.That(world.Explods.Count, Is.EqualTo(1));
+            Assert.That(world.Explods[0].Pos.X.Raw, Is.EqualTo(FFloat.Zero.Raw));
+            Assert.That(world.Explods[0].RemoveTime, Is.EqualTo(2));
+
+            world.StepExplods(ownerId => false);
+
+            Assert.That(world.Explods[0].Pos.X.Raw, Is.EqualTo(FFloat.FromInt(3).Raw));
+            Assert.That(world.Explods[0].RemoveTime, Is.EqualTo(1));
+        }
     }
 }

@@ -24,6 +24,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public Dictionary<string, string> Parameters = new Dictionary<string, string>();
 
+        // Project-specific: parse-preserving base for Ikemen controllers whose runtime fields are not implemented yet.
         public override bool Run(MChar character)
         {
             return false;
@@ -91,6 +92,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp PauseBg;
         public BytecodeExp EndCmdBufTime;
 
+        // Ikemen reference: src/bytecode.go Pause StateController writes shared pause timers.
         public override bool Run(MChar character)
         {
             int t = Time != null ? Time.Run(character).ToI() : 0;
@@ -116,6 +118,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Unhittable;
         public BytecodeExp[] Sound;
 
+        // Ikemen reference: src/bytecode.go SuperPause StateController writes super pause and poweradd.
         public override bool Run(MChar character)
         {
             // 写共享暂停态（移植 bytecode.go superPause.Run，默认 t=30/mt=0/unhittable=true）。
@@ -130,6 +133,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/char.go state controller effects clamp power into valid range.
         static int Clamp(int value, int low, int high)
         {
             return value < low ? low : (value > high ? high : value);
@@ -141,6 +145,7 @@ namespace Lockstep.Mugen.StateCtrl
     {
         public BytecodeExp Value;
 
+        // Ikemen reference: src/bytecode.go PosFreeze StateController toggles position integration freeze.
         public override bool Run(MChar character)
         {
             character.PosFreeze = Value == null || Value.Run(character).ToB();
@@ -155,28 +160,60 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] Player;
         public BytecodeExp[] Edge;
 
+        // Ikemen reference: src/bytecode.go Width StateController writes player and edge width values.
         public override bool Run(MChar character)
         {
             if (Value != null && Value.Length >= 1)
             {
                 FFloat front = Value[0].Run(character).ToF();
-                FFloat back = Value.Length > 1 ? Value[1].Run(character).ToF() : front;
-                character.WidthPlayerFront = front;
-                character.WidthPlayerBack = back;
+                character.WidthPlayerFront = BaseFront(character) + front;
+                character.WidthPlayerFrontSet = true;
                 character.WidthEdgeFront = front;
-                character.WidthEdgeBack = back;
+                character.WidthEdgeFrontSet = true;
+                if (Value.Length > 1)
+                {
+                    FFloat back = Value[1].Run(character).ToF();
+                    character.WidthPlayerBack = BaseBack(character) + back;
+                    character.WidthPlayerBackSet = true;
+                    character.WidthEdgeBack = back;
+                    character.WidthEdgeBackSet = true;
+                }
             }
             if (Player != null && Player.Length >= 1)
             {
-                character.WidthPlayerFront = Player[0].Run(character).ToF();
-                character.WidthPlayerBack = Player.Length > 1 ? Player[1].Run(character).ToF() : character.WidthPlayerFront;
+                character.WidthPlayerFront = BaseFront(character) + Player[0].Run(character).ToF();
+                character.WidthPlayerFrontSet = true;
+                if (Player.Length > 1)
+                {
+                    character.WidthPlayerBack = BaseBack(character) + Player[1].Run(character).ToF();
+                    character.WidthPlayerBackSet = true;
+                }
             }
             if (Edge != null && Edge.Length >= 1)
             {
                 character.WidthEdgeFront = Edge[0].Run(character).ToF();
-                character.WidthEdgeBack = Edge.Length > 1 ? Edge[1].Run(character).ToF() : character.WidthEdgeFront;
+                character.WidthEdgeFrontSet = true;
+                if (Edge.Length > 1)
+                {
+                    character.WidthEdgeBack = Edge[1].Run(character).ToF();
+                    character.WidthEdgeBackSet = true;
+                }
             }
             return false;
+        }
+
+        static FFloat BaseFront(MChar character)
+        {
+            return character.StateType == 4
+                ? character.ReadConst(MConstId.SizeAirFront).ToF()
+                : character.ReadConst(MConstId.SizeGroundFront).ToF();
+        }
+
+        static FFloat BaseBack(MChar character)
+        {
+            return character.StateType == 4
+                ? character.ReadConst(MConstId.SizeAirBack).ToF()
+                : character.ReadConst(MConstId.SizeGroundBack).ToF();
         }
     }
 
@@ -187,9 +224,10 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Priority;
         public BytecodeExp AffectTeam;
 
+        // Ikemen reference: src/bytecode.go PlayerPush StateController writes push enable/priority/team flags.
         public override bool Run(MChar character)
         {
-            if (Value != null) { character.PlayerPushEnabled = Value.Run(character).ToB(); }
+            character.PlayerPushEnabled = Value == null || Value.Run(character).ToB();
             if (Priority != null) { character.PushPriority = Priority.Run(character).ToI(); }
             if (AffectTeam != null) { character.PushAffectTeam = AffectTeam.Run(character).ToI(); }
             return false;
@@ -203,13 +241,19 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] MoveCamera;
         public BytecodeExp StageBound;
 
+        // Ikemen reference: src/bytecode.go ScreenBound StateController writes stage/camera bound flags.
         public override bool Run(MChar character)
         {
-            if (Value != null) { character.ScreenBoundEnabled = Value.Run(character).ToB(); }
+            character.ScreenBoundEnabled = Value != null && Value.Run(character).ToB();
             if (MoveCamera != null && MoveCamera.Length >= 1)
             {
                 character.ScreenBoundMoveCameraX = MoveCamera[0].Run(character).ToB();
                 character.ScreenBoundMoveCameraY = MoveCamera.Length > 1 && MoveCamera[1].Run(character).ToB();
+            }
+            else
+            {
+                character.ScreenBoundMoveCameraX = false;
+                character.ScreenBoundMoveCameraY = false;
             }
             if (StageBound != null) { character.ScreenBoundStageBound = StageBound.Run(character).ToB(); }
             return false;
@@ -223,6 +267,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] YValues;
         public BytecodeExp[] ZValues;
 
+        // Ikemen reference: src/bytecode.go AttackDist StateController writes guard distance.
         public override bool Run(MChar character)
         {
             if (XValues != null && XValues.Length > 0)
@@ -246,6 +291,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp ForceGuard;
         public BytecodeExp KeepState;
 
+        // Ikemen reference: src/bytecode.go HitOverride StateController stores hit override slot data.
         public override bool Run(MChar character)
         {
             int slot = Slot != null ? Slot.Run(character).ToI() : 0;
@@ -272,12 +318,15 @@ namespace Lockstep.Mugen.StateCtrl
     /// </summary>
     public sealed class MoveHitResetController : MStateController
     {
+        // Ikemen reference: src/char.go clearMoveHit clears move contact result flags.
         public override bool Run(MChar character)
         {
             character.MoveContact = 0;
             character.MoveHit = 0;
             character.MoveGuarded = 0;
             character.MoveReversed = 0;
+            character.MoveContactTime = 0;
+            character.CounterHit = false;
             return false;
         }
     }
@@ -291,6 +340,7 @@ namespace Lockstep.Mugen.StateCtrl
         public MHitDef Template;
         public PalFXParamSet PalFX = new PalFXParamSet();
 
+        // Ikemen reference: src/bytecode.go ReversalDef StateController installs reversal hit definition.
         public override bool Run(MChar character)
         {
             character.ReversalDef = new MReversalDefRuntime
@@ -303,6 +353,7 @@ namespace Lockstep.Mugen.StateCtrl
             };
             if (character.ReversalDef.Template != null)
             {
+                character.ReversalDef.Template.ResolveDynamicValues(character);
                 character.ReversalDef.Template.Active = true;
             }
             return false;
@@ -315,6 +366,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Index;
         public BytecodeExp[] Range;
 
+        // Ikemen reference: src/bytecode.go VarRandom StateController writes random integer var.
         public override bool Run(MChar character)
         {
             int index = Index != null ? Index.Run(character).ToI() : 0;
@@ -348,6 +400,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Value;
         public BytecodeExp FloatValue;
 
+        // Ikemen reference: src/bytecode.go VarRangeSet StateController writes inclusive var/fvar ranges.
         public override bool Run(MChar character)
         {
             int first = First != null ? First.Run(character).ToI() : 0;
@@ -382,6 +435,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp[] Source;
         public BytecodeExp[] Dest;
 
+        // Ikemen reference: src/bytecode.go RemapPal StateController remaps palette source to destination.
         public override bool Run(MChar character)
         {
             int srcGroup = -1, srcIndex = 0, dstGroup = -1, dstIndex = 0;
@@ -416,6 +470,7 @@ namespace Lockstep.Mugen.StateCtrl
         public int DefaultDst;
         public BytecodeExp[] Alpha;   // 可选 alpha 覆盖 [src, dst]
 
+        // Ikemen reference: src/bytecode.go Trans StateController writes blend mode and alpha values.
         public override bool Run(MChar character)
         {
             int src = Alpha != null && Alpha.Length > 0 && Alpha[0] != null ? Alpha[0].Run(character).ToI() : DefaultSrc;
@@ -426,6 +481,7 @@ namespace Lockstep.Mugen.StateCtrl
             return false;
         }
 
+        // Ikemen reference: src/bytecode.go Trans alpha values are clamped into byte range.
         static int Clamp255(int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
     }
 
@@ -435,6 +491,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp Value;
         public BytecodeExp LayerNo;
 
+        // Ikemen reference: src/bytecode.go SprPriority StateController writes draw priority and layer.
         public override bool Run(MChar character)
         {
             character.SprPriority = Value != null ? Value.Run(character).ToI() : 0;
@@ -449,6 +506,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp XOffset;
         public BytecodeExp YOffset;
 
+        // Ikemen reference: src/bytecode.go Offset StateController writes draw offset axes.
         public override bool Run(MChar character)
         {
             if (XOffset != null) { character.OffsetX = XOffset.Run(character).ToF(); }
@@ -465,6 +523,7 @@ namespace Lockstep.Mugen.StateCtrl
         public BytecodeExp YAngle;
         public BytecodeExp[] Scale;
 
+        // Ikemen reference: src/bytecode.go AngleDraw StateController enables angle drawing transform.
         public override bool Run(MChar character)
         {
             if (Value != null) { character.AngleSetValue(Value.Run(character).ToF()); }
@@ -893,6 +952,7 @@ namespace Lockstep.Mugen.StateCtrl
             if (OwnPal != null) { explod.OwnPal = OwnPal.Run(character).ToB(); }
             if (RemoveOnGetHit != null) { explod.RemoveOnGetHit = RemoveOnGetHit.Run(character).ToB(); }
             if (RemoveOnChangeState != null) { explod.RemoveOnChangeState = RemoveOnChangeState.Run(character).ToB(); }
+            if (ExplodIgnoreHitPause != null) { explod.IgnoreHitPause = ExplodIgnoreHitPause.Run(character).ToB(); }
         }
     }
 

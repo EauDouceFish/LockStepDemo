@@ -8,6 +8,8 @@ namespace Lockstep.Mugen.Char
         public int OwnerPlayerNo;
         public int AnimNo;
         public int Ctrl;
+        public bool InitPending;
+        public bool ReturningToSelf;
 
         public static MStateTransition None => new MStateTransition
         {
@@ -15,6 +17,8 @@ namespace Lockstep.Mugen.Char
             OwnerPlayerNo = -1,
             AnimNo = -1,
             Ctrl = -1,
+            InitPending = false,
+            ReturningToSelf = false,
         };
     }
 }

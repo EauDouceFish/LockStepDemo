@@ -1,4 +1,4 @@
-﻿# Ikemen Functions Not Name-Matched
+# Ikemen Functions Not Name-Matched
 
 This is a name-level gap list generated from selected Ikemen core battle files.
 It is not proof that a function is logically absent: some C# implementations are intentionally renamed or split.
@@ -44,7 +44,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `SetColorKey` | `anim.go:2064` | `(a *Anim)` | animation/resource ownership |
 | `SetAlpha` | `anim.go:2068` | `(a *Anim)` | animation/resource ownership |
 | `SetLocalcoord` | `anim.go:2072` | `(a *Anim)` | animation/resource ownership |
-| `SetPos` | `anim.go:2084` | `(a *Anim)` | animation/resource ownership |
 | `AddPos` | `anim.go:2091` | `(a *Anim)` | animation/resource ownership |
 | `SetScale` | `anim.go:2096` | `(a *Anim)` | animation/resource ownership |
 | `SetWindow` | `anim.go:2103` | `(a *Anim)` | animation/resource ownership |
@@ -173,7 +172,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `setAllPosY` | `char.go:1738` | `(e *Explod)` | manual review |
 | `setAllPosZ` | `char.go:1742` | `(e *Explod)` | manual review |
 | `setBind` | `char.go:1746` | `(e *Explod)` | manual review |
-| `setPos` | `char.go:1754` | `(e *Explod)` | manual review |
 | `matchId` | `char.go:1836` | `(e *Explod)` | manual review |
 | `setAnim` | `char.go:1840` | `(e *Explod)` | manual review |
 | `setAnimElem` | `char.go:1880` | `(e *Explod)` | manual review |
@@ -255,7 +253,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `isEnemyOf` | `char.go:5011` | `(c *Char)` | manual review |
 | `getAILevel` | `char.go:5034` | `(c *Char)` | manual review |
 | `setAILevel` | `char.go:5044` | `(c *Char)` | manual review |
-| `alive` | `char.go:5058` | `(c *Char)` | manual review |
 | `activelyFighting` | `char.go:5064` | `(c *Char)` | manual review |
 | `animElemNo` | `char.go:5071` | `(c *Char)` | manual review |
 | `animElemTime` | `char.go:5078` | `(c *Char)` | manual review |
@@ -1026,7 +1023,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `palfxvar2` | `system.go:1555` | `(s *System)` | round/system/entity lifecycle |
 | `screenHeight` | `system.go:1578` | `(s *System)` | round/system/entity lifecycle |
 | `screenWidth` | `system.go:1583` | `(s *System)` | round/system/entity lifecycle |
-| `roundEnded` | `system.go:1587` | `(s *System)` | round/system/entity lifecycle |
 | `roundNoDamage` | `system.go:1592` | `(s *System)` | round/system/entity lifecycle |
 | `gameTime` | `system.go:1597` | `(s *System)` | round/system/entity lifecycle |
 | `roundState` | `system.go:1613` | `(s *System)` | round/system/entity lifecycle |
@@ -1067,7 +1063,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `clearPlayerAssets` | `system.go:2131` | `(s *System)` | round/system/entity lifecycle |
 | `handleStageSwap` | `system.go:2160` | `(s *System)` | round/system/entity lifecycle |
 | `updateMusicMaps` | `system.go:2197` | `(s *System)` | round/system/entity lifecycle |
-| `resetRound` | `system.go:2238` | `(s *System)` | round/system/entity lifecycle |
 | `debugPaused` | `system.go:2346` | `(s *System)` | round/system/entity lifecycle |
 | `tickFrame` | `system.go:2351` | `(s *System)` | round/system/entity lifecycle |
 | `tickNextFrame` | `system.go:2357` | `(s *System)` | round/system/entity lifecycle |
@@ -1096,7 +1091,6 @@ Each row still requires manual mapping to one of: implemented-equivalent, implem
 | `matchEndDialoguePending` | `system.go:2912` | `(s *System)` | round/system/entity lifecycle |
 | `shouldStartMatchEndDialogue` | `system.go:2932` | `(s *System)` | round/system/entity lifecycle |
 | `holdPostMatchForDialogue` | `system.go:2942` | `(s *System)` | round/system/entity lifecycle |
-| `roundEndDecision` | `system.go:3180` | `(s *System)` | round/system/entity lifecycle |
 | `draw` | `system.go:3316` | `(s *System)` | round/system/entity lifecycle |
 | `drawCharTexts` | `system.go:3477` | `(s *System)` | round/system/entity lifecycle |
 | `drawTop` | `system.go:3485` | `(s *System)` | round/system/entity lifecycle |

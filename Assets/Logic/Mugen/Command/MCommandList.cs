@@ -16,7 +16,8 @@ namespace Lockstep.Mugen.Command
         bool[] _completedThisFrame = new bool[0];
         readonly HashSet<string> _completedNames = new HashSet<string>(StringComparer.Ordinal);
 
-        /// <summary>每帧推进所有命令的独立状态机。</summary>
+        /// <summary>Advances all command runtimes for one frame.</summary>
+        // Ikemen reference: src/input.go CommandList.Step updates CommandBuffer and advances each Command.Step.
         public void Update(MInput input, bool facingRight)
         {
             EnsureRuntimes();
@@ -35,7 +36,7 @@ namespace Lockstep.Mugen.Command
                 _completedNames.Add(_runtimes[i].Definition.Name ?? string.Empty);
             }
 
-            // 对齐 Ikemen ClearName：同名命令的一条完成后，清掉其余候选的部分进度，保留已有 buffer。
+            // Aligns Ikemen Command.Clear behavior: once one same-name command completes, clear partial progress in the others.
             if (_completedNames.Count == 0)
             {
                 return;
@@ -49,6 +50,7 @@ namespace Lockstep.Mugen.Command
             }
         }
 
+        // Ikemen reference: src/input.go CommandList.GetState/CommandList.BufReset active command buffer state.
         public bool IsActive(string name)
         {
             EnsureRuntimes();
@@ -62,6 +64,7 @@ namespace Lockstep.Mugen.Command
             return false;
         }
 
+        // Project-specific: exposes active C# command names for tests and move probes; Ikemen checks command triggers directly.
         public List<string> ActiveNames()
         {
             EnsureRuntimes();
@@ -88,6 +91,7 @@ namespace Lockstep.Mugen.Command
             return names;
         }
 
+        // Ikemen reference: src/input.go Command.Clear/CommandList.BufReset style command runtime buffer clearing.
         public void ResetRuntime()
         {
             Buffer = new MCommandBuffer(60);
@@ -101,6 +105,7 @@ namespace Lockstep.Mugen.Command
             }
         }
 
+        // Project-specific: rollback clone copies C# command/input runtime state; Ikemen does not expose a clone API.
         public MCommandList Clone()
         {
             EnsureRuntimes();
@@ -119,6 +124,7 @@ namespace Lockstep.Mugen.Command
             return clone;
         }
 
+        // Project-specific: rollback determinism hash over Ikemen-style command and input buffer state.
         public void WriteHash(ref Hash64 hash)
         {
             EnsureRuntimes();
@@ -131,6 +137,7 @@ namespace Lockstep.Mugen.Command
             }
         }
 
+        // Project-specific: rebuilds per-command C# runtime mirrors when the command definition list changes.
         void EnsureRuntimes()
         {
             bool rebuild = _runtimes.Count != Commands.Count;

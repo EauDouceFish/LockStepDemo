@@ -4,5 +4,14 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: b56be9165c3bb4b4b9d8a2c7e76aa321
+  - enabled: 1
+    path: Assets/Scenes/MugenTeamSelect.unity
+    guid: 3e47b8af8be26e04cb1a56f270b54fd3
+  - enabled: 1
+    path: Assets/Scenes/BattleScene.unity
+    guid: c743b633ae8001447b094732bb157bc3
   m_configObjects: {}

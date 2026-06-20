@@ -26,6 +26,10 @@ namespace Lockstep.View
         public string CommonFolder = "Terrarian";   // KFM 目录无 common1，借标准公共状态（与测试一致）
         public float PixelsPerUnit = 50f;
         public float TicksPerSecond = 60f;
+        public bool StrictSixtyHzLogic = true;
+        public int MaxLogicFramesPerRender = 1;
+        public bool DropLogicCatchUpOnSpike = true;
+        public bool LogLogicTimingDiagnostics = false;
 
         SpriteRenderer _renderer;
         MBattleEngine _engine;
@@ -36,12 +40,15 @@ namespace Lockstep.View
         readonly List<MInput> _inputs = new List<MInput> { MInput.None };
         float _accumulator;
         int _frame;
+        int _logicCatchUpDropTotal;
+        int _lastLogicTimingDiagnosticFrame = -999999;
+        const int LogicTimingDiagnosticIntervalFrames = 60;
 
         void Start()
         {
             _renderer = GetComponent<SpriteRenderer>();
 
-            string mugenRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource"));
+            string mugenRoot = MugenAssetPaths.MugenRoot();
             string charDir = Path.Combine(mugenRoot, CharacterFolder);
             string cnsPath = Path.Combine(charDir, "kfm.cns");
             string cmdPath = Path.Combine(charDir, "kfm.cmd");
@@ -91,19 +98,52 @@ namespace Lockstep.View
             {
                 return;
             }
-            _accumulator += Time.deltaTime * TicksPerSecond;
-            // 定步推进：每攒够一个逻辑帧就 Tick 一次（与 60Hz 锁步对齐）。
-            int guard = 0;
-            while (_accumulator >= 1f && guard < 8)
+
+            float deltaTime = Time.deltaTime;
+            int droppedCatchUpFrames;
+            int logicFrames = MugenPresentationClock.ConsumeLogicFrames(
+                deltaTime,
+                MugenPresentationClock.EffectiveTickRate(TicksPerSecond, StrictSixtyHzLogic),
+                MaxLogicFramesPerRender,
+                DropLogicCatchUpOnSpike,
+                ref _accumulator,
+                out droppedCatchUpFrames);
+            // Fixed 60Hz game logic, with no same-render catch-up burst after a deltaTime spike.
+            for (int i = 0; i < logicFrames; i++)
             {
-                _accumulator -= 1f;
-                guard++;
                 _inputs[0] = SampleInput();
                 _engine.Tick(_inputs);
                 _frame++;
             }
+            LogLogicTimingDropIfNeeded(droppedCatchUpFrames, deltaTime, logicFrames);
             Render();
         }
+
+        void LogLogicTimingDropIfNeeded(int droppedFrames, float deltaTime, int simulatedFrames)
+        {
+            if (droppedFrames <= 0)
+            {
+                return;
+            }
+
+            _logicCatchUpDropTotal += droppedFrames;
+            if (!LogLogicTimingDiagnostics ||
+                _frame - _lastLogicTimingDiagnosticFrame < LogicTimingDiagnosticIntervalFrames)
+            {
+                return;
+            }
+
+            _lastLogicTimingDiagnosticFrame = _frame;
+            Debug.LogWarning(string.Format(
+                "[MUGEN] Live dropped catch-up logic frames delta={0:0.0000}s simulated={1} dropped={2} totalDropped={3} tickRate={4:0.##} maxPerRender={5}",
+                deltaTime,
+                simulatedFrames,
+                droppedFrames,
+                _logicCatchUpDropTotal,
+                MugenPresentationClock.EffectiveTickRate(TicksPerSecond, StrictSixtyHzLogic),
+                Mathf.Max(1, MaxLogicFramesPerRender)));
+        }
+
 
         // 键盘 → MInput（方向存原始 L/R，B/F 由引擎按朝向转）。
         // MUGEN 6 键布局：拳 x/y/z = A/S/D（家位行），脚 a/b/c = Z/X/C（底行）。
@@ -175,11 +215,12 @@ namespace Lockstep.View
             }
             MChar c = _engine.Chars[0];
             string text = string.Format(
-                "Live 帧 {0}\nStateNo {1}   AnimNo {2}   Elem {3}\nPhysics {4}  Type {5}  Ctrl {6}\nPos ({7:0.0},{8:0.0})  Vel ({9:0.00},{10:0.00})  Facing {11}\n方向键移动  拳 A/S/D  脚 Z/X/C",
+                "实时演示  帧 {0}\n状态 {1}   动画 {2}   帧段 {3}\n物理 {4}  体态 {5}  可控 {6}\n坐标 ({7:0.0},{8:0.0})  速度 ({9:0.00},{10:0.00})  朝向 {11}\n方向键移动  拳 A/S/D  脚 Z/X/C",
                 _frame, c.StateNo, c.AnimNo, c.AnimElem, c.Physics, c.StateType, c.Ctrl,
                 c.Pos.X.ToFloat(), c.Pos.Y.ToFloat(), c.Vel.X.ToFloat(), c.Vel.Y.ToFloat(),
                 c.Facing.Raw < 0 ? -1 : 1);
             GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.font = MugenChineseText.Font();
             style.fontSize = 16;
             style.normal.textColor = Color.white;
             GUI.Label(new Rect(12f, 10f, 700f, 120f), text, style);

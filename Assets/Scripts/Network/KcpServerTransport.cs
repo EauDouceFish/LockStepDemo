@@ -11,6 +11,8 @@ namespace Lockstep.Server
 {
     public class KcpServerTransport : ITransport
     {
+        const float ClientTimeoutSeconds = 20f;
+
         public event Action<int> OnPlayerConnected;
         public event Action<int> OnPlayerDisconnected;
 
@@ -29,6 +31,7 @@ namespace Lockstep.Server
             public IPEndPoint Endpoint;
             public KCP Kcp;
             public int PlayerId;
+            public float LastSeenTime;
         }
 
         public void Start(int port)
@@ -56,6 +59,27 @@ namespace Lockstep.Server
 
             var bytes = MessageCodec.Encode(msg);
             link.Kcp.Send(bytes, 0, bytes.Length);
+        }
+
+        public void Flush(int playerId)
+        {
+            if (_clientsByPid.TryGetValue(playerId, out var link))
+            {
+                link.Kcp.Update();
+            }
+        }
+
+        public int Broadcast(IMessage msg)
+        {
+            int count = 0;
+            foreach (var link in _clientsByPid.Values)
+            {
+                var bytes = MessageCodec.Encode(msg);
+                link.Kcp.Send(bytes, 0, bytes.Length);
+                link.Kcp.Update();
+                count++;
+            }
+            return count;
         }
 
         public bool Poll(out int playerId, out IMessage msg)
@@ -96,6 +120,7 @@ namespace Lockstep.Server
 
                 var ip = (IPEndPoint)fromEp;
                 var link = GetOrCreateClient(ip);
+                link.LastSeenTime = Time.realtimeSinceStartup;
                 link.Kcp.Input(_udpRecv, 0, n, true, true);
             }
 
@@ -113,6 +138,7 @@ namespace Lockstep.Server
                 }
                 link.Kcp.Update();
             }
+            RemoveIdleClients();
         }
 
         ClientLink GetOrCreateClient(IPEndPoint ep)
@@ -123,7 +149,12 @@ namespace Lockstep.Server
             }
 
             var stable = new IPEndPoint(ep.Address, ep.Port);
-            var link = new ClientLink { Endpoint = stable, PlayerId = _nextPlayerId++ };
+            var link = new ClientLink
+            {
+                Endpoint = stable,
+                PlayerId = _nextPlayerId++,
+                LastSeenTime = Time.realtimeSinceStartup,
+            };
             link.Kcp = new KCP(KcpClientTransport.Conv, (data, len) =>
             {
                 try { _socket.SendTo(data, 0, len, SocketFlags.None, link.Endpoint); }
@@ -138,6 +169,39 @@ namespace Lockstep.Server
             OnPlayerConnected?.Invoke(link.PlayerId);
             return link;
         }
+
+        void RemoveIdleClients()
+        {
+            if (_clientsByPid.Count == 0)
+            {
+                return;
+            }
+
+            float now = Time.realtimeSinceStartup;
+            List<ClientLink> stale = null;
+            foreach (var link in _clientsByPid.Values)
+            {
+                if (now - link.LastSeenTime < ClientTimeoutSeconds)
+                {
+                    continue;
+                }
+                if (stale == null) { stale = new List<ClientLink>(); }
+                stale.Add(link);
+            }
+
+            if (stale == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < stale.Count; i++)
+            {
+                ClientLink link = stale[i];
+                _clientsByPid.Remove(link.PlayerId);
+                _clientsByEp.Remove(link.Endpoint);
+                Debug.Log($"[KcpServer] client timeout {link.Endpoint} playerId={link.PlayerId}");
+                OnPlayerDisconnected?.Invoke(link.PlayerId);
+            }
+        }
     }
 }
-

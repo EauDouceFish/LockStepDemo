@@ -106,8 +106,8 @@ namespace Lockstep.Tests.Mugen
         {
             string cns =
                 "[Statedef 100]\ntype = S\n" +
-                "[State 100, vel]\ntype = VelSet\ntrigger1 = 1\nx = 2.5\ny = 0 - 3\n" +
-                "[State 100, pos]\ntype = PosAdd\ntrigger1 = 1\nx = 5\n";
+                "[State 100, vel]\ntype = VelSet\ntrigger1 = 1\nx = 2.5\ny = 0 - 3\nz = 4\n" +
+                "[State 100, pos]\ntype = PosAdd\ntrigger1 = 1\nx = 5\nz = 6\n";
             Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
             MChar c = new MChar { StateNo = 100, Facing = Lockstep.Math.FFloat.One,
                 Pos = new Lockstep.Math.FVector3(Lockstep.Math.FFloat.FromInt(10), Lockstep.Math.FFloat.Zero, Lockstep.Math.FFloat.Zero) };
@@ -115,7 +115,48 @@ namespace Lockstep.Tests.Mugen
             new MStateMachine().RunFrame(c, states);
             Assert.That(c.Vel.X.Raw, Is.EqualTo((Lockstep.Math.FFloat.FromInt(5) / Lockstep.Math.FFloat.FromInt(2)).Raw), "vel.x=2.5");
             Assert.That(c.Vel.Y.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(-3).Raw));
+            Assert.That(c.Vel.Z.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(4).Raw));
+            Assert.That(c.Pos.Z.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(6).Raw));
             Assert.That(c.Pos.X.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(15).Raw), "posadd 5*facing(+1) → 15");
+        }
+
+        [Test]
+        public void ParsesVelAddAndPosSetZ()
+        {
+            string cns =
+                "[Statedef 100]\ntype = S\n" +
+                "[State 100, vel]\ntype = VelAdd\ntrigger1 = 1\nz = 4\n" +
+                "[State 100, pos]\ntype = PosSet\ntrigger1 = 1\nz = 9\n";
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+            MChar c = new MChar
+            {
+                StateNo = 100,
+                Vel = new Lockstep.Math.FVector3(Lockstep.Math.FFloat.Zero, Lockstep.Math.FFloat.Zero, Lockstep.Math.FFloat.FromInt(3)),
+                Pos = new Lockstep.Math.FVector3(Lockstep.Math.FFloat.Zero, Lockstep.Math.FFloat.Zero, Lockstep.Math.FFloat.FromInt(6)),
+            };
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(c.Vel.Z.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(7).Raw));
+            Assert.That(c.Pos.Z.Raw, Is.EqualTo(Lockstep.Math.FFloat.FromInt(9).Raw));
+        }
+
+        [Test]
+        public void Width_BlankEdgeAndPlayer_DoNotAssertRuntimeWidths()
+        {
+            string cns =
+                "[Statedef 100]\ntype = S\n" +
+                "[State 100, width]\ntype = Width\ntrigger1 = 1\nedge =\nplayer =\n";
+            Dictionary<int, MStateDef> states = MugenCnsParser.Parse(cns);
+            WidthController controller = (WidthController)states[100].Controllers[0];
+            MChar c = new MChar { StateNo = 100 };
+
+            new MStateMachine().RunFrame(c, states);
+
+            Assert.That(controller.Edge, Is.Null);
+            Assert.That(controller.Player, Is.Null);
+            Assert.That(c.WidthEdgeFrontSet, Is.False);
+            Assert.That(c.WidthPlayerFrontSet, Is.False);
         }
 
         [Test]

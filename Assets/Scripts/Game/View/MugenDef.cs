@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Lockstep.View
@@ -18,6 +19,47 @@ namespace Lockstep.View
         public static string AnimPath(string folder)
         {
             return ResolveFile(folder, "anim", "*.air");
+        }
+
+        public static string CmdPath(string folder)
+        {
+            return ResolveFile(folder, "cmd", "*.cmd");
+        }
+
+        /// <summary>角色常量 cns（[Files] cns=）；找不到回退首个 .cns。</summary>
+        public static string ConstantsPath(string folder)
+        {
+            return ResolveFile(folder, "cns", "*.cns");
+        }
+
+        /// <summary>角色状态文件集合：常量 cns + st/st0..stN（状态常分散其中），去重，仅存在者。</summary>
+        public static List<string> StatePaths(string folder)
+        {
+            List<string> list = new List<string>();
+            string cns = ConstantsPath(folder);
+            if (cns != null && File.Exists(cns))
+            {
+                list.Add(cns);
+            }
+            string defPath = MainDef(folder);
+            if (defPath != null)
+            {
+                string[] keys = { "st", "st0", "st1", "st2", "st3", "st4", "st5", "st6", "st7" };
+                for (int i = 0; i < keys.Length; i++)
+                {
+                    string fileName = ReadFilesEntry(defPath, keys[i]);
+                    if (fileName == null)
+                    {
+                        continue;
+                    }
+                    string full = Path.Combine(folder, fileName);
+                    if (File.Exists(full) && !list.Contains(full))
+                    {
+                        list.Add(full);
+                    }
+                }
+            }
+            return list;
         }
 
         static string ResolveFile(string folder, string key, string fallbackPattern)
@@ -45,6 +87,7 @@ namespace Lockstep.View
                 return null;
             }
             string[] defs = Directory.GetFiles(folder, "*.def");
+            Array.Sort(defs, StringComparer.OrdinalIgnoreCase);
             if (defs.Length == 0)
             {
                 return null;

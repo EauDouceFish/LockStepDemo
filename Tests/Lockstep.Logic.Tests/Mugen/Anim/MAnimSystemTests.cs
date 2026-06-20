@@ -99,6 +99,43 @@ namespace Lockstep.Logic.Tests.Mugen.Anim
         }
 
         [Test]
+        public void Action_LoopStartKeepsAnimTimeZeroOnBoundaryTick()
+        {
+            MAnimData a = Anim(0, 1, 2, 2, 2);
+            Dictionary<int, MAnimData> table = Table(a);
+            MChar c = new MChar { AnimNo = 0 };
+
+            for (int i = 0; i < a.TotalTime; i++)
+            {
+                MAnimSystem.Action(c, table);
+            }
+
+            Assert.That(c.AnimElemNo, Is.EqualTo(2), "end tick loops to loopstart element");
+            Assert.That(c.AnimTime, Is.EqualTo(0), "AnimTime=0 is visible for the controller frame after animation end");
+            Assert.That(c.AnimLoopEnd, Is.True);
+
+            MAnimSystem.Action(c, table);
+
+            Assert.That(c.AnimElemNo, Is.EqualTo(2));
+            Assert.That(c.AnimTime, Is.EqualTo(-3), "next action wraps curtime to total-looptime before advancing");
+        }
+
+        [Test]
+        public void AnimElemNoAtTime_UsesIkemenRelativeTimeAcrossLoop()
+        {
+            MAnimData a = Anim(0, 1, 2, 3, 4);
+            MChar c = new MChar { AnimNo = 0 };
+            MAnimSystem.PlayAt(c, 0, Table(a), 2, 1);
+
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, 0), Is.EqualTo(3));
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, -2), Is.EqualTo(2));
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, -5), Is.EqualTo(3));
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, 3), Is.EqualTo(3));
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, 4), Is.EqualTo(2));
+            Assert.That(MAnimSystem.AnimElemNoAtTime(c, a, 7), Is.EqualTo(3));
+        }
+
+        [Test]
         public void Action_InfiniteFrame_StaysOnLastElement()
         {
             MAnimData a = Anim(0, 0, 2, -1);

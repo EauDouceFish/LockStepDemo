@@ -28,6 +28,7 @@ namespace Lockstep.Mugen.Battle
         public int TargetLife = -1;
         public bool TargetGuarding;
 
+        // Project-specific: curated test prerequisites that approximate common Ikemen/MUGEN move-entry situations.
         public static List<MMovePrerequisiteProfile> DefaultSet()
         {
             return new List<MMovePrerequisiteProfile>
@@ -73,6 +74,7 @@ namespace Lockstep.Mugen.Battle
 
     public static class MMoveTestRunner
     {
+        // Project-specific: command reachability test harness around the C# Ikemen-style battle engine.
         public static MMoveTestResult Run(
             MCharData data,
             IReadOnlyList<MCommandDef> commands,
@@ -113,6 +115,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: runs one prerequisite profile twice to verify deterministic rollback behavior.
         static MMoveTestResult RunProfile(
             MCharData data,
             IReadOnlyList<MCommandDef> commands,
@@ -152,6 +155,7 @@ namespace Lockstep.Mugen.Battle
             };
         }
 
+        // Project-specific: feeds synthesized command input and observes state entry in the C# harness.
         static MMoveAttempt RunAttempt(
             MBattleEngine engine,
             IReadOnlyList<MCommandDef> commands,
@@ -194,6 +198,7 @@ namespace Lockstep.Mugen.Battle
             return result;
         }
 
+        // Ikemen reference: src/input.go command buffer matching; C# checks active command names exposed by MCommandList.
         static bool AnyCommandActive(MChar actor, IReadOnlyList<MCommandDef> commands)
         {
             if (actor.CommandList == null)
@@ -210,6 +215,7 @@ namespace Lockstep.Mugen.Battle
             return false;
         }
 
+        // Project-specific: classifies harness failures into command, transition, and determinism buckets.
         static MMoveTestStatus Classify(MMoveAttempt attempt, bool deterministic)
         {
             if (!attempt.CommandMatched)
@@ -223,6 +229,7 @@ namespace Lockstep.Mugen.Battle
             return deterministic ? MMoveTestStatus.Passed : MMoveTestStatus.DeterministicFailure;
         }
 
+        // Project-specific: sets C# actor/target state to emulate Ikemen preconditions before command execution.
         static void ApplyProfile(MBattleEngine engine, MMovePrerequisiteProfile profile)
         {
             MChar actor = engine.Chars[0];
@@ -251,6 +258,7 @@ namespace Lockstep.Mugen.Battle
             engine.LinkPair();
         }
 
+        // Project-specific: creates a two-player C# battle fixture with Ikemen-style P1/P2 facing and links.
         static MBattleEngine CreateEngine(MCharData data)
         {
             MBattleEngine engine = new MBattleEngine();
@@ -266,6 +274,7 @@ namespace Lockstep.Mugen.Battle
             return engine;
         }
 
+        // Project-specific: orders harness outcomes so the most useful failure is reported.
         static int Rank(MMoveTestStatus status)
         {
             switch (status)

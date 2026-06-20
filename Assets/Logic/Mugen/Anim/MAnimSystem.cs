@@ -166,8 +166,8 @@ namespace Lockstep.Mugen.Anim
             {
                 elem = a.Frames.Length - 1;
             }
-            c.AnimElemNo = elem + 1;                 // 1-based（对齐 Ikemen AnimElemNo 简单情形）
-            c.AnimTime = c.AnimCurTime - a.TotalTime;   // 惯例 ≤0（末帧到时为 0）
+            c.AnimElemNo = AnimElemNoAtTime(c, a, 0);
+            c.AnimTime = c.AnimCurTime - a.TotalTime;
             MAnimFrame frame = a.Frames[elem];
             if (frame == null)
             {
@@ -177,6 +177,88 @@ namespace Lockstep.Mugen.Anim
             }
             c.Clsn1 = frame.Clsn1;
             c.Clsn2 = frame.Clsn2;
+        }
+
+        // Ikemen reference: src/anim.go:428 Animation.AnimElemNo.
+        public static int AnimElemNoAtTime(MChar c, MAnimData a, int time)
+        {
+            if (a == null || a.Frames == null || a.Frames.Length == 0)
+            {
+                return 0;
+            }
+
+            int length = a.Frames.Length;
+            int i = c.AnimElem;
+            if (i < 0)
+            {
+                i = 0;
+            }
+            else if (i >= length)
+            {
+                i = length - 1;
+            }
+
+            int oldTime = 0;
+            if (time <= 0)
+            {
+                time += c.AnimElemTime;
+                bool loop = false;
+                while (true)
+                {
+                    if (time >= 0)
+                    {
+                        return i + 1;
+                    }
+
+                    i--;
+                    if (i < 0 || c.AnimElem >= a.LoopStart && i < a.LoopStart)
+                    {
+                        if (time == oldTime)
+                        {
+                            break;
+                        }
+                        oldTime = time;
+                        loop = true;
+                        i = length - 1;
+                    }
+
+                    time += PositiveFrameTime(a.Frames[i]);
+                    if (loop && i == length - 1 && a.Frames[i].Time == -1)
+                    {
+                        return i + 1;
+                    }
+                }
+            }
+            else
+            {
+                time += c.AnimElemTime;
+                while (true)
+                {
+                    time -= PositiveFrameTime(a.Frames[i]);
+                    if (time < 0 || i == length - 1 && a.Frames[i].Time == -1)
+                    {
+                        return i + 1;
+                    }
+
+                    i++;
+                    if (i >= length)
+                    {
+                        if (time == oldTime)
+                        {
+                            break;
+                        }
+                        oldTime = time;
+                        i = a.LoopStart;
+                    }
+                }
+            }
+
+            return length;
+        }
+
+        static int PositiveFrameTime(MAnimFrame frame)
+        {
+            return frame != null && frame.Time > 0 ? frame.Time : 0;
         }
     }
 }

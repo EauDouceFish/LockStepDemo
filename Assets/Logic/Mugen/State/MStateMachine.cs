@@ -49,7 +49,7 @@ namespace Lockstep.Mugen.State
             // 外部强制切换（命中系统等）优先
             if (c.PendingStateNo >= 0)
             {
-                ApplyTransition(c, states, commonStates);
+                BeginTransition(c, states, commonStates);
             }
 
             // 负状态每帧跑：-3(自身状态归属)、-2(通用)、-1(命令)。各自跑控制器，ChangeState 缓冲到 PendingStateNo。
@@ -58,8 +58,10 @@ namespace Lockstep.Mugen.State
             RunNegativeState(c, -1, states, commonStates, hitpause);
             if (c.PendingStateNo >= 0)
             {
-                ApplyTransition(c, states, commonStates);
+                BeginTransition(c, states, commonStates);
             }
+
+            FinishTransitionInit(c, states, commonStates, hitpause);
 
             RunCurrentState(c, states, commonStates, hitpause);
 
@@ -67,7 +69,32 @@ namespace Lockstep.Mugen.State
             {
                 UpdateGetHitTimers(c);
                 c.Time++;
+                UpdateMoveContactTimers(c);
             }
+        }
+
+        static void UpdateMoveContactTimers(MChar c)
+        {
+            if (c.MoveContactTime <= 0)
+            {
+                return;
+            }
+
+            c.MoveContactTime++;
+            int value = c.MoveContactTime;
+            if (c.MoveHit > 0)
+            {
+                c.MoveHit = value;
+            }
+            if (c.MoveGuarded > 0)
+            {
+                c.MoveGuarded = value;
+            }
+            if (c.MoveReversed > 0)
+            {
+                c.MoveReversed = value;
+            }
+            c.MoveContact = c.MoveReversed > 0 && c.MoveHit <= 0 && c.MoveGuarded <= 0 ? 0 : value;
         }
 
         // 受击计时逐帧更新（移植 Ikemen char.go:11775-11834，仅非 hitpause 帧）：
@@ -76,6 +103,7 @@ namespace Lockstep.Mugen.State
         static void UpdateGetHitTimers(MChar c)
         {
             MGetHitVar ghv = c.Ghv;
+            bool shakeActiveAtFrameStart = ghv.HitShakeTime > 0;
             if (c.MoveType == 2)   // MT_H 受击中
             {
                 if (ghv.HitShakeTime > 0)
@@ -86,6 +114,17 @@ namespace Lockstep.Mugen.State
                 {
                     c.FallTime++;
                 }
+                if (ghv.Guarded && !shakeActiveAtFrameStart)
+                {
+                    if (ghv.GuardCtrlTimeLeft > 0)
+                    {
+                        ghv.GuardCtrlTimeLeft--;
+                    }
+                    if (ghv.GuardCtrlTimeLeft <= 0)
+                    {
+                        c.Ctrl = true;
+                    }
+                }
             }
             else
             {
@@ -93,6 +132,7 @@ namespace Lockstep.Mugen.State
                 ghv.HitShakeTime = 0;
                 ghv.Fall = false;
                 ghv.FallCount = 0;
+                ghv.GuardCtrlTimeLeft = 0;
                 c.FallTime = 0;
                 c.ReceivedHits = 0;   // 连段结束清零（char.go:11809）
                 c.GuardCount = 0;     // char.go:11807
@@ -140,6 +180,7 @@ namespace Lockstep.Mugen.State
             {
                 return;
             }
+            c.CaptureStateControllerTriggerSnapshot();
             for (int i = 0; i < def.Controllers.Count; i++)
             {
                 MStateController ctrl = def.Controllers[i];
@@ -159,6 +200,7 @@ namespace Lockstep.Mugen.State
                 ResetPersist(c, no, i, ctrl.Persistent);
                 if (changed && c.PendingStateNo >= 0)
                 {
+                    BeginTransition(c, states, commonStates);
                     break;   // 负状态触发切换后停止本负状态后续控制器
                 }
             }
@@ -175,6 +217,7 @@ namespace Lockstep.Mugen.State
                 {
                     return;
                 }
+                c.CaptureStateControllerTriggerSnapshot();
                 bool changed = false;
                 for (int i = 0; i < def.Controllers.Count; i++)
                 {
@@ -194,8 +237,9 @@ namespace Lockstep.Mugen.State
                     bool ran = ctrl.Run(c);
                     if (ran && c.PendingStateNo >= 0)
                     {
-                        ApplyTransition(c, states, commonStates);   // 切状态：不 reset(对齐 Ikemen 在 return true 后才 reset)，
-                        changed = true;                             // 新状态计数器已由 ApplyTransition 清零
+                        BeginTransition(c, states, commonStates);   // 切状态：不 reset(对齐 Ikemen 在 return true 后才 reset)，
+                        FinishTransitionInit(c, states, commonStates, hitpause);
+                        changed = true;                             // 新状态计数器已由 BeginTransition 清零
                         break;      // 切状态后从新状态头部重入
                     }
                     ResetPersist(c, def.No, i, ctrl.Persistent);    // 未切状态：执行后重置冷却(对齐 Ikemen StateBlock.Run 末尾)
@@ -283,17 +327,32 @@ namespace Lockstep.Mugen.State
             }
         }
 
-        // 对应 changeStateEx + stateChange：设新状态号、time=0、清 persistent 计数、应用 statedef 头部。
-        static void ApplyTransition(MChar c, IReadOnlyDictionary<int, MStateDef> states,
+        // 对应 stateChange1：先提交状态号和 Time，但 statedef 头部延后到 -1 之后的 stateChange2。
+        static bool BeginTransition(MChar c, IReadOnlyDictionary<int, MStateDef> states,
             IReadOnlyDictionary<int, MStateDef> commonStates)
         {
+            if (!c.PendingTransition.Active)
+            {
+                return c.PendingTransition.InitPending;
+            }
+
             MStateTransition transition = c.PendingTransition;
             int target = transition.StateNo;
             int oldOwner = c.StatePlayerNo >= 0 ? c.StatePlayerNo : c.PlayerNo;
             int newOwner = transition.OwnerPlayerNo >= 0 ? transition.OwnerPlayerNo : oldOwner;
+            bool returningToSelf = newOwner == c.PlayerNo && (oldOwner != newOwner || c.StateOwner != null);
             if (oldOwner != newOwner) { RescaleStateLocalCoordinates(c, oldOwner, newOwner); }
 
-            c.PendingTransition = MStateTransition.None;
+            c.PendingTransition = new MStateTransition
+            {
+                Active = false,
+                StateNo = target,
+                OwnerPlayerNo = newOwner,
+                AnimNo = -1,
+                Ctrl = -1,
+                InitPending = true,
+                ReturningToSelf = returningToSelf,
+            };
             c.StatePlayerNo = newOwner;
             if (newOwner == c.PlayerNo)
             {
@@ -316,13 +375,46 @@ namespace Lockstep.Mugen.State
             c.StateNo = target;
             c.Time = 0;
             ClearStatePersist(c, target);   // 重置进入状态的 persistent 计数器（负状态计数器保留）
+            return true;
+        }
 
+        // 对应 stateChange2：hitpause 中不应用 statedef 头部，保留到后续非 hitpause 帧。
+        static void FinishTransitionInit(MChar c, IReadOnlyDictionary<int, MStateDef> states,
+            IReadOnlyDictionary<int, MStateDef> commonStates, bool hitpause)
+        {
+            if (!c.PendingTransition.InitPending || hitpause)
+            {
+                return;
+            }
+
+            bool returningToSelf = c.PendingTransition.ReturningToSelf;
+            int target = c.StateNo;
+            c.PendingTransition = MStateTransition.None;
             MStateDef def = LookupForCurrentOwner(c, target, states, commonStates);
             if (def == null)
             {
                 return;
             }
             def.RunInit(c);   // 应用头部：type/movetype/physics（字面量）+ anim/ctrl/velset/...（表达式求值）
+            NormalizeSelfStateReturn(c, target, returningToSelf);
+        }
+
+        static void NormalizeSelfStateReturn(MChar c, int target, bool returningToSelf)
+        {
+            if (!returningToSelf)
+            {
+                return;
+            }
+
+            c.ClearBind();
+            if (target != 0 || c.StateType != 1 || c.Pos.Y == FFloat.Zero)
+            {
+                return;
+            }
+
+            c.Pos = new FVector3(c.Pos.X, FFloat.Zero, c.Pos.Z);
+            c.OldPos = new FVector3(c.OldPos.X, FFloat.Zero, c.OldPos.Z);
+            c.Vel = new FVector3(c.Vel.X, FFloat.Zero, c.Vel.Z);
         }
 
         static void RescaleStateLocalCoordinates(MChar c, int oldOwner, int newOwner)

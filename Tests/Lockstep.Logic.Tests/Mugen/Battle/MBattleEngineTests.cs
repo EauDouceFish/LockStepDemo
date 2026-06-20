@@ -72,6 +72,94 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
         }
 
         [Test]
+        public void Loader_FillsMissingStandardCommonStatesWithoutOverridingLoadedCommon()
+        {
+            const string common =
+                "[Statedef 100]\n" +
+                "type = S\n" +
+                "physics = S\n" +
+                "anim = 200\n" +
+                "ctrl = 1\n";
+            string air = SynthAir +
+                "[Begin Action 200]\n" +
+                "200,0, 0,0, 4\n";
+
+            MCharData data = MCharLoader.Load(new[] { SynthCns }, SynthCns, common, air, null, "SynthCommon");
+
+            Assert.That(data.CommonStates.ContainsKey(5), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(100), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(105), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(106), Is.True);
+
+            MChar c = MCharLoader.SpawnChar(data, 0, startStateNo: 100, startAnimNo: 0);
+            Assert.That(c.AnimNo, Is.EqualTo(200),
+                "loaded common state 100 must not be overwritten by the fallback state.");
+            Assert.That(c.Ctrl, Is.True);
+        }
+
+        [Test]
+        public void SyntheticStandardCommonRunFallback_State100MovesAndStopsOnRelease()
+        {
+            const string cns =
+                "[Velocity]\n" +
+                "run.fwd = 3, 0\n" +
+                "run.back = -4, -3\n\n" +
+                "[Movement]\n" +
+                "yaccel = .5\n" +
+                "stand.friction = .85\n\n" +
+                "[Statedef 0]\n" +
+                "type = S\n" +
+                "physics = S\n" +
+                "anim = 0\n" +
+                "ctrl = 1\n";
+            const string common =
+                "[Statedef 0]\n" +
+                "type = S\n" +
+                "physics = S\n" +
+                "anim = 0\n" +
+                "ctrl = 1\n";
+            const string air =
+                "[Begin Action 0]\n" +
+                "0,0, 0,0, -1\n" +
+                "[Begin Action 100]\n" +
+                "100,0, 0,0, 4\n" +
+                "100,1, 0,0, 4\n";
+            const string cmd =
+                "[Command]\n" +
+                "name = \"holdfwd\"\n" +
+                "command = /$F\n" +
+                "time = 1\n" +
+                "[Command]\n" +
+                "name = \"holdup\"\n" +
+                "command = /$U\n" +
+                "time = 1\n";
+
+            MCharData data = MCharLoader.Load(new[] { cns }, cns, common, air, cmd, "SyntheticRun");
+            MBattleEngine engine = new MBattleEngine { EnableDemoAutoTurnFallback = false };
+            MChar c = MCharLoader.SpawnChar(data, 0, startStateNo: 100, startAnimNo: 100);
+            engine.Add(c, data);
+
+            List<MInput> forward = new List<MInput> { MInput.Right };
+            for (int i = 0; i < 4; i++)
+            {
+                engine.Tick(forward);
+            }
+
+            Assert.That(c.StateNo, Is.EqualTo(100));
+            Assert.That(c.AnimNo, Is.EqualTo(100));
+            Assert.That(c.Pos.X.Raw, Is.GreaterThan(0), "fallback state 100 should apply run.fwd velocity.");
+
+            List<MInput> none = new List<MInput> { MInput.None };
+            for (int i = 0; i < 4 && c.StateNo != 0; i++)
+            {
+                engine.Tick(none);
+            }
+
+            Assert.That(c.StateNo, Is.EqualTo(0), "releasing holdfwd should recover to stand.");
+            Assert.That(c.Ctrl, Is.True);
+        }
+
+        [Test]
         public void Engine_IsDeterministic_SameInputsSameHash()
         {
             MCharData data = MCharLoader.Load(new[] { SynthCns }, SynthCns, null, SynthAir, null, "Synth");
@@ -100,6 +188,9 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             expected.AddInt32(0);
             expected.AddInt32(engine.Random.Seed);
             engine.PauseState.WriteHash(ref expected);
+            engine.Stage.WriteHash(ref expected);
+            expected.AddBool(engine.NoDamage);
+            expected.AddBool(engine.EnableDemoAutoTurnFallback);
             engine.World.WriteHash(ref expected);
 
             Assert.That(engine.ComputeHash(), Is.EqualTo(expected.Value));
@@ -296,6 +387,68 @@ namespace Lockstep.Logic.Tests.Mugen.Battle
             List<MInput> none = new List<MInput> { MInput.None };
             for (int f = 0; f < 8; f++) { engine.Tick(none); }
             Assert.That(kfm.StateNo, Is.EqualTo(0), "松开 → 刹车回站立(0)");
+        }
+
+        [Test]
+        public void RealKfm_StandardCommonRunFallback_RunForwardAndBackHopRecover()
+        {
+            string kfmDir = TestAssets.KfmDir();
+            string common = TestAssets.Common1Cns();
+            string cns = Path.Combine(kfmDir, "kfm.cns");
+            string cmd = Path.Combine(kfmDir, "kfm.cmd");
+            string air = Path.Combine(kfmDir, "kfm.air");
+            if (!File.Exists(cns) || !File.Exists(air) || !File.Exists(common) || !File.Exists(cmd))
+            {
+                Assert.Ignore("KFM/common1 assets are missing.");
+            }
+
+            MCharData data = MCharLoader.Load(
+                new[] { File.ReadAllText(cns) }, File.ReadAllText(cns),
+                File.ReadAllText(common), File.ReadAllText(air), File.ReadAllText(cmd), "kfm");
+
+            Assert.That(data.CommonStates.ContainsKey(5), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(100), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(105), Is.True);
+            Assert.That(data.CommonStates.ContainsKey(106), Is.True);
+
+            MBattleEngine runEngine = new MBattleEngine { EnableDemoAutoTurnFallback = false };
+            MChar runner = MCharLoader.SpawnChar(data, 0, startStateNo: 100, startAnimNo: 100);
+            runEngine.Add(runner, data);
+            List<MInput> forward = new List<MInput> { MInput.Right };
+            for (int i = 0; i < 6; i++)
+            {
+                runEngine.Tick(forward);
+            }
+
+            Assert.That(runner.StateNo, Is.EqualTo(100));
+            Assert.That(runner.AnimNo, Is.EqualTo(100));
+            Assert.That(runner.Pos.X.Raw, Is.GreaterThan(0), "KFM state 100 should move via run.fwd.");
+
+            List<MInput> none = new List<MInput> { MInput.None };
+            for (int i = 0; i < 6 && runner.StateNo != 0; i++)
+            {
+                runEngine.Tick(none);
+            }
+            Assert.That(runner.StateNo, Is.EqualTo(0));
+            Assert.That(runner.Ctrl, Is.True);
+
+            MBattleEngine backHopEngine = new MBattleEngine { EnableDemoAutoTurnFallback = false };
+            MChar hopper = MCharLoader.SpawnChar(data, 1, startStateNo: 105, startAnimNo: 105);
+            backHopEngine.Add(hopper, data);
+            bool sawBackHopLand = false;
+            FFloat apex = FFloat.Zero;
+            for (int i = 0; i < 160 && hopper.StateNo != 0; i++)
+            {
+                backHopEngine.Tick(none);
+                if (hopper.StateNo == 106) { sawBackHopLand = true; }
+                if (hopper.Pos.Y < apex) { apex = hopper.Pos.Y; }
+            }
+
+            Assert.That(apex.Raw, Is.LessThan(0), "KFM state 105 should use run.back launch velocity.");
+            Assert.That(sawBackHopLand, Is.True, "KFM state 105 should land through fallback state 106.");
+            Assert.That(hopper.StateNo, Is.EqualTo(0));
+            Assert.That(hopper.Pos.Y.Raw, Is.EqualTo(0));
+            Assert.That(hopper.Ctrl, Is.True);
         }
 
         [Test]

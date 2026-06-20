@@ -91,6 +91,32 @@ namespace Lockstep.Tests.Mugen
         }
 
         [Test]
+        public void Hit_FallXVelocityUnsetKeepsCurrentHitXVelocity()
+        {
+            (MChar atk, MChar def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Fall = true;
+            atk.HitDef.FallXVel = F(-9);
+            atk.HitDef.FallXVelSet = false;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.Ghv.FallXVel.Raw, Is.EqualTo(def.Ghv.XVel.Raw));
+
+            (atk, def) = Pair();
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.Fall = true;
+            atk.HitDef.FallXVel = F(-9);
+            atk.HitDef.FallXVelSet = true;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.Ghv.FallXVel.Raw, Is.EqualTo(F(-9).Raw));
+        }
+
+        [Test]
         public void SameMove_HitsTargetOnlyOnce()
         {
             (MChar atk, MChar def) = Pair();
@@ -172,7 +198,7 @@ namespace Lockstep.Tests.Mugen
 
             Assert.IsTrue(MHitSystem.TryHit(atk, def));
 
-            Assert.That(def.PendingStateNo, Is.EqualTo(-1), "ForceGuard must not enter gethit override state.");
+            Assert.That(def.PendingStateNo, Is.EqualTo(150), "ForceGuard should enter guard state, not the gethit override state.");
             Assert.That(def.Ghv.Guarded, Is.True);
             Assert.That(def.Life, Is.EqualTo(993));
             Assert.That(atk.MoveGuarded, Is.EqualTo(1));
@@ -192,6 +218,28 @@ namespace Lockstep.Tests.Mugen
             Assert.That(atk.TargetRefs.Count, Is.EqualTo(1));
             Assert.That(atk.TargetRefs[0].Target, Is.SameAs(def));
             Assert.That(atk.TargetRefs[0].HitDefId, Is.EqualTo(77));
+        }
+
+        [Test]
+        public void CustomHitState_UsesCurrentStateOwnerReference()
+        {
+            (MChar atk, MChar def) = Pair();
+            MChar owner = new MChar { Id = 99, PlayerNo = 7, StatePlayerNo = 7 };
+            atk.PlayerNo = 3;
+            atk.StatePlayerNo = owner.PlayerNo;
+            atk.StateOwner = owner;
+            def.PlayerNo = 4;
+            def.StatePlayerNo = def.PlayerNo;
+            atk.HitDef = BasicHitDef();
+            atk.HitDef.Active = true;
+            atk.HitDef.P2StateNo = 1200;
+            atk.HitDef.P2GetP1State = true;
+
+            Assert.IsTrue(MHitSystem.TryHit(atk, def));
+
+            Assert.That(def.PendingStateNo, Is.EqualTo(1200));
+            Assert.That(def.PendingTransition.OwnerPlayerNo, Is.EqualTo(owner.PlayerNo));
+            Assert.That(def.StateOwner, Is.SameAs(owner), "p2getp1state should keep the state block owner, not the controlled attacker object.");
         }
 
         [Test]

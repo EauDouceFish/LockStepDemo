@@ -22,10 +22,15 @@ namespace Lockstep.View
         public float PixelsPerUnit = 50f;
         public float TicksPerSecond = 60f;
         public float StartSeparation = 50f;   // 两人初始间距（MUGEN 单位，各距中心一半）
+        public int StageHalfWidth = 240;       // 决斗场左右边界（MUGEN 单位，各距中心）；超出夹回
+        public float CameraOrthoSize = 6.5f;   // 决斗场相机正交半高（加大视野，看清场地+边界）
+
+        public bool EnableDebugBridge = true;   // 调试修改器（OnGUI 面板 + 文件/CLI 桥）；联机务必关。
 
         MBattleEngine _engine;
         MRoundSystem _round;
         MugenBattleHud _hud;
+        Lockstep.View.Debugging.MugenBattleDebugBridge _debug;
         MCharData _data;
         MugenSpriteLoader.Source _source;
         readonly Dictionary<int, GameData.AnimData> _gameAnims = new Dictionary<int, GameData.AnimData>();
@@ -37,7 +42,7 @@ namespace Lockstep.View
 
         void Start()
         {
-            string mugenRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "MugenSource"));
+            string mugenRoot = MugenAssetPaths.MugenRoot();
             string charDir = Path.Combine(mugenRoot, CharacterFolder);
             string cnsPath = Path.Combine(charDir, "kfm.cns");
             string cmdPath = Path.Combine(charDir, "kfm.cmd");
@@ -70,7 +75,15 @@ namespace Lockstep.View
             _engine.Add(p1, _data);
             _engine.Add(p2, _data);
             _engine.LinkPair();
-            _round = new MRoundSystem(_engine);   // 默认三局两胜 + 入场鞠躬 + 99 秒倒计时
+            _engine.Stage.SetSymmetric(StageHalfWidth);   // 决斗场左右边界（角色不能走出场外）
+            _round = new MRoundSystem(_engine);   // 默认三局两胜 + 入场鞠躬 + 60 秒倒计时
+
+            // 加大决斗场相机视野（正交），看清整片场地与左右边界。
+            Camera cam = Camera.main;
+            if (cam != null && cam.orthographic)
+            {
+                cam.orthographicSize = CameraOrthoSize;
+            }
 
             _source = MugenSpriteLoader.Open(sffPath, PixelsPerUnit);
             List<GameData.AnimData> anims = AirParser.ParseFile(airPath);
@@ -88,6 +101,11 @@ namespace Lockstep.View
             }
 
             _hud = MugenBattleHud.Create(_round.RoundsToWin);
+
+            if (EnableDebugBridge)
+            {
+                _debug = new Lockstep.View.Debugging.MugenBattleDebugBridge(_engine, _round);
+            }
 
             Application.runInBackground = true;
             Debug.Log(string.Format(
@@ -112,13 +130,26 @@ namespace Lockstep.View
                     KeyCode.Z, KeyCode.X, KeyCode.C);
                 _inputs[1] = SampleInput(KeyCode.W, KeyCode.S, KeyCode.A, KeyCode.D,
                     KeyCode.J, KeyCode.K, KeyCode.L);
+                // 调试桥的暂停/单步门控：未启用时恒为 true，行为不变。
+                if (_debug != null && !_debug.ShouldTick())
+                {
+                    break;
+                }
                 _round.Tick(_inputs);
+                if (_debug != null)
+                {
+                    _debug.AfterTick();
+                }
                 _frame++;
             }
             RenderAll();
             if (_hud != null)
             {
                 _hud.UpdateHud(_round, _engine.Chars[0], _engine.Chars[1], Time.deltaTime);
+            }
+            if (_debug != null)
+            {
+                _debug.Poll(Time.deltaTime);
             }
         }
 
@@ -189,13 +220,19 @@ namespace Lockstep.View
             MChar p1 = _engine.Chars[0];
             MChar p2 = _engine.Chars[1];
             string text = string.Format(
-                "Versus 帧 {0}   回合态 {1}\nP1  State {2}  Life {3}  Ctrl {4}\nP2  State {5}  Life {6}  MoveType {7}\nP1 方向键走位 + Z/X/C 出招命中 P2",
+                "双人演示  帧 {0}   回合态 {1}\n玩家一  状态 {2}  生命 {3}  可控 {4}\n玩家二  状态 {5}  生命 {6}  行动类型 {7}\n玩家一方向键走位 + Z/X/C 出招命中玩家二",
                 _frame, _round.State, p1.StateNo, p1.Life, p1.Ctrl,
                 p2.StateNo, p2.Life, p2.MoveType);
             GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.font = MugenChineseText.Font();
             style.fontSize = 16;
             style.normal.textColor = Color.white;
             GUI.Label(new Rect(12f, 10f, 760f, 120f), text, style);
+
+            if (_debug != null)
+            {
+                _debug.DrawPanel();
+            }
         }
     }
 }

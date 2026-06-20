@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using Lockstep.Core;
 using Lockstep.Math;
 using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.Parse;
 using Lockstep.Mugen.State;
 using Lockstep.Mugen.StateCtrl;
@@ -13,6 +15,14 @@ namespace Lockstep.Logic.Tests.Mugen.State
     public sealed class ResourceOwnershipStateMachineTests
     {
         static FFloat F(int value) => FFloat.FromInt(value);
+        static BytecodeExp Expr(string text) => new MugenExprCompiler().Compile(text);
+
+        static ulong HashOf(MChar c)
+        {
+            Hash64 hash = Hash64.Create();
+            c.WriteHash(ref hash);
+            return hash.Value;
+        }
 
         static MCharData Data(int localCoordWidth)
         {
@@ -27,6 +37,120 @@ namespace Lockstep.Logic.Tests.Mugen.State
         }
 
         [Test]
+        public void CustomState_ConstAndWidthUseCurrentStateOwnerLocalCoordScale()
+        {
+            MCharData ownerData = Data(320);
+            MStateDef custom = new MStateDef { No = 1200 };
+            custom.Controllers.Add(new VarSetController
+            {
+                Index = 9,
+                IsFloat = true,
+                Value = Expr("const(velocity.run.fwd.x)"),
+            });
+            custom.Controllers.Add(new WidthController
+            {
+                Value = new[] { Expr("const(size.ground.front)") },
+            });
+            ownerData.States[1200] = custom;
+
+            MCharData selfData = Data(640);
+            selfData.Constants = new MConstants
+            {
+                RunFwdX = F(8),
+                SizeGroundFront = F(16),
+                SizeGroundBack = F(12),
+            };
+            selfData.States[0] = new MStateDef { No = 0 };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int selfPlayerNo = resources.Register(selfData);
+            MChar character = new MChar
+            {
+                Resources = resources,
+                OwnData = selfData,
+                Constants = selfData.Constants,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = selfPlayerNo,
+                StateNo = 0,
+            };
+            character.QueueTransition(1200, ownerPlayerNo);
+
+            new MStateMachine().RunFrame(character, selfData.States, selfData.CommonStates);
+
+            Assert.That(character.FloatVars[9].Raw, Is.EqualTo(F(4).Raw), "640 self constants must be read in the 320 state owner's coordinate space.");
+            Assert.That(character.WidthPlayerFront.Raw, Is.EqualTo(F(16).Raw), "base front 16 and value 16 both scale to 8 in the 320 owner state.");
+            Assert.That(character.WidthEdgeFront.Raw, Is.EqualTo(F(8).Raw));
+            Assert.That(character.WidthPlayerBackSet, Is.False);
+        }
+
+        [Test]
+        public void CustomState_StatedefAnimKeepsSelfAnimationOwner()
+        {
+            MCharData ownerData = Data(320);
+            ownerData.States[1300] = new MStateDef { No = 1300, Anim = Expr("700") };
+
+            MCharData selfData = Data(640);
+            selfData.Anims[700] = new Lockstep.Mugen.Anim.MAnimData
+            {
+                No = 700,
+                Frames = new[] { new Lockstep.Mugen.Anim.MAnimFrame { Time = 1 } },
+            };
+            selfData.States[0] = new MStateDef { No = 0 };
+
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int ownerPlayerNo = resources.Register(ownerData);
+            int selfPlayerNo = resources.Register(selfData);
+            MChar character = new MChar
+            {
+                Resources = resources,
+                OwnData = selfData,
+                Constants = selfData.Constants,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = selfPlayerNo,
+                AnimPlayerNo = selfPlayerNo,
+                SpritePlayerNo = selfPlayerNo,
+                StateNo = 0,
+            };
+            character.QueueTransition(1300, ownerPlayerNo);
+
+            new MStateMachine().RunFrame(character, selfData.States, selfData.CommonStates);
+
+            Assert.That(character.AnimNo, Is.EqualTo(700));
+            Assert.That(character.AnimPlayerNo, Is.EqualTo(selfPlayerNo), "Statedef anim is regular ChangeAnim semantics, not ChangeAnim2.");
+            Assert.That(character.SpritePlayerNo, Is.EqualTo(selfPlayerNo));
+        }
+
+        [Test]
+        public void CloneAndHash_PreserveResourceOwnerNumbers()
+        {
+            MPlayerResourceRegistry resources = new MPlayerResourceRegistry();
+            int selfPlayerNo = resources.Register(Data(640));
+            int ownerPlayerNo = resources.Register(Data(320));
+            MChar character = new MChar
+            {
+                Resources = resources,
+                PlayerNo = selfPlayerNo,
+                StatePlayerNo = ownerPlayerNo,
+                AnimPlayerNo = ownerPlayerNo,
+                SpritePlayerNo = selfPlayerNo,
+                StateNo = 1200,
+                AnimNo = 900,
+            };
+
+            MChar clone = character.Clone();
+            Assert.That(clone.Resources, Is.SameAs(resources));
+            Assert.That(clone.PlayerNo, Is.EqualTo(selfPlayerNo));
+            Assert.That(clone.StatePlayerNo, Is.EqualTo(ownerPlayerNo));
+            Assert.That(clone.AnimPlayerNo, Is.EqualTo(ownerPlayerNo));
+            Assert.That(clone.SpritePlayerNo, Is.EqualTo(selfPlayerNo));
+            Assert.That(HashOf(clone), Is.EqualTo(HashOf(character)));
+
+            clone.AnimPlayerNo = selfPlayerNo;
+            Assert.That(HashOf(clone), Is.Not.EqualTo(HashOf(character)), "rollback hash must include animation owner changes.");
+        }
+
+        [Test]
         public void CustomState_UsesRegisteredOwnerTableAndRescalesRuntimeCoordinates()
         {
             MCharData ownerData = Data(320);
@@ -34,7 +158,7 @@ namespace Lockstep.Logic.Tests.Mugen.State
             custom.Controllers.Add(new VarSetController
             {
                 Index = 7,
-                Value = new Lockstep.Mugen.Expr.MugenExprCompiler().Compile("77"),
+                Value = Expr("77"),
             });
             ownerData.States[1100] = custom;
 

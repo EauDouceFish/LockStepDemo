@@ -28,6 +28,7 @@ namespace Lockstep.Mugen.Battle
         public string Label { get; private set; }
         public string StatusText { get; private set; }
 
+        // Project-specific: Unity move preview harness that feeds synthesized Ikemen-style command input to MBattleEngine.
         public MMovePreviewSession(IReadOnlyList<MCommandDef> commands, bool facingRight, int targetStateNo,
             string label = "", int maxSearchFrames = 90, int maxMoveFrames = 180)
         {
@@ -44,6 +45,7 @@ namespace Lockstep.Mugen.Battle
             }
         }
 
+        // Project-specific: exposes the next synthesized preview input; Ikemen consumes real input buffers instead.
         public MInput NextInput()
         {
             if (Done || EnteredTarget || _inputs.Count == 0)
@@ -53,6 +55,7 @@ namespace Lockstep.Mugen.Battle
             return _inputs.Dequeue();
         }
 
+        // Project-specific: watches C# preview playback state and clears command runtime after the target state is reached.
         public void AfterTick(MBattleEngine engine)
         {
             if (Done || engine == null || engine.Chars.Count == 0)
@@ -109,11 +112,13 @@ namespace Lockstep.Mugen.Battle
             StatusText = FormatStatus("playing", actor);
         }
 
+        // Project-specific: preview completion predicate for returning to controllable standing state 0.
         static bool IsDefaultReady(MChar actor)
         {
             return actor.StateNo == 0 && actor.Ctrl;
         }
 
+        // Project-specific: formats Unity preview diagnostics; no Ikemen runtime counterpart.
         string FormatStatus(string status, MChar actor)
         {
             string prefix = Label.Length == 0 ? "preview" : Label;

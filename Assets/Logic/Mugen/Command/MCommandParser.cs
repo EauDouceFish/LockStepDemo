@@ -1,5 +1,5 @@
 // Ported from Ikemen GO (MIT License), Copyright (c) 2016 Suehiro and contributors.
-// Source: src/input.go (ReadCommandSymbols)。把 CMD 命令串解析为 MCommandDef。
+// Source: src/input.go (ReadCommand). Parses CMD command strings into MCommandDef.
 // 支持：方向 B/F/U/D + 对角 DB/DF/UB/UF；按钮 a/b/c/x/y/z/s；修饰 '~'(释放,带数字=蓄力)、'/'(按住)、'$'(4way)；
 //       步内 '+' (同时按 AND) 或 '|' (任一 OR，二者不混用)；'>' (禁止中间无关输入变化)。
 using System.Collections.Generic;

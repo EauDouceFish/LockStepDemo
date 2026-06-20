@@ -2,7 +2,10 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using Lockstep.Math;
+using Lockstep.Mugen.Anim;
+using Lockstep.Mugen.Battle;
 using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Command;
 using Lockstep.Mugen.Expr;
 using Lockstep.Mugen.Hit;
 using Lockstep.Mugen.Parse;
@@ -153,6 +156,62 @@ namespace Lockstep.Tests.Mugen
             Assert.That(c.Ghv.HitShakeTime, Is.EqualTo(0), "离开受击清抖动");
             Assert.IsFalse(c.Ghv.Fall, "离开受击清 fall 标志");
             Assert.That(c.FallTime, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void BattleTick_HitpauseFreezesTimeAnimAndHardcodedBasics()
+        {
+            MAnimData anim = new MAnimData
+            {
+                No = 0,
+                Frames = new[]
+                {
+                    new MAnimFrame { Time = 5 },
+                    new MAnimFrame { Time = 5 },
+                },
+            };
+            anim.ComputePacing();
+
+            MCharData data = new MCharData();
+            data.States[0] = new MStateDef { No = 0, StateType = 1, MoveType = 1, Physics = 0 };
+            data.Anims[0] = anim;
+
+            MChar c = new MChar
+            {
+                Id = 1,
+                StateNo = 0,
+                StateType = 1,
+                MoveType = 1,
+                Physics = 0,
+                Ctrl = true,
+                KeyCtrl = true,
+                Hitstop = 2,
+                Facing = FFloat.One,
+                Input = new MInputBuffer(),
+                Constants = new MConstants(),
+            };
+            MBattleEngine engine = new MBattleEngine();
+            engine.Add(c, data);
+            Assert.IsTrue(c.PlayAnimation(0, c.PlayerNo, c.PlayerNo));
+
+            engine.Tick(new[] { MInput.Up });
+            Assert.That(c.StateNo, Is.EqualTo(0), "hardcoded jump must not start during hitpause");
+            Assert.That(c.PendingStateNo, Is.EqualTo(-1), "actionPrepare is frozen during hitpause");
+            Assert.That(c.Time, Is.EqualTo(0), "state time freezes during hitpause");
+            Assert.That(c.AnimCurTime, Is.EqualTo(0), "animation time freezes during hitpause");
+            Assert.That(c.Hitstop, Is.EqualTo(1));
+
+            engine.Tick(new[] { MInput.Up });
+            Assert.That(c.StateNo, Is.EqualTo(0));
+            Assert.That(c.PendingStateNo, Is.EqualTo(-1));
+            Assert.That(c.Time, Is.EqualTo(0));
+            Assert.That(c.AnimCurTime, Is.EqualTo(0));
+            Assert.That(c.Hitstop, Is.EqualTo(0));
+
+            engine.Tick(new[] { MInput.None });
+            Assert.That(c.StateNo, Is.EqualTo(0));
+            Assert.That(c.Time, Is.EqualTo(1), "state time resumes after hitpause");
+            Assert.That(c.AnimCurTime, Is.EqualTo(1), "animation resumes after hitpause");
         }
 
         // ───────── 受击状态路由（MHitSystem）─────────

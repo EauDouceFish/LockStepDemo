@@ -60,6 +60,36 @@ namespace Lockstep.Logic.Tests.Mugen.StateCtrl
         }
 
         [Test]
+        public void HelperProjectile_IsOwnedByRootForNumProjAndHashState()
+        {
+            const string cns =
+                "[Statedef 0]\ntype = S\nphysics = N\nanim = 0\n\n" +
+                "[State -1, spawn]\ntype = Helper\ntrigger1 = time = 1\nid = 4\nstateno = 1000\n\n" +
+                "[Statedef 1000]\ntype = S\nphysics = N\nanim = 0\n\n" +
+                "[State 1000, fire]\ntype = Projectile\ntrigger1 = time = 0\nprojid = 7\nvelocity = 0, 0\n" +
+                "offset = 0, 0\nprojremovetime = 20\n";
+            MCharData data = MCharLoader.Load(new[] { cns }, cns, null, Air, null, "Owner");
+            MBattleEngine engine = new MBattleEngine();
+            engine.Add(MCharLoader.SpawnChar(data, 0), data);
+            engine.LinkPair();
+            engine.StartRound();
+
+            for (int frame = 0; frame < 3; frame++) { engine.Tick(NoInput()); }
+
+            Assert.That(engine.Helpers.Count, Is.EqualTo(1));
+            Assert.That(engine.World.Projectiles.Count, Is.EqualTo(1));
+            MChar root = engine.Chars[0];
+            MChar helper = engine.Helpers[0];
+            MProjectile projectile = engine.World.Projectiles[0];
+            Assert.That(ReferenceEquals(projectile.Owner, root), Is.True);
+            Assert.That(projectile.OwnerId, Is.EqualTo(root.Id));
+
+            BytecodeExp numproj = new MugenExprCompiler().Compile("numproj");
+            Assert.That(numproj.Run(root).ToI(), Is.EqualTo(1));
+            Assert.That(numproj.Run(helper).ToI(), Is.EqualTo(1));
+        }
+
+        [Test]
         public void Projectile_ExpiresAfterRemoveTime()
         {
             MBattleEngine engine = Engine();

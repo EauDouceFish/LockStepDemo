@@ -4,6 +4,8 @@
 // See Docs/移植方案_Ikemen.md.
 using Lockstep.Core;
 using Lockstep.Math;
+using Lockstep.Mugen.Char;
+using Lockstep.Mugen.Expr;
 
 namespace Lockstep.Mugen.Hit
 {
@@ -113,6 +115,9 @@ namespace Lockstep.Mugen.Hit
         // 伤害
         public int HitDamage;
         public int GuardDamage;
+        public BytecodeExp HitDamageExpr;
+        public BytecodeExp GuardDamageExpr;
+        public BytecodeExp FallDamageExpr;
 
         // 时间（帧）
         public int P1PauseTime;     // 攻方 hitstop
@@ -146,7 +151,8 @@ namespace Lockstep.Mugen.Hit
 
         // 击飞 fall 分支（连续量容差；解析归 R-HITDEF，此处给 MUGEN 默认值）
         public FFloat YAccel = FFloat.FromInt(35) / FFloat.FromInt(100);   // yaccel 默认 .35
-        public FFloat FallXVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.xvelocity 默认 -4.5
+        public FFloat FallXVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.xvelocity 显式值；未写时命中结算沿用当前 X 速度
+        public bool FallXVelSet;                         // Ikemen 用 NaN 表示未写；定点侧用显式标志。
         public FFloat FallYVel = FFloat.FromInt(-45) / FFloat.FromInt(10); // fall.yvelocity 默认 -4.5
         public bool FallRecover = true;     // fall.recover 默认 1
         public int FallRecoverTime = 4;     // fall.recovertime 默认 4
@@ -177,6 +183,22 @@ namespace Lockstep.Mugen.Hit
             return (MHitDef)MemberwiseClone();
         }
 
+        public void ResolveDynamicValues(MChar character)
+        {
+            if (HitDamageExpr != null)
+            {
+                HitDamage = HitDamageExpr.Run(character).ToI();
+            }
+            if (GuardDamageExpr != null)
+            {
+                GuardDamage = GuardDamageExpr.Run(character).ToI();
+            }
+            if (FallDamageExpr != null)
+            {
+                FallDamage = FallDamageExpr.Run(character).ToI();
+            }
+        }
+
         public void WriteHash(ref Hash64 hash)
         {
             hash.AddBool(Active); hash.AddInt32(Attr); hash.AddInt32(Id);
@@ -190,7 +212,7 @@ namespace Lockstep.Mugen.Hit
             hash.AddInt32((int)AnimType); hash.AddInt32((int)AirAnimType); hash.AddInt32((int)FallAnimType);
             hash.AddInt32((int)GroundType); hash.AddInt32((int)AirType);
             hash.AddBool(Fall); hash.AddInt32(P1StateNo); hash.AddInt32(P2StateNo); hash.AddBool(P2GetP1State); hash.AddInt32(NumHits); hash.AddInt32(HitOnce);
-            hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddFixed(FallYVel);
+            hash.AddFixed(YAccel); hash.AddFixed(FallXVel); hash.AddBool(FallXVelSet); hash.AddFixed(FallYVel);
             hash.AddBool(FallRecover); hash.AddInt32(FallRecoverTime); hash.AddInt32(FallDamage); hash.AddInt32(AirJuggle);
             hash.AddFixed(DownVelX); hash.AddFixed(DownVelY); hash.AddInt32(DownHitTime); hash.AddBool(DownBounce);
             hash.AddBool(Kill); hash.AddBool(GuardKill); hash.AddBool(FallKill); hash.AddBool(ForceStand);
