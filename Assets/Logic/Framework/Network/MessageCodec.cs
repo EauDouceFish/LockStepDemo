@@ -71,6 +71,12 @@ namespace Lockstep.Network
                     bw.Write(m.ContentHash ?? string.Empty);
                     bw.Write(m.ClientVersion ?? string.Empty);
                     bw.Write(m.ClientInstanceId ?? string.Empty);
+                    bw.Write(m.ClientBuildVersion ?? string.Empty);
+                    bw.Write(m.ClientBuildGuid ?? string.Empty);
+                    bw.Write(m.ClientPlatform ?? string.Empty);
+                    bw.Write(m.ClientDeviceModel ?? string.Empty);
+                    bw.Write(m.ClientDeviceType ?? string.Empty);
+                    bw.Write(m.ClientOperatingSystem ?? string.Empty);
                     break;
                 case CancelMatchMsg m:
                     bw.Write(m.RequestId);
@@ -237,6 +243,12 @@ namespace Lockstep.Network
                         ContentHash = br.ReadString(),
                         ClientVersion = br.ReadString(),
                         ClientInstanceId = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientBuildVersion = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientBuildGuid = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientPlatform = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientDeviceModel = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientDeviceType = HasRemaining(br) ? br.ReadString() : string.Empty,
+                        ClientOperatingSystem = HasRemaining(br) ? br.ReadString() : string.Empty,
                     };
                 case MsgType.CancelMatch:
                     return new CancelMatchMsg { RequestId = br.ReadInt32() };

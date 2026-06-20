@@ -134,10 +134,11 @@ namespace Lockstep.View
         public bool OnlineRollbackPredictionDefault = true;
         public int OnlineMaxPredictFrames = 12;
         public int OnlineMaxUnpredictedInputLead = 36;
-        public int OnlineMaxSimulatedFramesPerLogicFrame = 1;
+        public int OnlineMaxSimulatedFramesPerLogicFrame = 4;
         public int OnlineLatencyBudgetCapMs = 1000;
         public int OnlineLatencyBudgetSafetyFrames = 8;
-        public int OnlineRollbackPredictionMinBudgetMs = 80;
+        public int OnlineInputQueueSafetyFrames = 6;
+        public int OnlineRollbackPredictionMinBudgetMs = 30;
         public int WeakNetworkSuppressFeelAssistMs = 80;
         public bool AutoRunLog = true;
         public bool SaveRunLogFiles = true;
@@ -873,6 +874,8 @@ namespace Lockstep.View
                     LogNetStartWaitIfNeeded();
                     return;
                 }
+                _session.DrainIncoming();
+                _session.MaxSimulatedFramesPerStep = OnlineSimFramesThisStep();
                 _session.PredictionEnabled = CanPredictLogicFrame();
                 _session.Step(p0);
                 LogNetHealthIfNeeded();
@@ -1352,6 +1355,36 @@ namespace Lockstep.View
                 Mathf.Max(Mathf.Max(1, OnlineMaxPredictFrames), oneWayDelayFrames + _session.InputLag + safetyFrames));
             _session.MaxUnpredictedInputLead = Mathf.Min(maxLead,
                 Mathf.Max(configuredLead, roundTripDelayFrames + _session.InputLag + safetyFrames * 2));
+            _session.MaxPredictedInputLead = Mathf.Min(maxLead,
+                Mathf.Max(_session.InputLag + _session.MaxPredictFrameCount + Mathf.Max(0, OnlineInputQueueSafetyFrames),
+                    roundTripDelayFrames + _session.InputLag + safetyFrames));
+        }
+
+        int OnlineSimFramesThisStep()
+        {
+            if (_session == null)
+            {
+                return 1;
+            }
+
+            int configured = Mathf.Max(1, OnlineMaxSimulatedFramesPerLogicFrame);
+            if (configured <= 1 || !_session.CanAdvance())
+            {
+                return 1;
+            }
+
+            int pending = _session.PendingInputFrames;
+            if (pending <= _session.InputLag + 2)
+            {
+                return 1;
+            }
+
+            if (pending > _session.InputLag + _session.MaxPredictFrameCount)
+            {
+                return configured;
+            }
+
+            return Mathf.Min(configured, 2);
         }
 
         MInput ApplyWeakLocalInputDelay(MInput rawInput)
@@ -1463,11 +1496,6 @@ namespace Lockstep.View
             if (CanPredictNonGameplayFrame())
             {
                 return true;
-            }
-
-            if (IsWeakNetworkFeelSuppressed())
-            {
-                return false;
             }
 
             return ShouldUseRollbackPrediction() &&
@@ -2058,6 +2086,7 @@ namespace Lockstep.View
                 int localInputDelayFrames = CurrentWeakInputDelayFrames();
                 int maxPredictFrameCount = _session != null ? _session.MaxPredictFrameCount : -1;
                 int maxUnpredictedLead = _session != null ? _session.MaxUnpredictedInputLead : -1;
+                int maxPredictedLead = _session != null ? _session.MaxPredictedInputLead : -1;
                 int stepSimulatedFrames = _session != null ? _session.LastStepSimulatedFrames : -1;
                 int frameMinusSim = simFrame >= 0 ? _frame - simFrame : -1;
                 string predictionEnabled = _session != null && _session.PredictionEnabled ? "true" : "false";
@@ -2065,7 +2094,7 @@ namespace Lockstep.View
                 string canPredictLogic = CanPredictLogicFrame() ? "true" : "false";
                 string canAdvance = _session != null && _session.CanAdvance() ? "true" : "false";
                 string json = string.Format(CultureInfo.InvariantCulture,
-                    "{{\"unixMs\":{0},\"realtimeMs\":{1},\"roomId\":{2},\"localPlayer\":{3},\"frame\":{4},\"simFrame\":{5},\"inputFrame\":{6},\"pending\":{7},\"inputLag\":{8},\"rollback\":{9},\"rttMs\":{10},\"weakDelayMs\":{11},\"remoteWeakDelayMs\":{12},\"localLatencyMs\":{13},\"remoteLatencyMs\":{14},\"effectiveWeakDelayMs\":{15},\"latencyBudgetMs\":{16},\"localInputDelayFrames\":{17},\"predictionEnabled\":{18},\"rollbackPredictionEnabled\":{19},\"canPredictLogic\":{20},\"canAdvance\":{21},\"maxPredictFrameCount\":{22},\"maxUnpredictedInputLead\":{23},\"stepSimulatedFrames\":{24},\"frameMinusSim\":{25},\"simQueued\":{26},\"netStarted\":{27},\"event\":\"{28}\",\"detail\":\"{29}\"}}",
+                    "{{\"unixMs\":{0},\"realtimeMs\":{1},\"roomId\":{2},\"localPlayer\":{3},\"frame\":{4},\"simFrame\":{5},\"inputFrame\":{6},\"pending\":{7},\"inputLag\":{8},\"rollback\":{9},\"rttMs\":{10},\"weakDelayMs\":{11},\"remoteWeakDelayMs\":{12},\"localLatencyMs\":{13},\"remoteLatencyMs\":{14},\"effectiveWeakDelayMs\":{15},\"latencyBudgetMs\":{16},\"localInputDelayFrames\":{17},\"predictionEnabled\":{18},\"rollbackPredictionEnabled\":{19},\"canPredictLogic\":{20},\"canAdvance\":{21},\"maxPredictFrameCount\":{22},\"maxUnpredictedInputLead\":{23},\"maxPredictedInputLead\":{24},\"stepSimulatedFrames\":{25},\"frameMinusSim\":{26},\"simQueued\":{27},\"netStarted\":{28},\"event\":\"{29}\",\"detail\":\"{30}\"}}",
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     Mathf.RoundToInt(Time.realtimeSinceStartup * 1000f),
                     MugenMatchSetup.NetRoomId,
@@ -2090,6 +2119,7 @@ namespace Lockstep.View
                     canAdvance,
                     maxPredictFrameCount,
                     maxUnpredictedLead,
+                    maxPredictedLead,
                     stepSimulatedFrames,
                     frameMinusSim,
                     queued,

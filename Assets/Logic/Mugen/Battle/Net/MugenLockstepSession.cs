@@ -82,6 +82,7 @@ namespace Lockstep.Mugen.Battle.Net
         public bool PredictionEnabled { get; set; }
         public int MaxPredictFrameCount { get; set; } = 8;
         public int MaxUnpredictedInputLead { get; set; } = Capacity - BackpressureReserve;
+        public int MaxPredictedInputLead { get; set; }
         public int MaxSimulatedFramesPerStep { get; set; } = 1;
         public int LastStepSimulatedFrames { get; private set; }
         public int RollbackCount { get; private set; }
@@ -197,11 +198,20 @@ namespace Lockstep.Mugen.Battle.Net
 
         bool CanSendNextInput(bool predictionActive)
         {
-            if (predictionActive)
+            int limit = predictionActive ? PredictedInputLeadLimit() : _inputLag + MaxUnpredictedInputLead;
+            limit = System.Math.Min(System.Math.Max(_inputLag, limit), MaxPendingInputFrames - 1);
+            return PendingInputFrames <= limit;
+        }
+
+        int PredictedInputLeadLimit()
+        {
+            if (MaxPredictedInputLead > 0)
             {
-                return true;
+                return MaxPredictedInputLead;
             }
-            return PendingInputFrames <= _inputLag + MaxUnpredictedInputLead;
+
+            int safety = System.Math.Max(2, _inputLag);
+            return _inputLag + System.Math.Max(1, MaxPredictFrameCount) + safety;
         }
 
         public void DrainIncoming()

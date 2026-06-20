@@ -10,6 +10,7 @@ namespace Lockstep.Editor
         const string ServerScene = "Assets/Scenes/MugenRelayServer.unity";
         const string DefaultBuildPath = "Build/MugenServerLinux/MugenServer.x86_64";
         const string DefaultPlayerBuildPath = "Build/AutoTest/LockstepActDemo.exe";
+        const string DefaultAndroidBuildPath = "Build/Android/LockstepActDemo.apk";
 
         public static void BuildLinuxServer()
         {
@@ -73,6 +74,40 @@ namespace Lockstep.Editor
             }
 
             UnityEngine.Debug.Log("MUGEN player build written to " + fullBuildPath);
+        }
+
+        public static void BuildAndroidPlayer()
+        {
+            string buildPath = ArgValue("-mugenBuildPath") ?? DefaultAndroidBuildPath;
+            string fullBuildPath = Path.GetFullPath(buildPath);
+            string directory = Path.GetDirectoryName(fullBuildPath);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            string[] scenes = EnabledBuildScenes();
+            if (scenes.Length == 0)
+            {
+                throw new Exception("No enabled scenes in EditorBuildSettings.");
+            }
+
+            EditorUserBuildSettings.buildAppBundle = false;
+            BuildPlayerOptions options = new BuildPlayerOptions
+            {
+                scenes = scenes,
+                locationPathName = fullBuildPath,
+                target = BuildTarget.Android,
+                options = BuildOptions.None,
+            };
+
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                throw new Exception("MUGEN Android build failed: " + report.summary.result);
+            }
+
+            UnityEngine.Debug.Log("MUGEN Android build written to " + fullBuildPath);
         }
 
         static string[] EnabledBuildScenes()

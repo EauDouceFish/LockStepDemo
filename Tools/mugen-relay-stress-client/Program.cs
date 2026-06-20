@@ -29,6 +29,12 @@ for (int match = 0; match < matches; match++)
         TeamCsv = "a,b,c",
         ContentHash = "stress",
         ClientVersion = "stress-client",
+        ClientInstanceId = $"stress-{match}:A",
+        ClientBuildVersion = "stress",
+        ClientPlatform = "standalone",
+        ClientDeviceModel = "stress-client",
+        ClientDeviceType = "desktop",
+        ClientOperatingSystem = Environment.OSVersion.ToString(),
     });
     b.Send(new FindMatchMsg
     {
@@ -37,17 +43,28 @@ for (int match = 0; match < matches; match++)
         TeamCsv = "d,e,f",
         ContentHash = "stress",
         ClientVersion = "stress-client",
+        ClientInstanceId = $"stress-{match}:B",
+        ClientBuildVersion = "stress",
+        ClientPlatform = "standalone",
+        ClientDeviceModel = "stress-client",
+        ClientDeviceType = "desktop",
+        ClientOperatingSystem = Environment.OSVersion.ToString(),
     });
 
     MatchFoundMsg foundA = WaitFor<MatchFoundMsg>(a, b, timeoutMs, "match found A", _ => a.Take<MatchFoundMsg>());
     MatchFoundMsg foundB = WaitFor<MatchFoundMsg>(a, b, timeoutMs, "match found B", _ => b.Take<MatchFoundMsg>());
-    if (foundA.RoomId != foundB.RoomId || foundA.LocalPlayerId != 0 || foundB.LocalPlayerId != 1)
+    if (foundA.RoomId != foundB.RoomId ||
+        foundA.LocalPlayerId < 0 ||
+        foundB.LocalPlayerId < 0 ||
+        foundA.LocalPlayerId == foundB.LocalPlayerId)
     {
         throw new InvalidOperationException($"bad match result roomA={foundA.RoomId} roomB={foundB.RoomId} localA={foundA.LocalPlayerId} localB={foundB.LocalPlayerId}");
     }
 
-    a.Send(Ready(foundA.RoomId, foundA.Seed, 0));
-    b.Send(Ready(foundB.RoomId, foundB.Seed, 1));
+    int playerA = foundA.LocalPlayerId;
+    int playerB = foundB.LocalPlayerId;
+    a.Send(Ready(foundA.RoomId, foundA.Seed, playerA));
+    b.Send(Ready(foundB.RoomId, foundB.Seed, playerB));
     StartMatchMsg startA = WaitFor<StartMatchMsg>(a, b, timeoutMs, "start A", _ => a.Take<StartMatchMsg>());
     StartMatchMsg startB = WaitFor<StartMatchMsg>(a, b, timeoutMs, "start B", _ => b.Take<StartMatchMsg>());
     if (startA.RoomId != foundA.RoomId || startB.RoomId != foundA.RoomId)
@@ -59,16 +76,16 @@ for (int match = 0; match < matches; match++)
     {
         int inputA = random.Next(0, 2048);
         int inputB = random.Next(0, 2048);
-        a.Send(new MugenInputMsg { Frame = frame, PlayerId = 0, Input = inputA });
-        b.Send(new MugenInputMsg { Frame = frame, PlayerId = 1, Input = inputB });
+        a.Send(new MugenInputMsg { Frame = frame, PlayerId = playerA, Input = inputA });
+        b.Send(new MugenInputMsg { Frame = frame, PlayerId = playerB, Input = inputB });
 
         MugenInputMsg toA = WaitFor<MugenInputMsg>(a, b, timeoutMs, "input to A", _ => a.Take<MugenInputMsg>());
         MugenInputMsg toB = WaitFor<MugenInputMsg>(a, b, timeoutMs, "input to B", _ => b.Take<MugenInputMsg>());
-        if (toA.Frame != frame || toA.PlayerId != 1 || toA.Input != inputB)
+        if (toA.Frame != frame || toA.PlayerId != playerB || toA.Input != inputB)
         {
             throw new InvalidOperationException($"bad input relay to A frame={frame}");
         }
-        if (toB.Frame != frame || toB.PlayerId != 0 || toB.Input != inputA)
+        if (toB.Frame != frame || toB.PlayerId != playerA || toB.Input != inputA)
         {
             throw new InvalidOperationException($"bad input relay to B frame={frame}");
         }

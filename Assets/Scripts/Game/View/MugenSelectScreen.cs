@@ -820,8 +820,15 @@ namespace Lockstep.View
             string teamCsv = MugenMatchSetup.ToCsv(MugenMatchSetup.Team0);
             string contentHash = BuildContentHash();
             string clientInstanceId = MugenAutoTest.ClientInstanceId;
+            string buildVersion = SafeDeviceText(Application.version);
+            string buildGuid = SafeDeviceText(Application.buildGUID);
+            string platform = SafeDeviceText(Application.platform.ToString());
+            string deviceModel = SafeDeviceText(SystemInfo.deviceModel);
+            string deviceType = SafeDeviceText(SystemInfo.deviceType.ToString());
+            string operatingSystem = SafeDeviceText(SystemInfo.operatingSystem);
             MugenAutoTest.SendTrace(_netClient, "match_request",
-                "team=" + teamCsv + " hash=" + contentHash + " instance=" + clientInstanceId);
+                "team=" + teamCsv + " hash=" + contentHash + " instance=" + clientInstanceId +
+                " platform=" + platform + " device=" + deviceModel);
             Debug.Log(string.Format(
                 "[匹配客户端] 发送匹配请求 request={0} 昵称={1} 版本={2} 内容Hash={3} 队伍={4}",
                 _activeMatchRequestId, Nickname, MugenMatchProtocol.ClientVersion, contentHash, teamCsv));
@@ -833,6 +840,12 @@ namespace Lockstep.View
                 ContentHash = contentHash,
                 ClientVersion = MugenMatchProtocol.ClientVersion,
                 ClientInstanceId = clientInstanceId,
+                ClientBuildVersion = buildVersion,
+                ClientBuildGuid = buildGuid,
+                ClientPlatform = platform,
+                ClientDeviceModel = deviceModel,
+                ClientDeviceType = deviceType,
+                ClientOperatingSystem = operatingSystem,
             });
             _netClient.Flush();
             Debug.Log(string.Format("[匹配客户端] 匹配请求已写入网络 request={0}", _activeMatchRequestId));
@@ -1018,6 +1031,17 @@ namespace Lockstep.View
                 HashCharacterCatalog(ref hash);
                 return hash.ToString("X8");
             }
+        }
+
+        static string SafeDeviceText(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            value = value.Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ').Trim();
+            return value.Length <= 128 ? value : value.Substring(0, 128);
         }
 
         void HashCharacterCatalog(ref uint hash)

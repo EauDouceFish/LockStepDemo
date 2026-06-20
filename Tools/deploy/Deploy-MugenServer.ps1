@@ -1,5 +1,5 @@
 param(
-    [string]$Server = "dev@47.84.193.58",
+    [string]$Server = "root@8.163.135.18",
     [string]$ProjectPath = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$BuildDir = "",
     [string]$UnityPath = "",
@@ -8,7 +8,9 @@ param(
     [string]$RemoteDir = "/home/dev/mugen-server",
     [string]$ServiceName = "mugen-server",
     [string]$ServiceUser = "dev",
-    [int]$Port = 7777
+    [int]$Port = 7777,
+    [string]$AuditHttpHost = "127.0.0.1",
+    [int]$AuditHttpPort = 17778
 )
 
 $ErrorActionPreference = "Stop"
@@ -80,7 +82,7 @@ if ([string]::IsNullOrWhiteSpace($BuildDir) -or -not (Test-Path -LiteralPath $Bu
 }
 
 $serverExeName = ""
-$serverArgs = "--port `$PORT"
+$serverArgs = "--port `$PORT --trace-log `$REMOTE_DIR/logs/server-trace.jsonl --audit-http-host $AuditHttpHost --audit-http-port $AuditHttpPort"
 if (Test-Path -LiteralPath (Join-Path $BuildDir "MugenRelayServer")) {
     $serverExeName = "MugenRelayServer"
 }

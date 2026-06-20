@@ -384,6 +384,35 @@ namespace Lockstep.Logic.Tests.Mugen.Battle.Net
         }
 
         [Test]
+        public void Prediction_SendLeadCapStopsFutureInputQueueGrowth()
+        {
+            ManualNetChannel channel = new ManualNetChannel();
+            MugenLockstepSession session = new MugenLockstepSession(
+                inputs => { },
+                () => 0UL,
+                channel,
+                localPlayerId: 0,
+                playerCount: 2,
+                inputLag: 0,
+                captureSimulation: () => 0,
+                restoreSimulation: snapshot => { },
+                canPredict: () => true);
+
+            session.PredictionEnabled = true;
+            session.MaxPredictFrameCount = 4;
+            session.MaxPredictedInputLead = 6;
+
+            for (int i = 0; i < 200; i++)
+            {
+                session.Step(MInput.None);
+            }
+
+            Assert.That(session.SimulatedFrame, Is.EqualTo(4));
+            Assert.That(session.PendingInputFrames, Is.LessThanOrEqualTo(session.MaxPredictedInputLead + 1));
+            Assert.That(session.IsInputBackedUp, Is.False);
+        }
+
+        [Test]
         public void Prediction_DoesNotSimulatePastLocalSentInputFrame()
         {
             ManualNetChannel channel = new ManualNetChannel();
@@ -526,6 +555,38 @@ namespace Lockstep.Logic.Tests.Mugen.Battle.Net
             Assert.That(session.LastStepSimulatedFrames, Is.EqualTo(1));
             Assert.That(session.SimulatedFrame, Is.EqualTo(2));
             Assert.That(simulated, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Step_CatchUpCapSimulatesReadyBacklogDeterministically()
+        {
+            ManualNetChannel channel = new ManualNetChannel();
+            int simulated = 0;
+            MugenLockstepSession session = new MugenLockstepSession(
+                inputs => simulated++,
+                () => (ulong)simulated,
+                channel,
+                localPlayerId: 0,
+                playerCount: 2,
+                inputLag: 0);
+
+            for (int i = 0; i < 6; i++)
+            {
+                session.Step(MInput.None);
+            }
+
+            Assert.That(session.SimulatedFrame, Is.EqualTo(0));
+            for (int frame = 0; frame < 6; frame++)
+            {
+                channel.Enqueue(frame, 1, MInput.None);
+            }
+
+            session.MaxSimulatedFramesPerStep = 4;
+            session.Step(MInput.None);
+
+            Assert.That(session.LastStepSimulatedFrames, Is.EqualTo(4));
+            Assert.That(session.SimulatedFrame, Is.EqualTo(4));
+            Assert.That(simulated, Is.EqualTo(4));
         }
 
         sealed class ManualNetChannel : IMugenNetChannel

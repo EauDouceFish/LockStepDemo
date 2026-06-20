@@ -120,8 +120,9 @@ namespace Lockstep.Net
             switch (message)
             {
                 case FindMatchMsg find:
-                    return string.Format("匹配请求 request={0} 昵称={1} 版本={2} 内容Hash={3} 队伍={4}",
-                        find.RequestId, find.Nickname, find.ClientVersion, find.ContentHash, find.TeamCsv);
+                    return string.Format("匹配请求 request={0} 昵称={1} 版本={2} 内容Hash={3} 队伍={4} 平台={5} 设备={6} 系统={7}",
+                        find.RequestId, find.Nickname, find.ClientVersion, find.ContentHash, find.TeamCsv,
+                        find.ClientPlatform, find.ClientDeviceModel, find.ClientOperatingSystem);
                 case MatchFoundMsg found:
                     return string.Format("匹配成功 request={0} 房间={1} 本地玩家={2} 种子={3}",
                         found.RequestId, found.RoomId, found.LocalPlayerId, found.Seed);

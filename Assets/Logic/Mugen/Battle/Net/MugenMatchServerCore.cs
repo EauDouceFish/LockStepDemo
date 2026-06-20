@@ -16,7 +16,7 @@ namespace Lockstep.Mugen.Battle.Net
     public sealed class MugenMatchServerCore
     {
         const int QueueTimeoutMs = 120000;
-        const int RoomTimeoutMs = 10000;
+        const int RoomTimeoutMs = 30000;
         const int MatchFoundResendIntervalMs = 1000;
         const int MatchFoundResendWindowMs = 12000;
         const int MaxSequentialInputFrameJump = 12;
@@ -175,6 +175,10 @@ namespace Lockstep.Mugen.Battle.Net
                 " request=" + message.RequestId +
                 " 昵称=" + Safe(message.Nickname) +
                 " 版本=" + Safe(message.ClientVersion) +
+                " build=" + Safe(message.ClientBuildVersion) +
+                " platform=" + Safe(message.ClientPlatform) +
+                " device=" + Safe(message.ClientDeviceModel) +
+                " os=" + Safe(message.ClientOperatingSystem) +
                 " 内容Hash=" + Safe(message.ContentHash) +
                 " 队伍=" + Safe(message.TeamCsv));
 
@@ -199,6 +203,12 @@ namespace Lockstep.Mugen.Battle.Net
             session.ContentHash = message.ContentHash ?? string.Empty;
             session.ClientVersion = message.ClientVersion ?? string.Empty;
             session.ClientInstanceId = message.ClientInstanceId ?? string.Empty;
+            session.ClientBuildVersion = message.ClientBuildVersion ?? string.Empty;
+            session.ClientBuildGuid = message.ClientBuildGuid ?? string.Empty;
+            session.ClientPlatform = message.ClientPlatform ?? string.Empty;
+            session.ClientDeviceModel = message.ClientDeviceModel ?? string.Empty;
+            session.ClientDeviceType = message.ClientDeviceType ?? string.Empty;
+            session.ClientOperatingSystem = message.ClientOperatingSystem ?? string.Empty;
             session.RequestId = message.RequestId;
             session.InQueue = true;
             _queue.Add(session);
@@ -924,6 +934,10 @@ namespace Lockstep.Mugen.Battle.Net
                    " 昵称=" + Safe(player.Nickname) +
                    " 实例=" + Safe(player.ClientInstanceId) +
                    " 版本=" + Safe(player.ClientVersion) +
+                   " build=" + Safe(player.ClientBuildVersion) +
+                   " platform=" + Safe(player.ClientPlatform) +
+                   " device=" + Safe(player.ClientDeviceModel) +
+                   " os=" + Safe(player.ClientOperatingSystem) +
                    " 内容Hash=" + Safe(player.ContentHash) +
                    " 队伍=" + Safe(player.TeamCsv) +
                    " 房间=" + player.RoomId +
@@ -974,7 +988,7 @@ namespace Lockstep.Mugen.Battle.Net
 
         static string Safe(string value)
         {
-            return string.IsNullOrEmpty(value) ? "<空>" : value;
+            return string.IsNullOrEmpty(value) ? "<空>" : value.Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
         }
 
         static string ReasonText(string reason)
@@ -1067,6 +1081,12 @@ namespace Lockstep.Mugen.Battle.Net
             public string ContentHash = "";
             public string ClientVersion = "";
             public string ClientInstanceId = "";
+            public string ClientBuildVersion = "";
+            public string ClientBuildGuid = "";
+            public string ClientPlatform = "";
+            public string ClientDeviceModel = "";
+            public string ClientDeviceType = "";
+            public string ClientOperatingSystem = "";
             public bool InQueue;
             public int RoomId;
             public int LastSeenMs;

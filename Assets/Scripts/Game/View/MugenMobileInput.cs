@@ -152,6 +152,76 @@ namespace Lockstep.View
         }
     }
 
+    public sealed class MugenResponsiveJoystickLayout : MonoBehaviour
+    {
+        public RectTransform Joystick;
+        public RectTransform Knob;
+        public float WidthFraction = 0.25f;
+        public float BottomMargin = 24f;
+        public float MinSide = 260f;
+
+        int _lastScreenWidth;
+        int _lastScreenHeight;
+        Vector2 _lastParentSize;
+
+        void OnEnable()
+        {
+            Apply();
+        }
+
+        void LateUpdate()
+        {
+            RectTransform parent = Joystick != null ? Joystick.parent as RectTransform : null;
+            Vector2 parentSize = parent != null ? parent.rect.size : new Vector2(Screen.width, Screen.height);
+            if (_lastScreenWidth == Screen.width &&
+                _lastScreenHeight == Screen.height &&
+                _lastParentSize == parentSize)
+            {
+                return;
+            }
+            Apply();
+        }
+
+        public void Apply()
+        {
+            RectTransform joystick = Joystick != null ? Joystick : transform as RectTransform;
+            if (joystick == null)
+            {
+                return;
+            }
+
+            RectTransform parent = joystick.parent as RectTransform;
+            float parentWidth = parent != null && parent.rect.width > 1f
+                ? parent.rect.width
+                : Screen.width;
+            float side = Mathf.Max(MinSide, parentWidth * Mathf.Max(WidthFraction, 0.25f));
+
+            joystick.anchorMin = joystick.anchorMax = new Vector2(0f, 0f);
+            joystick.pivot = new Vector2(0.5f, 0.5f);
+            joystick.sizeDelta = new Vector2(side, side);
+            joystick.anchoredPosition = new Vector2(side * 0.5f, BottomMargin + side * 0.5f);
+
+            if (Knob != null)
+            {
+                float knobSide = side * 0.4f;
+                Knob.anchorMin = Knob.anchorMax = new Vector2(0.5f, 0.5f);
+                Knob.sizeDelta = new Vector2(knobSide, knobSide);
+                Knob.anchoredPosition = Vector2.zero;
+            }
+
+            MugenVirtualJoystick virtualJoystick = joystick.GetComponent<MugenVirtualJoystick>();
+            if (virtualJoystick != null)
+            {
+                virtualJoystick.MaxRadius = side * 0.42f;
+                virtualJoystick.DeadZone = side * 0.08f;
+            }
+
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            _lastParentSize = parent != null ? parent.rect.size : new Vector2(Screen.width, Screen.height);
+        }
+    }
+
     public sealed class MugenVirtualButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
         public MInput Button = MInput.A;
@@ -311,6 +381,10 @@ namespace Lockstep.View
                 Transform knob = FindChildRecursive(joystickTransform, "Knob");
                 joystick.Knob = knob as RectTransform;
             }
+            if (joystickTransform != null)
+            {
+                ConfigureJoystick(joystickTransform.gameObject, joystick);
+            }
             MugenKeyboardInputBridge bridge = root.GetComponent<MugenKeyboardInputBridge>() ?? root.gameObject.AddComponent<MugenKeyboardInputBridge>();
             bridge.Bind(root, joystick);
 
@@ -388,7 +462,7 @@ namespace Lockstep.View
             RectTransform rootRt = root.AddComponent<RectTransform>();
             rootRt.anchorMin = rootRt.anchorMax = new Vector2(0f, 0f);
             rootRt.anchoredPosition = new Vector2(160f, 140f);
-            rootRt.sizeDelta = new Vector2(180f, 180f);
+            rootRt.sizeDelta = new Vector2(320f, 320f);
 
             Image bg = root.AddComponent<Image>();
             bg.color = new Color(1f, 1f, 1f, 0.18f);
@@ -399,13 +473,62 @@ namespace Lockstep.View
             knob.color = new Color(1f, 1f, 1f, 0.45f);
             RectTransform knobRt = knob.rectTransform;
             knobRt.anchorMin = knobRt.anchorMax = new Vector2(0.5f, 0.5f);
-            knobRt.sizeDelta = new Vector2(72f, 72f);
+            knobRt.sizeDelta = new Vector2(128f, 128f);
             knobRt.anchoredPosition = Vector2.zero;
 
             MugenVirtualJoystick joystick = root.AddComponent<MugenVirtualJoystick>();
             joystick.Background = rootRt;
             joystick.Knob = knobRt;
+            ConfigureJoystick(root, joystick);
             return root;
+        }
+
+        static void ConfigureJoystick(GameObject root, MugenVirtualJoystick joystick)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            RectTransform rect = root.transform as RectTransform;
+            if (joystick != null)
+            {
+                joystick.Background = rect;
+                if (joystick.Knob == null)
+                {
+                    Transform knob = FindChildRecursive(root.transform, "Knob");
+                    joystick.Knob = knob as RectTransform;
+                }
+            }
+
+            Image bg = root.GetComponent<Image>();
+            if (bg != null)
+            {
+                Color color = bg.color;
+                color.a = Mathf.Clamp(color.a <= 0f ? 0.18f : color.a, 0.14f, 0.28f);
+                bg.color = color;
+            }
+
+            RectTransform knobRt = joystick != null ? joystick.Knob : null;
+            if (knobRt != null)
+            {
+                Image knob = knobRt.GetComponent<Image>();
+                if (knob != null)
+                {
+                    Color color = knob.color;
+                    color.a = Mathf.Clamp(color.a <= 0f ? 0.45f : color.a, 0.32f, 0.55f);
+                    knob.color = color;
+                }
+            }
+
+            MugenResponsiveJoystickLayout layout = root.GetComponent<MugenResponsiveJoystickLayout>() ??
+                                                   root.AddComponent<MugenResponsiveJoystickLayout>();
+            layout.Joystick = rect;
+            layout.Knob = knobRt;
+            layout.WidthFraction = 0.25f;
+            layout.MinSide = 260f;
+            layout.BottomMargin = 24f;
+            layout.Apply();
         }
 
         static void CreateButton(Transform parent, string label, MInput button, Vector2 offset)

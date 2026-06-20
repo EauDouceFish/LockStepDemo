@@ -13,6 +13,8 @@ namespace Lockstep.Client
         public const uint Conv = 0xFEEDFACE;
         const int MaxSimulatedPacketsPerDirection = 512;
         const int MaxConsecutiveSendFailures = 6;
+        const int MaxUdpDatagramsPerUpdate = 256;
+        const int MaxKcpMessagesPerUpdate = 512;
 
         public event Action<int> OnPlayerConnected;
         public event Action<int> OnPlayerDisconnected;
@@ -221,12 +223,14 @@ namespace Lockstep.Client
             FlushDueOutgoing();
             if (!_connected || _socket == null) return;
 
-            while (_connected && _socket != null && _socket.Available > 0)
+            int datagrams = 0;
+            while (_connected && _socket != null && _socket.Available > 0 && datagrams < MaxUdpDatagramsPerUpdate)
             {
                 int n;
                 try { n = _socket.Receive(_udpRecv); }
                 catch (SocketException) { break; }
                 if (n <= 0) break;
+                datagrams++;
 
                 if (_networkSimulationEnabled)
                 {
@@ -251,7 +255,8 @@ namespace Lockstep.Client
 
             FlushDueIncoming();
 
-            while (true)
+            int messages = 0;
+            while (messages < MaxKcpMessagesPerUpdate)
             {
                 int size = _kcp.PeekSize();
                 if (size <= 0) break;
@@ -260,6 +265,7 @@ namespace Lockstep.Client
                 if (got <= 0) break;
                 var msg = MessageCodec.Decode(_kcpRecv, 0, got);
                 if (msg != null) _inbox.Enqueue(msg);
+                messages++;
             }
 
             _kcp.Update();

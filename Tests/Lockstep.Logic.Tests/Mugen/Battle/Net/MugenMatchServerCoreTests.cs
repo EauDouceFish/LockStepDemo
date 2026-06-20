@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Lockstep.Mugen.Battle.Net;
 using Lockstep.Network;
 using NUnit.Framework;
@@ -386,10 +387,10 @@ namespace Lockstep.Logic.Tests.Mugen.Battle.Net
             int roomId = sink.Take<MatchFoundMsg>(1).RoomId;
             sink.Take<MatchFoundMsg>(2);
 
-            server.Tick(10100);
+            server.Tick(30100);
             Assert.That(server.RoomCount, Is.EqualTo(1));
 
-            server.Tick(10101);
+            server.Tick(30101);
 
             Assert.That(server.RoomCount, Is.EqualTo(0));
             Assert.That(sink.Take<RoomClosedMsg>(1).RoomId, Is.EqualTo(roomId));
@@ -665,6 +666,12 @@ namespace Lockstep.Logic.Tests.Mugen.Battle.Net
                 ContentHash = "hash",
                 ClientVersion = "version",
                 ClientInstanceId = "run-1:P",
+                ClientBuildVersion = "1.2.3",
+                ClientBuildGuid = "build-guid",
+                ClientPlatform = "Android",
+                ClientDeviceModel = "Pixel",
+                ClientDeviceType = "Handheld",
+                ClientOperatingSystem = "Android 15",
             };
             byte[] findBytes = MessageCodec.Encode(find);
             FindMatchMsg findBack = (FindMatchMsg)MessageCodec.Decode(findBytes, 0, findBytes.Length);
@@ -674,6 +681,37 @@ namespace Lockstep.Logic.Tests.Mugen.Battle.Net
             Assert.That(findBack.ContentHash, Is.EqualTo(find.ContentHash));
             Assert.That(findBack.ClientVersion, Is.EqualTo(find.ClientVersion));
             Assert.That(findBack.ClientInstanceId, Is.EqualTo(find.ClientInstanceId));
+            Assert.That(findBack.ClientBuildVersion, Is.EqualTo(find.ClientBuildVersion));
+            Assert.That(findBack.ClientBuildGuid, Is.EqualTo(find.ClientBuildGuid));
+            Assert.That(findBack.ClientPlatform, Is.EqualTo(find.ClientPlatform));
+            Assert.That(findBack.ClientDeviceModel, Is.EqualTo(find.ClientDeviceModel));
+            Assert.That(findBack.ClientDeviceType, Is.EqualTo(find.ClientDeviceType));
+            Assert.That(findBack.ClientOperatingSystem, Is.EqualTo(find.ClientOperatingSystem));
+        }
+
+        [Test]
+        public void FindMatchMsg_LegacyPayloadWithoutDeviceInfo_DecodesWithEmptyDeviceFields()
+        {
+            using MemoryStream stream = new MemoryStream();
+            using (BinaryWriter writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write((byte)MsgType.FindMatch);
+                writer.Write(7);
+                writer.Write("Legacy");
+                writer.Write("a,b,c");
+                writer.Write("hash");
+                writer.Write("version");
+                writer.Write("legacy-instance");
+            }
+
+            FindMatchMsg decoded = (FindMatchMsg)MessageCodec.Decode(stream.ToArray(), 0, (int)stream.Length);
+            Assert.That(decoded.ClientInstanceId, Is.EqualTo("legacy-instance"));
+            Assert.That(decoded.ClientBuildVersion, Is.EqualTo(string.Empty));
+            Assert.That(decoded.ClientBuildGuid, Is.EqualTo(string.Empty));
+            Assert.That(decoded.ClientPlatform, Is.EqualTo(string.Empty));
+            Assert.That(decoded.ClientDeviceModel, Is.EqualTo(string.Empty));
+            Assert.That(decoded.ClientDeviceType, Is.EqualTo(string.Empty));
+            Assert.That(decoded.ClientOperatingSystem, Is.EqualTo(string.Empty));
         }
 
         static int StartReadyRoom(MugenMatchServerCore server, Sink sink)

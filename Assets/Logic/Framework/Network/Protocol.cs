@@ -80,6 +80,12 @@ namespace Lockstep.Network
         public string ContentHash;
         public string ClientVersion;
         public string ClientInstanceId;
+        public string ClientBuildVersion;
+        public string ClientBuildGuid;
+        public string ClientPlatform;
+        public string ClientDeviceModel;
+        public string ClientDeviceType;
+        public string ClientOperatingSystem;
     }
 
     public class CancelMatchMsg : IMessage
