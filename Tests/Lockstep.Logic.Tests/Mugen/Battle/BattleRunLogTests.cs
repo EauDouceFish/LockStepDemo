@@ -65,6 +65,49 @@ namespace Lockstep.Tests.Mugen.Battle
         }
 
         [Test]
+        public void Recorder_ReplacesPredictedRollbackFramesWithLatestCapture()
+        {
+            MInput[][] authoritativeScript =
+            {
+                new[] { MInput.None, MInput.None },
+                new[] { MInput.Right, MInput.None },
+                new[] { MInput.X, MInput.None },
+            };
+            MBattleRunLog expected = CreateRecordedLog(authoritativeScript);
+            MBattleRunLogRecorder recorder = CreateRecorder();
+
+            MBattleEngine firstPass = CreateEngine();
+            firstPass.Tick(authoritativeScript[0]);
+            recorder.CaptureFrame(0, firstPass, authoritativeScript[0]);
+
+            MInput[] predictedInputs = { MInput.A, MInput.None };
+            firstPass.Tick(predictedInputs);
+            recorder.CaptureFrame(1, firstPass, predictedInputs);
+
+            MBattleEngine rollbackPass = CreateEngine();
+            rollbackPass.Tick(authoritativeScript[0]);
+            rollbackPass.Tick(authoritativeScript[1]);
+            MBattleRunFrame corrected = recorder.CaptureFrame(1, rollbackPass, authoritativeScript[1]);
+            rollbackPass.Tick(authoritativeScript[2]);
+            recorder.CaptureFrame(2, rollbackPass, authoritativeScript[2]);
+
+            MBattleRunLog log = recorder.Complete("script-end");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(log.Frames.Count, Is.EqualTo(3));
+                Assert.That(log.Frames[1].Frame, Is.EqualTo(1));
+                Assert.That(log.Frames[1].Inputs[0], Is.EqualTo((int)MInput.Right));
+                Assert.That(log.Frames[1].HashHex, Is.EqualTo(corrected.HashHex));
+                Assert.That(log.InputChecksumHex, Is.EqualTo(expected.InputChecksumHex));
+                Assert.That(log.HashChecksumHex, Is.EqualTo(expected.HashChecksumHex));
+                Assert.That(log.FinalHashHex, Is.EqualTo(expected.FinalHashHex));
+            });
+            MBattleRunLogVerification ok = MBattleRunLogVerifier.Verify(CreateEngine(), log);
+            Assert.That(ok.Success, Is.True, ok.Message);
+        }
+
+        [Test]
         public void Json_IncludesControlStateForLossOfControlDebugging()
         {
             MBattleRunLog log = CreateRecordedLog();
@@ -120,12 +163,6 @@ namespace Lockstep.Tests.Mugen.Battle
 
         static MBattleRunLog CreateRecordedLog()
         {
-            MBattleEngine recordedEngine = CreateEngine();
-            MBattleRunLogRecorder recorder = new MBattleRunLogRecorder(
-                MBattleRunMode.LocalTest, "kfm-replay", playerCount: 2);
-            recorder.SetPlayer(0, "p0", "script", "kfm");
-            recorder.SetPlayer(1, "p1", "idle", "kfm");
-
             MInput[][] script =
             {
                 new[] { MInput.None, MInput.None },
@@ -134,8 +171,24 @@ namespace Lockstep.Tests.Mugen.Battle
                 new[] { MInput.Right, MInput.None },
                 new[] { MInput.None, MInput.None },
             };
+            return CreateRecordedLog(script);
+        }
+
+        static MBattleRunLog CreateRecordedLog(IReadOnlyList<MInput[]> script)
+        {
+            MBattleEngine recordedEngine = CreateEngine();
+            MBattleRunLogRecorder recorder = CreateRecorder();
             RunScript(recordedEngine, recorder, script);
             return recorder.Complete("script-end");
+        }
+
+        static MBattleRunLogRecorder CreateRecorder()
+        {
+            MBattleRunLogRecorder recorder = new MBattleRunLogRecorder(
+                MBattleRunMode.LocalTest, "kfm-replay", playerCount: 2);
+            recorder.SetPlayer(0, "p0", "script", "kfm");
+            recorder.SetPlayer(1, "p1", "idle", "kfm");
+            return recorder;
         }
 
         static MBattleEngine CreateEngine()

@@ -85,9 +85,7 @@ namespace Lockstep.Mugen.Battle
     public sealed class MBattleRunLogRecorder
     {
         readonly MBattleRunLog _log;
-        Hash64 _inputChecksum;
-        Hash64 _hashChecksum;
-        string _finalHashHex = "0000000000000000";
+        readonly Dictionary<int, int> _frameIndexByNumber = new Dictionary<int, int>();
 
         // Project-specific: creates a compact C# battle-run audit log around Ikemen-style deterministic simulation.
         public MBattleRunLogRecorder(MBattleRunMode mode, string scenarioId, int playerCount)
@@ -102,8 +100,6 @@ namespace Lockstep.Mugen.Battle
             {
                 _log.Players.Add(new MBattleRunPlayer { Slot = i });
             }
-            _inputChecksum = Hash64.Create();
-            _hashChecksum = Hash64.Create();
         }
 
         // Project-specific: annotates log players with local/server-facing identity and input source.
@@ -140,19 +136,12 @@ namespace Lockstep.Mugen.Battle
                 ActiveCommands = new List<string>[inputCount],
                 HashHex = ToHex(hash),
             };
-            _finalHashHex = record.HashHex;
-
-            _inputChecksum.AddInt32(frame);
-            _hashChecksum.AddInt32(frame);
             for (int i = 0; i < inputCount; i++)
             {
                 int bits = inputs != null && i < inputs.Count ? (int)inputs[i] : 0;
                 record.Inputs[i] = bits;
-                _inputChecksum.AddInt32(bits);
                 record.ActiveCommands[i] = ActiveNames(engine, i);
             }
-
-            _hashChecksum.AddUInt64(hash);
             for (int i = 0; i < engine.Chars.Count; i++)
             {
                 MChar c = engine.Chars[i];
@@ -190,19 +179,87 @@ namespace Lockstep.Mugen.Battle
                     PushAffectTeam = c.PushAffectTeam,
                 });
             }
-            _log.Frames.Add(record);
+            StoreFrame(record);
             return record;
         }
 
         // Project-specific: closes the run log and emits deterministic checksums for later validation.
         public MBattleRunLog Complete(string reason)
         {
+            RecomputeChecksums();
             _log.Completed = true;
             _log.EndReason = reason ?? "";
-            _log.InputChecksumHex = ToHex(_inputChecksum.Value);
-            _log.HashChecksumHex = ToHex(_hashChecksum.Value);
-            _log.FinalHashHex = _finalHashHex;
             return _log;
+        }
+
+        void StoreFrame(MBattleRunFrame record)
+        {
+            if (_frameIndexByNumber.TryGetValue(record.Frame, out int existingIndex))
+            {
+                TruncateFramesAfter(existingIndex);
+                _log.Frames[existingIndex] = record;
+                return;
+            }
+
+            if (_log.Frames.Count > 0 && record.Frame <= _log.Frames[_log.Frames.Count - 1].Frame)
+            {
+                for (int i = 0; i < _log.Frames.Count; i++)
+                {
+                    if (_log.Frames[i].Frame >= record.Frame)
+                    {
+                        TruncateFramesFrom(i);
+                        break;
+                    }
+                }
+            }
+
+            _frameIndexByNumber[record.Frame] = _log.Frames.Count;
+            _log.Frames.Add(record);
+        }
+
+        void TruncateFramesAfter(int index)
+        {
+            TruncateFramesFrom(index + 1);
+        }
+
+        void TruncateFramesFrom(int index)
+        {
+            if (index < 0 || index >= _log.Frames.Count)
+            {
+                return;
+            }
+
+            for (int i = index; i < _log.Frames.Count; i++)
+            {
+                _frameIndexByNumber.Remove(_log.Frames[i].Frame);
+            }
+            _log.Frames.RemoveRange(index, _log.Frames.Count - index);
+        }
+
+        void RecomputeChecksums()
+        {
+            Hash64 inputChecksum = Hash64.Create();
+            Hash64 hashChecksum = Hash64.Create();
+            string finalHashHex = "0000000000000000";
+            for (int i = 0; i < _log.Frames.Count; i++)
+            {
+                MBattleRunFrame frame = _log.Frames[i];
+                inputChecksum.AddInt32(frame.Frame);
+                hashChecksum.AddInt32(frame.Frame);
+                if (frame.Inputs != null)
+                {
+                    for (int p = 0; p < frame.Inputs.Length; p++)
+                    {
+                        inputChecksum.AddInt32(frame.Inputs[p]);
+                    }
+                }
+                hashChecksum.AddUInt64(ParseHashHex(frame.HashHex));
+                finalHashHex = frame.HashHex ?? "";
+            }
+
+            _log.InputChecksumHex = ToHex(inputChecksum.Value);
+            _log.HashChecksumHex = ToHex(hashChecksum.Value);
+            _log.FinalHashHex = finalHashHex;
         }
 
         static List<string> ActiveNames(MBattleEngine engine, int slot)
@@ -212,6 +269,13 @@ namespace Lockstep.Mugen.Battle
                 return new List<string>();
             }
             return engine.Chars[slot].CommandList.ActiveNames();
+        }
+
+        static ulong ParseHashHex(string value)
+        {
+            return string.IsNullOrEmpty(value)
+                ? 0UL
+                : ulong.Parse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         }
 
         static string ToHex(ulong value) => value.ToString("x16", CultureInfo.InvariantCulture);
